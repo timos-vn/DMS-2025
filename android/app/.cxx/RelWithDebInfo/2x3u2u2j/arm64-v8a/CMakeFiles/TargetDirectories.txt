@@ -1,0 +1,2 @@
+/Users/tiennq/StudioProjects/dms/android/app/.cxx/RelWithDebInfo/2x3u2u2j/arm64-v8a/CMakeFiles/edit_cache.dir
+/Users/tiennq/StudioProjects/dms/android/app/.cxx/RelWithDebInfo/2x3u2u2j/arm64-v8a/CMakeFiles/rebuild_cache.dir

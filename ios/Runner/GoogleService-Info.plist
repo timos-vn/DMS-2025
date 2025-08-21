@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CLIENT_ID</key>
+	<string>837135663484-ksmq6q9d5dj0toh4ghqk891hmtievjr3.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.837135663484-ksmq6q9d5dj0toh4ghqk891hmtievjr3</string>
+	<key>ANDROID_CLIENT_ID</key>
+	<string>837135663484-2bpfelelpie780464fd5dnjgd06kfqh6.apps.googleusercontent.com</string>
+	<key>API_KEY</key>
+	<string>AIzaSyAt5K-b8zdgL8ci6TYy0lGrH0RnnP5PCoQ</string>
+	<key>GCM_SENDER_ID</key>
+	<string>837135663484</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>sse.net.dms</string>
+	<key>PROJECT_ID</key>
+	<string>sse-cloud-erp</string>
+	<key>STORAGE_BUCKET</key>
+	<string>sse-cloud-erp.appspot.com</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:837135663484:ios:3acf9b14e924c2f05ce4f9</string>
+</dict>
+</plist>

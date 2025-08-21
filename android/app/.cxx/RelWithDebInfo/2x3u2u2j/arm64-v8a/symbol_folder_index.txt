@@ -1,0 +1,1 @@
+/Users/tiennq/StudioProjects/dms/build/app/intermediates/cxx/RelWithDebInfo/2x3u2u2j/obj/arm64-v8a
