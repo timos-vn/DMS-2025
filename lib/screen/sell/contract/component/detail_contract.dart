@@ -194,6 +194,21 @@ class _DetailContractScreenState extends State<DetailContractScreen> with Ticker
                     if (selectedItem.maVt != null && selectedQuantities.containsKey(itemId)) {
                       double selectedQty = selectedQuantities[itemId] ?? 0;
                       
+                      // Tính số lượng tối đa có thể đặt
+                      double currentInCart = _getQuantityFromCartForItem(itemId);
+                      double availableExcludingCurrent = _getAvailableQuantityExcludingCurrentItem(selectedItem.maVt, selectedItem.maVt2, selectedItem.so_luong_kd, itemId);
+                      double maxCanOrder = currentInCart + availableExcludingCurrent;
+                      
+                      if (selectedQty > maxCanOrder) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Vật tư ${selectedItem.maVt} vượt quá số lượng tối đa (${maxCanOrder.toInt()})'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                        continue; // Bỏ qua item này
+                      }
+                      
                       // Tạo Product object để thêm vào giỏ hàng
                       Product product = Product(
                         code: selectedItem.maVt!,
@@ -227,8 +242,8 @@ class _DetailContractScreenState extends State<DetailContractScreen> with Ticker
                         nameStock: selectedItem.tenKho ?? '',
                       );
                       
-                      // Thêm vào giỏ hàng (database helper sẽ tự động xử lý trùng lặp)
-                      _bloc.add(AddCartEvent(productItem: product));
+                      // Thêm vào giỏ hàng (sử dụng sttRec0 làm key, THAY THẾ số lượng)
+                      _bloc.add(AddCartWithSttRec0ReplaceEvent(productItem: product));
                       addedCount++;
                     }
                   }
@@ -374,15 +389,15 @@ class _DetailContractScreenState extends State<DetailContractScreen> with Ticker
                   const SizedBox(height: 6),
                                      _buildDetailRow('Kho', '${item.maKho?.toString().trim() ?? ''} - ${item.tenKho?.toString().trim() ?? ''}'),
                    _buildDetailRow('Số lượng', widget.isSearchItem 
-                     ? '${Utils.formatDecimalNumber(_getTotalQuantityForItem(item.sttRec0))}/${Utils.formatDecimalNumber(_getAvailableQuantityForItem(item.maVt, item.maVt2, item.so_luong_kd))} ${item.dvt?.toString() ?? ''}'
+                     ? _buildQuantityDisplayForSearchItem(item)
                      : '${Utils.formatDecimalNumber(item.slDh)}/${Utils.formatDecimalNumber(item.so_luong_kd)} ${item.dvt?.toString() ?? ''}', 
                      highlight: widget.isSearchItem 
-                       ? _getTotalQuantityForItem(item.sttRec0) < _getAvailableQuantityForItem(item.maVt, item.maVt2, item.so_luong_kd)
+                       ? _getAvailableQuantityForItem(item.maVt, item.maVt2, item.so_luong_kd) > 0
                        : item.slDh < item.so_luong_kd),
                    _buildDetailRow('Đơn giá', '${Utils.formatMoneyStringToDouble(item.giaNt2)} đ'),
-                   if (item.tlCk != null && item.tlCk.toString() != 'null' && item.tlCk.toString().isNotEmpty)
+                   if (item.tlCk.toString() != 'null' && item.tlCk.toString().isNotEmpty)
                      _buildDetailRow('Tỷ lệ CK', '${Utils.formatDecimalNumber(item.tlCk)}%'),
-                   if (item.thueSuat != null && item.thueSuat.toString() != 'null' && item.thueSuat.toString().isNotEmpty)
+                   if (item.thueSuat.toString() != 'null' && item.thueSuat.toString().isNotEmpty)
                      _buildDetailRow('Thuế', '${Utils.formatDecimalNumber(item.thueSuat)}%'),
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 2),
@@ -409,8 +424,8 @@ class _DetailContractScreenState extends State<DetailContractScreen> with Ticker
   }
 
   Widget _buildDetailRow(String label, String value, {bool highlight = false}) {
-    // Ẩn trường nếu giá trị là null, rỗng hoặc "null"
-    if (value == null || value.isEmpty || value.trim() == 'null' || value.trim() == '') {
+    // Ẩn trường nếu giá trị rỗng hoặc "null"
+    if (value.isEmpty || value.trim() == 'null' || value.trim() == '') {
       return const SizedBox.shrink();
     }
     
@@ -762,53 +777,9 @@ class _DetailContractScreenState extends State<DetailContractScreen> with Ticker
     );
   }
 
-  double _getAvailableQuantityForMaVt2(String? maVt2) {
-    if (maVt2 == null) return 0;
-    
-    // Tìm item đầu tiên có maVt2 này để lấy so_luong_kd gốc
-    var firstItem = _bloc.listItemProduct.firstWhere(
-      (element) => element.maVt2 == maVt2,
-      orElse: () => ListItem(),
-    );
-    
-    if (firstItem.maVt == null) return 0;
-    
-    // Tính tổng số lượng đã đặt cho maVt2 này (từ cả selectedQuantities và giỏ hàng)
-    double totalOrderedForMaVt2 = 0;
-    
-    // Từ selectedQuantities (đang chọn trong màn này)
-    for (String selectedId in selectedItemIds) {
-      var selectedItem = _bloc.listItemProduct.firstWhere(
-        (element) => element.sttRec0 == selectedId,
-        orElse: () => ListItem(),
-      );
-      if (selectedItem.maVt2 == maVt2) {
-        totalOrderedForMaVt2 += selectedQuantities[selectedId] ?? 0;
-      }
-    }
-    
-    // Từ giỏ hàng hiện tại (nếu có)
-    if (widget.isSearchItem) {
-      totalOrderedForMaVt2 += _getQuantityFromCart(maVt2);
-    }
-    
-    // Trả về số lượng khả dụng còn lại
-    return (firstItem.so_luong_kd - totalOrderedForMaVt2).clamp(0, firstItem.so_luong_kd);
-  }
 
-  double _getTotalQuantityForItem(String? sttRec0) {
-    if (sttRec0 == null) return 0;
-    
-    double totalQuantity = 0;
-    
-    // Từ selectedQuantities (đang chọn trong màn này)
-    totalQuantity += selectedQuantities[sttRec0] ?? 0;
-    
-    // Từ giỏ hàng hiện tại - tìm item tương ứng
-    totalQuantity += _getQuantityFromCartForItem(sttRec0);
-    
-    return totalQuantity;
-  }
+
+
 
   double _getAvailableQuantityForItem(String? maVt, String? maVt2, double soLuongKd) {
     if (maVt == null || maVt2 == null) return soLuongKd;
@@ -840,6 +811,39 @@ class _DetailContractScreenState extends State<DetailContractScreen> with Ticker
     return (soLuongKd - totalOrderedForMaVt2).clamp(0, soLuongKd);
   }
 
+  // Method tính số lượng khả dụng KHÔNG bao gồm item hiện tại (để tránh circular logic)
+  double _getAvailableQuantityExcludingCurrentItem(String? maVt, String? maVt2, double soLuongKd, String currentItemId) {
+    if (maVt == null || maVt2 == null) return soLuongKd;
+    
+    // Tính tổng số lượng đã đặt cho maVt2 này, KHÔNG bao gồm currentItemId
+    double totalOrderedForMaVt2 = 0;
+    
+    // Từ giỏ hàng hiện tại
+    if (widget.cartItems != null) {
+      for (var item in widget.cartItems!) {
+        if (item.maVt2 == maVt2) {
+          totalOrderedForMaVt2 += item.count ?? 0;
+        }
+      }
+    }
+    
+    // Từ selectedQuantities (đang chọn trong màn này) - LOẠI TRỪ item hiện tại
+    for (String selectedId in selectedItemIds) {
+      if (selectedId == currentItemId) continue; // Bỏ qua item hiện tại
+      
+      var selectedItem = _bloc.listItemProduct.firstWhere(
+        (element) => element.sttRec0 == selectedId,
+        orElse: () => ListItem(),
+      );
+      if (selectedItem.maVt2 == maVt2) {
+        totalOrderedForMaVt2 += selectedQuantities[selectedId] ?? 0;
+      }
+    }
+    
+    // Trả về số lượng khả dụng còn lại
+    return (soLuongKd - totalOrderedForMaVt2).clamp(0, soLuongKd);
+  }
+
   double _getQuantityFromCartForItem(String? sttRec0) {
     if (sttRec0 == null || widget.cartItems == null) return 0;
     
@@ -862,48 +866,59 @@ class _DetailContractScreenState extends State<DetailContractScreen> with Ticker
     return quantityFromCart;
   }
 
-  double _getQuantityFromCart(String? maVt2) {
-    if (maVt2 == null || widget.cartItems == null) return 0;
+  // Method để hiển thị số lượng theo format A/B cho search item
+  String _buildQuantityDisplayForSearchItem(ListItem item) {
+    // A = Số lượng hiện tại (giỏ hàng + đang chọn)
+    double currentInCart = _getQuantityFromCartForItem(item.sttRec0);
+    double currentSelected = selectedQuantities[item.sttRec0] ?? 0;
+    double totalCurrent = currentInCart + currentSelected;
     
-    // Lấy dữ liệu từ giỏ hàng được truyền vào
-    double totalFromCart = 0;
+    // B = Số lượng khả dụng còn lại = Tổng kho - Tổng đã đặt cho maVt2
+    double totalOrderedForMaVt2 = 0;
     
-    try {
-      for (var item in widget.cartItems!) {
-        // Kiểm tra xem item có thuộc tính maVt2 và count không
-        if (item.maVt2 == maVt2) {
-          totalFromCart += item.count ?? 0;
+    // Tính tổng số lượng đã đặt cho maVt2 này
+    // Từ giỏ hàng hiện tại
+    if (widget.cartItems != null) {
+      for (var cartItem in widget.cartItems!) {
+        if (cartItem.maVt2 == item.maVt2) {
+          totalOrderedForMaVt2 += cartItem.count ?? 0;
         }
       }
-    } catch (e) {
-      // Fallback nếu không truy cập được
-      print('Không thể lấy dữ liệu từ giỏ hàng: $e');
     }
     
-    return totalFromCart;
+    // Từ selectedQuantities (đang chọn trong màn này)
+    for (String selectedId in selectedItemIds) {
+      var selectedItem = _bloc.listItemProduct.firstWhere(
+        (element) => element.sttRec0 == selectedId,
+        orElse: () => ListItem(),
+      );
+      if (selectedItem.maVt2 == item.maVt2) {
+        totalOrderedForMaVt2 += selectedQuantities[selectedId] ?? 0;
+      }
+    }
+    
+    double remainingAvailable = (item.so_luong_kd - totalOrderedForMaVt2).clamp(0, item.so_luong_kd);
+    
+    return '${Utils.formatDecimalNumber(totalCurrent)}/${Utils.formatDecimalNumber(remainingAvailable)} ${item.dvt?.toString() ?? ''}';
   }
+
+
 
   void _handleItemSelection(int index, ListItem item, bool isSelected) async {
     if (isSelected) {
-      // Tính tổng số lượng đã đặt cho maVt2 này
-      double totalOrderedForMaVt2 = 0;
-      for (String selectedId in selectedItemIds) {
-        var selectedItem = _bloc.listItemProduct.firstWhere(
-          (element) => element.sttRec0 == selectedId,
-          orElse: () => ListItem(),
-        );
-        if (selectedItem.maVt2 == item.maVt2) {
-          totalOrderedForMaVt2 += selectedQuantities[selectedId] ?? 0;
-        }
-      }
+      // Tính số lượng hiện tại từ giỏ hàng (chỉ tính từ giỏ hàng, không tính selectedQuantities)
+      double currentQuantityFromCart = _getQuantityFromCartForItem(item.sttRec0);
       
-      // Số lượng khả dụng còn lại cho maVt2 này
-      double remainingQuantity = item.so_luong_kd - totalOrderedForMaVt2;
+      // Tính số lượng khả dụng còn lại (không bao gồm item hiện tại)
+      double availableQuantityExcludingCurrent = _getAvailableQuantityExcludingCurrentItem(item.maVt, item.maVt2, item.so_luong_kd, item.sttRec0 ?? '');
+      
+      // Tổng số lượng tối đa có thể đặt = số lượng hiện tại + số lượng khả dụng còn lại
+      double maxQuantityCanOrder = currentQuantityFromCart + availableQuantityExcludingCurrent;
       
       // Hiển thị popup nhập số lượng khi tích chọn
       await showChangeQuantityPopup(
         context: context,
-        originalQuantity: remainingQuantity,
+        originalQuantity: maxQuantityCanOrder, // Số lượng tối đa có thể đặt
         onConfirmed: (newQuantity) {
           setState(() {
             selectedItemIds.add(item.sttRec0 ?? '');
@@ -913,8 +928,8 @@ class _DetailContractScreenState extends State<DetailContractScreen> with Ticker
         },
         maVt2: item.maVt ?? '',
         listOrder: [],
-        currentQuantity: selectedQuantities[item.sttRec0] ?? 0,
-        availableQuantity: remainingQuantity,
+        currentQuantity: currentQuantityFromCart, // Số lượng hiện tại trong giỏ hàng
+        availableQuantity: maxQuantityCanOrder, // Tối đa có thể đặt
       );
     } else {
       // Khi bỏ tích chọn, reset số lượng về 0
@@ -926,68 +941,11 @@ class _DetailContractScreenState extends State<DetailContractScreen> with Ticker
     }
   }
 
-  void _addAllItemsToCart() {
-    for (var element in _bloc.listItemProduct) {
-      // Chỉ add những item có slDh < so_luong_kd (a < b)
-      if (element.slDh < element.so_luong_kd) {
-        Product production = Product(
-          code: element.maVt,
-          name: element.tenVt,
-          name2: element.tenVt,
-          dvt: element.dvt,
-          description: '',
-          price: element.giaNt2,
-          priceAfter: element.giaNt2 - ((element.giaNt2 * element.tlCk)/100) ,
-          discountPercent: element.tlCk,
-          stockAmount: 0,
-          taxPercent: 0,
-          imageUrl:  '',
-          count: element.soLuong - element.slDh,
-          countMax: element.soLuong - element.slDh,
-          isMark:1,
-          discountMoney: '0',
-          discountProduct: '0',
-          budgetForItem: '',
-          budgetForProduct: '',
-          residualValueProduct: 0,
-          residualValue: 0,
-          unit: '',
-          unitProduct:  '',
-          dsCKLineItem: '',
-          allowDvt:  0,
-          contentDvt: element.dvt,
-          kColorFormatAlphaB: 0,
-          codeStock: element.maKho,
-          nameStock: element.tenKho,
-          isSanXuat: (0),
-          isCheBien: (0),
-          giaSuaDoi: element.giaNt2,
-          giaGui: 0,
-          priceMin:  0,
-          note: '',
-          jsonOtherInfo: '',
-          heSo: '',
-          idNVKD: '',
-          nameNVKD: '',
-          nuocsx: '',
-          quycach: '',
-          maThue: element.maThue,
-          tenThue: element.tenThue,
-          thueSuat: element.thueSuat,
-          applyPriceAfterTax:  1,
-          discountByHand: 1,
-          discountPercentByHand: element.tlCk,
-          ckntByHand: element.ck,
-          priceOk: element.giaNt2,
-          woPrice: 0,
-          woPriceAfter: 0,
-          maVt2: element.maVt2,
-          sttRec0: element.sttRec0,
-        );
-        _bloc.add(AddCartEvent(productItem: production));
-      }
-    }
-    // Xóa PersistentNavBarNavigator.pushNewScreen ở đây để tránh gọi 2 lần
-    // Logic chuyển màn hình sẽ được xử lý trong BlocListener khi GetCountProductSuccess
-  }
+
 }
+
+
+
+
+
+

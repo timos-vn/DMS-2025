@@ -11,6 +11,10 @@ import 'package:persistent_bottom_nav_bar/persistent_bottom_nav_bar.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../model/database/data_local.dart';
+import '../../model/entity/quick_access_feature.dart';
+import '../../services/navigation_service.dart';
+import '../../services/quick_access_service.dart';
+import '../../services/search_service.dart';
 import '../../services/shore_bird/shorebird_utils.dart';
 import '../dms/check_in/check_in_screen.dart';
 import '../dms/component/request_open_store.dart';
@@ -19,6 +23,8 @@ import '../sell/order/order_sceen.dart';
 import 'component/chart_spline.dart';
 import 'component/home_slider.dart';
 import 'component/kpi.dart';
+import 'component/quick_access_settings_screen.dart';
+import 'component/search_screen.dart';
 import 'home_bloc.dart';
 import 'home_event.dart';
 import 'home_state.dart';
@@ -42,6 +48,9 @@ class _HomeScreen2State extends State<HomeScreen2>  with WidgetsBindingObserver{
   double he = 0;
 
   late HomeBloc _bloc;
+  final QuickAccessService _quickAccessService = QuickAccessService();
+  final SearchService _searchService = SearchService();
+  final NavigationService _navigationService = NavigationService();
 
   @override
   void initState() {
@@ -198,36 +207,45 @@ class _HomeScreen2State extends State<HomeScreen2>  with WidgetsBindingObserver{
                 ],
               ),
             ),
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-              decoration: BoxDecoration(
-                  borderRadius: const BorderRadius.all(Radius.circular(16)),
-                  border: Border.all(color: Colors.grey.withOpacity(0.4))),
-              child: Row(
-                children: [
-                  Row(
-                    children: [
-                      const Icon(
-                        EneftyIcons.search_normal_2_outline,
-                        size: 18,
-                      ),
-                      const SizedBox(
-                        width: 10,
-                      ),
-                      Text(
-                        'Bạn có thể tìm kiếm mọi thứ từ đây',
-                        style: TextStyle(
-                            color: subColor.withOpacity(0.5), fontSize: 12.5),
-                      )
-                    ],
-                  ),
-                  const Spacer(),
-                  const Icon(
-                    EneftyIcons.setting_4_outline,
-                    size: 18,
-                  ),
-                ],
+            GestureDetector(
+              onTap: () {
+                PersistentNavBarNavigator.pushNewScreen(
+                  context,
+                  screen: const SearchScreen(),
+                  withNavBar: false,
+                );
+              },
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                decoration: BoxDecoration(
+                    borderRadius: const BorderRadius.all(Radius.circular(16)),
+                    border: Border.all(color: Colors.grey.withOpacity(0.4))),
+                child: Row(
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(
+                          EneftyIcons.search_normal_2_outline,
+                          size: 18,
+                        ),
+                        const SizedBox(
+                          width: 10,
+                        ),
+                        Text(
+                          'Bạn có thể tìm kiếm mọi thứ từ đây',
+                          style: TextStyle(
+                              color: subColor.withOpacity(0.5), fontSize: 12.5),
+                        )
+                      ],
+                    ),
+                    const Spacer(),
+                    const Icon(
+                      EneftyIcons.setting_4_outline,
+                      size: 18,
+                    ),
+                  ],
+                ),
               ),
             ),
             SizedBox(
@@ -267,20 +285,22 @@ class _HomeScreen2State extends State<HomeScreen2>  with WidgetsBindingObserver{
                 ),
               ),
               const Spacer(),
-              Container(
-                alignment: Alignment.topRight,
-                child: const Text(
-                  "Cài đặt tiện ích",
-                  style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.normal,
-                      color: Colors.white),
+              GestureDetector(
+                onTap: () {
+                  PersistentNavBarNavigator.pushNewScreen(
+                    context,
+                    screen: const QuickAccessSettingsScreen(),
+                    withNavBar: false,
+                  ).then((value) {
+                    // Refresh the screen to show updated quick access features
+                    setState(() {});
+                  });
+                },
+                child: const Icon(
+                  Icons.menu_sharp,
+                  color: subColor,
                 ),
               ),
-              const Icon(
-                Icons.navigate_next,
-                color: Colors.white54,
-              )
             ],
           ),
           SizedBox(
@@ -301,48 +321,7 @@ class _HomeScreen2State extends State<HomeScreen2>  with WidgetsBindingObserver{
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    itemControl(EneftyIcons.bag_2_outline, 'Đặt đơn', () {
-                      if (Const.createNewOrder == true) {
-                        PersistentNavBarNavigator.pushNewScreen(context,
-                            screen: const OrderScreen(), withNavBar: false);
-                      } else {
-                        Utils.showUpgradeAccount(context);
-                      }
-                    }),
-                    itemControl(EneftyIcons.location_outline, 'Gặp gỡ', () {
-                      if (Const.checkIn == true) {
-                        PersistentNavBarNavigator.pushNewScreen(context,
-                            screen: CheckInScreen(
-                              reloadData: false,
-                              listCheckInToDay: const [],
-                              listAlbumOffline: const [],
-                              listAlbumTicketOffLine: const [],
-                              userId: _bloc.userId,
-                            ),
-                            withNavBar: false);
-                      } else {
-                        Utils.showUpgradeAccount(context);
-                      }
-                    }),
-                    itemControl(EneftyIcons.shop_add_outline, 'Mở mới', () {
-                      if (Const.openStore == true) {
-                        PersistentNavBarNavigator.pushNewScreen(context,
-                            screen: const RequestOpenStoreScreen(),
-                            withNavBar: true);
-                      } else {
-                        Utils.showUpgradeAccount(context);
-                      }
-                    }),
-                    itemControl(EneftyIcons.chart_2_outline, 'Báo cáo', () {
-                      if (Const.approval == true) {
-                        PersistentNavBarNavigator.pushNewScreen(context,
-                            screen: const ApprovalScreen(), withNavBar: true);
-                      } else {
-                        Utils.showUpgradeAccount(context);
-                      }
-                    })
-                  ],
+                  children: _buildQuickAccessFeatures(),
                 ),
               ),
             ),
@@ -721,6 +700,79 @@ class _HomeScreen2State extends State<HomeScreen2>  with WidgetsBindingObserver{
         ],
       ),
     );
+  }
+
+  List<Widget> _buildQuickAccessFeatures() {
+    final quickAccessFeatures = _quickAccessService.getQuickAccessFeatures();
+    final widgets = <Widget>[];
+    
+    for (int i = 0; i < 4; i++) {
+      if (i < quickAccessFeatures.length) {
+        final feature = quickAccessFeatures[i];
+        widgets.add(
+          Expanded(
+            child: _buildQuickAccessFeature(feature),
+          ),
+        );
+      } else {
+        // Add empty space to maintain layout
+        widgets.add(const Expanded(child: SizedBox()));
+      }
+    }
+    
+    return widgets;
+  }
+
+  Widget _buildQuickAccessFeature(QuickAccessFeature feature) {
+    return GestureDetector(
+      onTap: () => _navigateToQuickAccessFeature(feature),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              height: 50,
+              width: 50,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(48),
+                border: Border.all(
+                  color: Colors.grey.withOpacity(0.7),
+                  width: 0.8,
+                ),
+              ),
+              child: Icon(
+                feature.icon,
+                size: 22,
+                color: accent,
+              ),
+            ),
+            const SizedBox(height: 8),
+            ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: 80, // Limit text width
+                maxHeight: 40, // Limit text height
+              ),
+              child: Text(
+                feature.title,
+                style: TextStyle(
+                  color: Colors.black.withOpacity(0.8),
+                  fontSize: 12,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _navigateToQuickAccessFeature(QuickAccessFeature feature) {
+    _navigationService.navigateToRoute(context, feature.route, feature.parameters);
   }
 
   itemControl(

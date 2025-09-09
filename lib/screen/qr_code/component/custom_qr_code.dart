@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:dms/screen/qr_code/component/scanner_panel_widget.dart';
+import 'package:dms/screen/qr_code/component/view_infor_card.dart';
 import 'package:dms/utils/utils.dart';
 import 'package:dms/widget/barcode_scanner_widget.dart';
 import 'package:dms/widget/custom_choose_function.dart';
@@ -53,6 +54,14 @@ class _MyHomePageState extends State<QRCodeGeneratorWidget> with TickerProviderS
   }
 
   @override
+  void dispose() {
+    // Stop camera when leaving the screen
+    BarcodeScannerWidget.globalKey.currentState?.stopCamera();
+    tabController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
 
     return Scaffold(
@@ -61,6 +70,7 @@ class _MyHomePageState extends State<QRCodeGeneratorWidget> with TickerProviderS
         listener: (context,state){
           if(state is GetQuantityForTicketSuccess){
             if(state.allowCreate == true){
+              print('adx 0');
               showDialog(
                   context: context,
                   builder: (context) {
@@ -80,21 +90,24 @@ class _MyHomePageState extends State<QRCodeGeneratorWidget> with TickerProviderS
                       _panelController.animatePanelToPosition(1.0);
                     });
                   }else{
-                    // _controller.stop();
-                    // _barcodes = [];
-                    // Navigator.push(context, MaterialPageRoute(builder: (context)=> ViewInformationCardScreen(
-                    //   ruleActionInformationCard: _bloc.ruleActionInformationCard,
-                    //   listItemCard: _bloc.listItemCard,
-                    //   masterInformationCard: _bloc.masterInformationCard,
-                    //   keyFunction: key ,
-                    //   nameCard:  Const.listFunctionQrCode[indexSelected].description.toString(),
-                    //   formatProvider: _bloc.formatProvider,
-                    // ))).then((value) {
-                    //   valuesBarcode = '';
-                    //   setState(() {
-                    //     _controller.start();
-                    //   });
-                    // });
+                    // Stop camera before navigating
+                    BarcodeScannerWidget.globalKey.currentState?.stopCamera();
+                    Navigator.push(context, MaterialPageRoute(builder: (context)=> ViewInformationCardScreen(
+                      ruleActionInformationCard: _bloc.ruleActionInformationCard,
+                      listItemCard: _bloc.listItemCard,
+                      masterInformationCard: _bloc.masterInformationCard,
+                      keyFunction: key ,
+                      nameCard:  Const.listFunctionQrCode[indexSelected].description.toString(),
+                      formatProvider: _bloc.formatProvider,
+                    ))).then((value) {
+                      // Restart camera when returning
+                      Future.delayed(const Duration(milliseconds: 300), () {
+                        if (mounted) {
+                          BarcodeScannerWidget.globalKey.currentState?.startCamera();
+                        }
+                      });
+                      buildFunc(indexSelected);
+                    });
                   }
                 }
                 else{
@@ -117,6 +130,7 @@ class _MyHomePageState extends State<QRCodeGeneratorWidget> with TickerProviderS
                 _bloc.add(GetQuantityForTicketEvent(sttRec: _bloc.masterInformationCard.sttRec.toString(), key: key.toString()));
               }
               else{
+                print('adx 1');
                 showDialog(
                     context: context,
                     builder: (context) {
@@ -136,21 +150,24 @@ class _MyHomePageState extends State<QRCodeGeneratorWidget> with TickerProviderS
                         _panelController.animatePanelToPosition(1.0);
                       });
                     }else{
-                      // _controller.stop();
-                      // _barcodes = [];
-                      // Navigator.push(context, MaterialPageRoute(builder: (context)=> ViewInformationCardScreen(
-                      //   ruleActionInformationCard: _bloc.ruleActionInformationCard,
-                      //   listItemCard: _bloc.listItemCard,
-                      //   masterInformationCard: _bloc.masterInformationCard,
-                      //   keyFunction: key ,
-                      //   nameCard:  Const.listFunctionQrCode[indexSelected].description.toString(),
-                      //   formatProvider: _bloc.formatProvider,
-                      // ))).then((value) {
-                      //   valuesBarcode = '';
-                      //   setState(() {
-                      //     _controller.start();
-                      //   });
-                      // });
+                      // Stop camera before navigating
+                      BarcodeScannerWidget.globalKey.currentState?.stopCamera();
+                      Navigator.push(context, MaterialPageRoute(builder: (context)=> ViewInformationCardScreen(
+                        ruleActionInformationCard: _bloc.ruleActionInformationCard,
+                        listItemCard: _bloc.listItemCard,
+                        masterInformationCard: _bloc.masterInformationCard,
+                        keyFunction: key ,
+                        nameCard:  Const.listFunctionQrCode[indexSelected].description.toString(),
+                        formatProvider: _bloc.formatProvider,
+                      ))).then((value) {
+                        // Restart camera when returning
+                        Future.delayed(const Duration(milliseconds: 300), () {
+                          if (mounted) {
+                            BarcodeScannerWidget.globalKey.currentState?.startCamera();
+                          }
+                        });
+                        buildFunc(indexSelected);
+                      });
                     }
                   }
                   else{

@@ -31,6 +31,26 @@ class GetListInventoryRequest extends DMSEvent {
   @override
   String toString() => 'GetListInventoryRequest {}';
 }
+
+class FindProvinceEvent extends DMSEvent {
+
+  final String? province;
+  final String? district;
+  final int typeGetList;
+  final String keysText;
+  final String? idArea;
+
+  FindProvinceEvent({this.province,this.district,required this.typeGetList, required this.keysText, this.idArea});
+
+  @override
+  String toString() => 'FindProvinceEvent {}';
+}
+
+class AutoMapAddressFromGPSEvent extends DMSEvent {
+  @override
+  String toString() => 'AutoMapAddressFromGPSEvent';
+}
+
 class GetListItemInventoryEvent extends DMSEvent {
   final String searchKey;
   final String sttRec;

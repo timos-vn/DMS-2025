@@ -1,3 +1,4 @@
+import 'dart:io' show Platform;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dms/widget/pending_action.dart';
 import 'package:flutter/material.dart';
@@ -6,6 +7,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import 'package:persistent_bottom_nav_bar/persistent_bottom_nav_bar.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../model/database/data_local.dart';
 import '../../../themes/colors.dart';
@@ -39,6 +41,70 @@ class _DetailInfoCustomerScreenState extends State<DetailInfoCustomerScreen> {
     super.initState();
     _bloc = DetailCustomerBloc(context);
     _bloc.add(GetPrefs());
+  }
+
+  Future<void> _openGoogleMapsWithAddress(String address) async {
+    final String trimmed = address.replaceAll('null', '').trim();
+    if (trimmed.isEmpty) {
+      Utils.showCustomToast(context, Icons.warning_amber_outlined, 'Địa chỉ trống, không thể mở Google Maps');
+      return;
+    }
+
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Mở bản đồ'),
+        content: Text('Bạn có muốn mở bản đồ với địa chỉ:\n\n$trimmed'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Hủy'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Mở'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    final String encoded = Uri.encodeComponent(trimmed);
+
+    if (Platform.isIOS) {
+      final Uri iosAppUri = Uri.parse('comgooglemaps://?q=$encoded');
+      try {
+        if (await canLaunchUrl(iosAppUri)) {
+          await launchUrl(iosAppUri, mode: LaunchMode.externalApplication);
+          return;
+        }
+        // Fallback to Apple Maps if Google Maps app is not available
+        final Uri appleMapsUri = Uri.parse('http://maps.apple.com/?q=$encoded');
+        if (await canLaunchUrl(appleMapsUri)) {
+          await launchUrl(appleMapsUri, mode: LaunchMode.externalApplication);
+          return;
+        }
+      } catch (_) {}
+    } else if (Platform.isAndroid) {
+      final Uri androidGeoUri = Uri.parse('geo:0,0?q=$encoded');
+      try {
+        if (await canLaunchUrl(androidGeoUri)) {
+          await launchUrl(androidGeoUri, mode: LaunchMode.externalApplication);
+          return;
+        }
+      } catch (_) {}
+    }
+
+    final Uri webUri = Uri.parse('https://www.google.com/maps/search/?api=1&query=$encoded');
+    try {
+      final launched = await launchUrl(webUri, mode: LaunchMode.externalApplication);
+      if (!launched) {
+        Utils.showCustomToast(context, Icons.warning_amber_outlined, 'Không thể mở Google Maps');
+      }
+    } catch (_) {
+      Utils.showCustomToast(context, Icons.warning_amber_outlined, 'Không thể mở Google Maps');
+    }
   }
 
   @override
@@ -151,13 +217,30 @@ class _DetailInfoCustomerScreenState extends State<DetailInfoCustomerScreen> {
                             children: [
                               const Icon(Icons.location_on,size: 13,color: grey,),
                               const SizedBox(width: 8,),
-                              Flexible(
+                              Expanded(
                                 child: Text(
                                   _bloc.detailCustomer.address??'',
                                   style: const TextStyle(fontSize: 13,color: grey,),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
+                              ),
+                              const SizedBox(width: 5,),
+                              IconButton(
+                                onPressed: (_bloc.detailCustomer.address?.replaceAll('null', '').trim().isNotEmpty == true) 
+                                  ? () => _openGoogleMapsWithAddress(_bloc.detailCustomer.address ?? '') 
+                                  : null,
+                                icon: Icon(
+                                  MdiIcons.mapOutline, 
+                                  color: (_bloc.detailCustomer.address?.replaceAll('null', '').trim().isNotEmpty == true) 
+                                    ? Colors.blueGrey 
+                                    : Colors.grey, 
+                                  size: 20,
+                                ),
+                                tooltip: 'Mở bản đồ',
+                                splashRadius: 20,
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
                               ),
                             ],
                           ),

@@ -9,7 +9,7 @@ class Product extends Equatable {
   String? name2;
   String? dvt;
   String? description;
-  double? price;
+  double? price = 0;
   double? priceAfterTax;
   double? valuesTax;
   double? discountPercent;
@@ -69,7 +69,7 @@ class Product extends Equatable {
   String? sttRec0;
 
 
-  Product({this.code,this.maVt2 = '', this.name, this.name2, this.dvt, this.description, this.price,this.priceAfterTax,this.valuesTax,
+  Product({this.code,this.maVt2 = '', this.name, this.name2, this.dvt, this.description, this.price = 0,this.priceAfterTax,this.valuesTax,
     this.discountPercent, this.imageUrl, this.priceAfter, this.stockAmount,this.count,this.countMax,this.so_luong_kd = 0,this.isMark,
     this.discountMoney,this.discountProduct,this.budgetForItem,this.budgetForProduct,this.residualValueProduct,this.residualValue,
     this.unit,this.unitProduct,this.dsCKLineItem, this.taxPercent, this.allowDvt, this.contentDvt,this.kColorFormatAlphaB,

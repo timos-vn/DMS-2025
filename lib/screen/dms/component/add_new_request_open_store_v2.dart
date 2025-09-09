@@ -22,14 +22,14 @@ import '../check_in/search_province/search_province_screen.dart';
 import '../check_in/search_tour/search_tour_screen.dart';
 
 
-class AddNewRequestOpenStoreScreen extends StatefulWidget {
-  const AddNewRequestOpenStoreScreen({Key? key}) : super(key: key);
+class AddNewRequestOpenStoreScreenV2 extends StatefulWidget {
+  const AddNewRequestOpenStoreScreenV2({Key? key}) : super(key: key);
 
   @override
   _AddNewRequestOpenStoreScreenState createState() => _AddNewRequestOpenStoreScreenState();
 }
 
-class _AddNewRequestOpenStoreScreenState extends State<AddNewRequestOpenStoreScreen> {
+class _AddNewRequestOpenStoreScreenState extends State<AddNewRequestOpenStoreScreenV2> {
 
   late DMSBloc _bloc;
 

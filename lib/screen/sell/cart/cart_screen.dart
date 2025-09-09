@@ -98,6 +98,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
   late SearchItemResponseData itemSelect;
   late Timer _timer = Timer(const Duration(milliseconds: 1), () {});
   int start = 3;bool waitingLoad = false;
+  bool _isProcessing = false; // Biến để ngăn chặn double-tap
   void startTimer() {
     const oneSec = Duration(seconds: 1);
     _timer =  Timer.periodic(
@@ -364,6 +365,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
           _bloc.add(GetListProductFromDB(addOrderFromCheckIn: widget.orderFromCheckIn, getValuesTax: false,key: ''));
         }
         else if(state is CartFailure){
+          _isProcessing = false; // Reset flag khi có lỗi
           showDialog(
               context: context,
               builder: (context) {
@@ -528,6 +530,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
           }
         }
         else if(state is CreateOrderSuccess){
+          _isProcessing = false; // Reset flag khi thành công
           Const.numberProductInCart = 0;
           Const.listKeyGroupCheck = '';
           Const.listKeyGroup = '';
@@ -971,12 +974,29 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
   }
 
   void logic(){
+    // Ngăn chặn double-tap
+    if (_isProcessing) {
+      print('DEBUG: Đang xử lý, bỏ qua tap');
+      return;
+    }
+    
+    _isProcessing = true;
+    
+    // Tự động reset flag sau 1 giây để tránh trường hợp bị kẹt
+    Timer(const Duration(seconds: 1), () {
+      if (_isProcessing) {
+        print('DEBUG: Tự động reset _isProcessing sau 1 giây');
+        _isProcessing = false;
+      }
+    });
+    
     if (Const.chooseAgency == true){
       if(_bloc.transactionName.contains('Đại lý')){
         if(_bloc.codeAgency.toString() != '' && _bloc.codeAgency.toString() != 'null'){
           createOrder();
         }else{
           Utils.showCustomToast(context, Icons.warning_amber_outlined, 'Úi, Bạn chưa chọn Đại lý kìa');
+          _isProcessing = false; // Reset flag khi có lỗi
         }
       }else{
         createOrder();
@@ -989,6 +1009,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
             createOrder();
           }else{
             Utils.showCustomToast(context, Icons.warning_amber_outlined, 'Úi, Bạn chưa chọn ngày thanh toán kìa');
+            _isProcessing = false; // Reset flag khi có lỗi
           }
         }else{
           createOrder();

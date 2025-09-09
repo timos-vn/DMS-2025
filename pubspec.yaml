@@ -2,7 +2,7 @@ name: dms
 description: "A new Flutter project."
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 
-version: 1.0.75+138
+version: 1.0.77+142
 
 environment:
   sdk: '>=3.5.4 <4.0.0'
@@ -82,6 +82,8 @@ dependencies:
   restart_app:
     git:
       url: https://github.com/putpin/restart_app
+  dvhcvn: ^2.1.20250301
+  expansion_tile_card: ^3.0.0
 
 dev_dependencies:
   flutter_test:

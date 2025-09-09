@@ -28,6 +28,12 @@ class _BarcodeScannerWidgetState extends State<BarcodeScannerWidget>
   void initState() {
     super.initState();
     cameraController = MobileScannerController();
+    // Start camera automatically when widget is initialized
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        cameraController.start();
+      }
+    });
 
     lineController = AnimationController(
       vsync: this,
@@ -42,8 +48,25 @@ class _BarcodeScannerWidgetState extends State<BarcodeScannerWidget>
     super.dispose();
   }
 
-  void startCamera() => cameraController.start();
-  void stopCamera() => cameraController.stop();
+  void startCamera() {
+    try {
+      if (mounted) {
+        cameraController.start();
+      }
+    } catch (e) {
+      debugPrint('Error starting camera: $e');
+    }
+  }
+  
+  void stopCamera() {
+    try {
+      if (mounted) {
+        cameraController.stop();
+      }
+    } catch (e) {
+      debugPrint('Error stopping camera: $e');
+    }
+  }
   void scanFromGalleryPublic() => scanFromGallery();
 
   Future<void> scanFromGallery() async {

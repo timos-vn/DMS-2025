@@ -1469,7 +1469,7 @@ class _InputQuantityPopupOrderState extends State<InputQuantityPopupOrder> {
           height: 35,//width: double.infinity,
           child: Align(
             alignment: Alignment.centerLeft,
-            child: Text(unitOfCalculation.toString().trim(),style: const TextStyle(color: Colors.blueGrey,fontSize: 13),textAlign: TextAlign.center,maxLines: 1,overflow: TextOverflow.ellipsis,),)),
+            child: Text(unitOfCalculation.toString().trim().replaceAll('null', ''),style: const TextStyle(color: Colors.blueGrey,fontSize: 13),textAlign: TextAlign.center,maxLines: 1,overflow: TextOverflow.ellipsis,),)),
     );
   }
 
@@ -1518,7 +1518,6 @@ class _InputQuantityPopupOrderState extends State<InputQuantityPopupOrder> {
                       onTap: () {
                         unitOfCalculation = widget.listQuyDoiDonViTinh[index].dvt.toString().trim();
                         unitTransfer = (widget.listQuyDoiDonViTinh[index].heSo.toString());
-                        print(unitTransfer);
                         setState(() {});
                         // FocusScope.of(context).requestFocus(focusNodeContent);
                         Navigator.pop(context);
@@ -1535,7 +1534,7 @@ class _InputQuantityPopupOrderState extends State<InputQuantityPopupOrder> {
           height: 35,//width: double.infinity,
           child: Align(
             alignment: Alignment.centerLeft,
-            child: Text(unitOfCalculation.toString().trim(),style: const TextStyle(color: Colors.blueGrey,fontSize: 13),textAlign: TextAlign.center,maxLines: 1,overflow: TextOverflow.ellipsis,),)),
+            child: Text(unitOfCalculation.toString().trim().replaceAll('null', ''),style: const TextStyle(color: Colors.blueGrey,fontSize: 13),textAlign: TextAlign.center,maxLines: 1,overflow: TextOverflow.ellipsis,),)),
     );
   }
 

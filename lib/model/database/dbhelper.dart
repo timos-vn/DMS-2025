@@ -15,7 +15,7 @@ import '../entity/item_check_in.dart';
 import '../entity/product.dart';
 
 class DatabaseHelper {
-  static const NEW_DB_VERSION = 20250822; // current 15
+  static const NEW_DB_VERSION = 20250830; // current 15
   static final DatabaseHelper _instance = DatabaseHelper._();
   Database? _database;
 
@@ -132,6 +132,7 @@ class DatabaseHelper {
     db.execute('''
     CREATE TABLE saleOut(
       code TEXT,
+      maVt2 TEXT,
       name TEXT,
       name2 TEXT,
       dvt TEXT,
@@ -184,7 +185,9 @@ class DatabaseHelper {
       ckntByHand REAL,
       priceOk REAL,
       woPrice REAL,
-      woPriceAfter REAL)
+      woPriceAfter REAL,
+      so_luong_kd REAL,
+      sttRec0 TEXT)
   ''');
     print("Database saleOut was created!");
 
@@ -1032,6 +1035,37 @@ class DatabaseHelper {
       return Product.fromDb(maps.first);
     }
     return null;
+  }
+
+  // Method để fetch product bằng sttRec0
+  Future<Product?> fetchProductBySttRec0(String sttRec0) async {
+    var client = await db;
+    final Future<List<Map<String, dynamic>>> futureMaps =
+    client.query('product', where: 'sttRec0 = ?', whereArgs: [sttRec0]);
+    var maps = await futureMaps;
+    if (maps.length != 0) {
+      return Product.fromDb(maps.first);
+    }
+    return null;
+  }
+
+  // Method để add product với sttRec0 làm key chính (thay thế số lượng)
+  Future<void> addProductWithSttRec0Replace(Product product) async {
+    var client = await db;
+    Product? oldProduct = await fetchProductBySttRec0(product.sttRec0.toString().trim());
+    
+    if (oldProduct == null) {
+      // Chưa có sản phẩm này, thêm mới
+      await client.insert('product', product.toMapForDb(),
+          conflictAlgorithm: ConflictAlgorithm.replace);
+    } else {
+      // Đã có sản phẩm này, THAY THẾ số lượng
+      oldProduct.count = product.count!; // THAY THẾ, không cộng dồn
+      await client.update('product', oldProduct.toMapForDb(),
+          where: 'sttRec0 = ?',
+          whereArgs: [product.sttRec0],
+          conflictAlgorithm: ConflictAlgorithm.replace);
+    }
   }
 
   Future<void> deleteAllProduct() async {

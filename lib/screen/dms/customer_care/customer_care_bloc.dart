@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
@@ -11,6 +12,7 @@ import 'package:dms/utils/const.dart';
 import '../../../model/network/response/list_customer_care_response.dart';
 import '../../../model/network/services/network_factory.dart';
 import '../../../utils/utils.dart';
+import '../../../model/entity/survey_data.dart'; // ✅ Import SurveyDataList
 import 'customer_care_event.dart';
 import 'customer_care_state.dart';
 
@@ -165,24 +167,29 @@ class CustomerCareBloc extends Bloc<CustomerCareEvent,CustomerCareState>{
       valuesTypeCare.add(event.otherTypeCare);
     }
 
+    // ✅ Lấy dữ liệu khảo sát đã lưu theo customerId
+    final surveyData = _getSavedSurveyData(event.idCustomer);
+    final surveyJsonString = surveyData != null ? jsonEncode(surveyData.toJson()) : jsonEncode([]);
+
     var formData = FormData.fromMap(
         {
           "CustomerCode":event.idCustomer.toString(),
           "TypeCare": valuesTypeCare.join(','),
           "Description":event.description.toString().replaceAll("'", "''"),
           "Feedback":event.feedback.toString().replaceAll("'", "''"),
+          "ListSurvey": surveyJsonString // ✅ Thay thế "yourSurveyList"
         }
     );
     if(listFileInvoice.isNotEmpty){
       for (var element in listFileInvoice) {
         formData.files.addAll([
-          MapEntry("ListFile",await MultipartFile.fromFile(element.path))
+          MapEntry("ListFile",await MultipartFile.fromFile(element.path)) 
         ]);
       }
     }else{
       const MapEntry("ListFile","");
     }
-    print('_accssetoken: $_accessToken');
+
     CustomerCareState state = _handleAddNewRequestOpenStore(await _networkFactory!.addNewCustomerCare(formData,_accessToken!));
     emitter(state);
   }
@@ -261,7 +268,20 @@ class CustomerCareBloc extends Bloc<CustomerCareEvent,CustomerCareState>{
     }
   }
 
-
+  /// ✅ Lấy dữ liệu khảo sát đã lưu theo customerId
+  SurveyDataList? _getSavedSurveyData(String customerId) {
+    try {
+      final storageKey = '${Const.SURVEY_DATA}_$customerId';
+      final jsonData = box.read(storageKey);
+      if (jsonData != null) {
+        return SurveyDataList.fromJson(jsonData);
+      }
+      return null;
+    } catch (e) {
+      print('❌ Lỗi khi lấy survey data: $e');
+      return null;
+    }
+  }
 
   CustomerCareState _handleAddNewRequestOpenStore(Object data){
     if(data is String) return CustomerCareFailure('Úi, ${data.toString()}');

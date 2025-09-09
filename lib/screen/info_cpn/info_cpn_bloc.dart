@@ -339,6 +339,7 @@ class InfoCPNBloc extends Bloc<InfoCPNEvent,InfoCPNState>{
       Const.isDefaultCongNo = response.masterAppSettings?.isDefaultCongNo == 1 ? true : false;
       Const.scanQRCodeForInvoicePXB = response.masterAppSettings?.scanQRCodeForInvoicePXB == 1 ? true : false;
       Const.allowCreateTicketShipping = response.masterAppSettings?.allowCreateTicketShipping == 1 ? true : false;
+      Const.percentQuantityImage = response.masterAppSettings?.percentQuantityImage??70;
 
       DataLocal.listTypeDelivery = response.listTypeDelivery??[];
       DataLocal.listAgency = response.listAgency??[];

@@ -1,5 +1,3 @@
-import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:dms/model/network/response/get_list_history_dnnk_response.dart';
 import 'package:dms/screen/qr_code/qr_code_bloc.dart';
@@ -22,7 +20,6 @@ import '../../../model/network/request/update_quantity_warehouse_delivery_card_r
 import '../../../model/network/response/get_info_card_response.dart';
 import '../../../themes/colors.dart';
 import '../../../utils/const.dart';
-import '../../../utils/functions/scanner_overlay_shape.dart';
 import '../../../utils/images.dart';
 import '../../../utils/utils.dart';
 import '../../filter/filter_page.dart';
@@ -77,6 +74,14 @@ class _ViewInformationCardScreenState extends State<ViewInformationCardScreen> w
     if(widget.keyFunction == '#4'){
       _bloc.add(GetListHistoryDNNKEvent(sttRec: widget.masterInformationCard.sttRec.toString()));
     }
+  }
+
+  @override
+  void dispose() {
+    // Stop camera when leaving the screen
+    BarcodeScannerWidget.globalKey.currentState?.stopCamera();
+    tabController.dispose();
+    super.dispose();
   }
 
   void handleBarcodeScan(String code) async {
@@ -134,12 +139,6 @@ class _ViewInformationCardScreenState extends State<ViewInformationCardScreen> w
   }
 
 
-  @override
-  void dispose() {
-    // TODO: implement dispose
-    super.dispose();
-    tabController.dispose();
-  }
 
 
   @override
@@ -228,12 +227,9 @@ class _ViewInformationCardScreenState extends State<ViewInformationCardScreen> w
         buildAppBar(),
         Visibility(
           visible: viewQRCode == true,
-          child: Padding(
-            padding: const EdgeInsets.only(top: 10),
-            child: SizedBox(
-              height: 400, width: double.infinity,
-              child: buildCamera(),
-            ),
+          child: SizedBox(
+            height: 200, width: double.infinity,
+            child: buildCamera(),
           ),
         ),
         Padding(
@@ -900,7 +896,7 @@ class _ViewInformationCardScreenState extends State<ViewInformationCardScreen> w
                 children: [
                   Container(
                     width: 100,
-                    height: 130,
+                    height: 80,
                     decoration: const BoxDecoration(
                         borderRadius:BorderRadius.all( Radius.circular(6),)
                     ),
@@ -1163,6 +1159,7 @@ class _ViewInformationCardScreenState extends State<ViewInformationCardScreen> w
     return BarcodeScannerWidget(
       key: BarcodeScannerWidget.globalKey,
       onBarcodeDetected: handleBarcodeScan,
+      framePadding: const EdgeInsets.symmetric(vertical: 16),
     );
   }
 

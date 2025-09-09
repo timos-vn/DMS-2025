@@ -1,5 +1,6 @@
 // ignore_for_file: library_private_types_in_public_api, unrelated_type_equality_checks
 
+import 'dart:io' show Platform;
 import 'package:dms/model/database/data_local.dart';
 import 'package:dms/screen/dms/check_in/component/map.dart';
 import 'package:dms/screen/dms/check_in/search_task/search_task_screen.dart';
@@ -87,6 +88,70 @@ class _CheckInScreenState extends State<CheckInScreen> {
   void dispose() {
     super.dispose();
 
+  }
+
+  Future<void> _openGoogleMapsWithAddress(String address) async {
+    final String trimmed = address.replaceAll('null', '').trim();
+    if (trimmed.isEmpty) {
+      Utils.showCustomToast(context, Icons.warning_amber_outlined, 'Địa chỉ trống, không thể mở Google Maps');
+      return;
+    }
+
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Mở bản đồ'),
+        content: Text('Bạn có muốn mở bản đồ với địa chỉ:\n\n$trimmed'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Hủy'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Mở'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    final String encoded = Uri.encodeComponent(trimmed);
+
+    if (Platform.isIOS) {
+      final Uri iosAppUri = Uri.parse('comgooglemaps://?q=$encoded');
+      try {
+        if (await canLaunchUrl(iosAppUri)) {
+          await launchUrl(iosAppUri, mode: LaunchMode.externalApplication);
+          return;
+        }
+        // Fallback to Apple Maps if Google Maps app is not available
+        final Uri appleMapsUri = Uri.parse('http://maps.apple.com/?q=$encoded');
+        if (await canLaunchUrl(appleMapsUri)) {
+          await launchUrl(appleMapsUri, mode: LaunchMode.externalApplication);
+          return;
+        }
+      } catch (_) {}
+    } else if (Platform.isAndroid) {
+      final Uri androidGeoUri = Uri.parse('geo:0,0?q=$encoded');
+      try {
+        if (await canLaunchUrl(androidGeoUri)) {
+          await launchUrl(androidGeoUri, mode: LaunchMode.externalApplication);
+          return;
+        }
+      } catch (_) {}
+    }
+
+    final Uri webUri = Uri.parse('https://www.google.com/maps/search/?api=1&query=$encoded');
+    try {
+      final launched = await launchUrl(webUri, mode: LaunchMode.externalApplication);
+      if (!launched) {
+        Utils.showCustomToast(context, Icons.warning_amber_outlined, 'Không thể mở Google Maps');
+      }
+    } catch (_) {
+      Utils.showCustomToast(context, Icons.warning_amber_outlined, 'Không thể mở Google Maps');
+    }
   }
 
   void _onDaySelected(DateTime selectedDay, DateTime focusedDay) {
@@ -578,7 +643,24 @@ class _CheckInScreenState extends State<CheckInScreen> {
                                                           children: [
                                                              Icon(MdiIcons.mapMarkerRadiusOutline,color: subColor,size: 16,),
                                                             const SizedBox(width: 5,),
-                                                            Flexible(child: Text('${_bloc.listCheckInOffline[index].diaChi}',style:const TextStyle(color: Colors.blueGrey,fontSize: 12),maxLines: 2,overflow: TextOverflow.ellipsis,)),
+                                                            Expanded(child: Text('${_bloc.listCheckInOffline[index].diaChi}',style:const TextStyle(color: Colors.blueGrey,fontSize: 12),maxLines: 2,overflow: TextOverflow.ellipsis,)),
+                                                            const SizedBox(width: 5,),
+                                                            IconButton(
+                                                              onPressed: (_bloc.listCheckInOffline[index].diaChi?.replaceAll('null', '').trim().isNotEmpty == true) 
+                                                                ? () => _openGoogleMapsWithAddress(_bloc.listCheckInOffline[index].diaChi ?? '') 
+                                                                : null,
+                                                              icon: Icon(
+                                                                MdiIcons.mapOutline, 
+                                                                color: (_bloc.listCheckInOffline[index].diaChi?.replaceAll('null', '').trim().isNotEmpty == true) 
+                                                                  ? Colors.blueGrey 
+                                                                  : Colors.grey, 
+                                                                size: 20,
+                                                              ),
+                                                              tooltip: 'Mở bản đồ',
+                                                              splashRadius: 20,
+                                                              padding: EdgeInsets.zero,
+                                                              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                                                            ),
                                                           ],
                                                         ),
                                                         const SizedBox(height: 5,),
@@ -768,7 +850,24 @@ class _CheckInScreenState extends State<CheckInScreen> {
                                     children: [
                                       Icon(MdiIcons.mapMarkerRadiusOutline,color: subColor,size: 16,),
                                       const SizedBox(width: 5,),
-                                      Flexible(child: Text('${_bloc.listCheckInOther[index].diaChi}',style:const TextStyle(color: Colors.blueGrey,fontSize: 12),maxLines: 2,overflow: TextOverflow.ellipsis,)),
+                                      Expanded(child: Text('${_bloc.listCheckInOther[index].diaChi}',style:const TextStyle(color: Colors.blueGrey,fontSize: 12),maxLines: 2,overflow: TextOverflow.ellipsis,)),
+                                      const SizedBox(width: 5,),
+                                      IconButton(
+                                        onPressed: (_bloc.listCheckInOther[index].diaChi?.replaceAll('null', '').trim().isNotEmpty == true) 
+                                          ? () => _openGoogleMapsWithAddress(_bloc.listCheckInOther[index].diaChi ?? '') 
+                                          : null,
+                                        icon: Icon(
+                                          MdiIcons.mapOutline, 
+                                          color: (_bloc.listCheckInOther[index].diaChi?.replaceAll('null', '').trim().isNotEmpty == true) 
+                                            ? Colors.blueGrey 
+                                            : Colors.grey, 
+                                          size: 20,
+                                        ),
+                                        tooltip: 'Mở bản đồ',
+                                        splashRadius: 20,
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                                      ),
                                     ],
                                   ),
                                   const SizedBox(height: 5,),

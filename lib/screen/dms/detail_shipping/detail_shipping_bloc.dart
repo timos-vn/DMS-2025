@@ -54,7 +54,7 @@ class DetailShippingBloc extends Bloc<DetailShippingEvent,DetailShippingState>{
     final result = await FlutterImageCompress.compressAndGetFile(
       file.absolute.path,
       targetPath,
-      quality: 70, // giảm chất lượng xuống ~70%
+      quality: Const.percentQuantityImage, // Sử dụng chất lượng ảnh từ API
     );
 
     return result!;

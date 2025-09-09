@@ -167,6 +167,7 @@ class MasterAppSettings {
   int? isDefaultCongNo;
   int? scanQRCodeForInvoicePXB;
   int? allowCreateTicketShipping;
+  int? percentQuantityImage;
 
   MasterAppSettings({
     this.inStockCheck,
@@ -224,6 +225,7 @@ class MasterAppSettings {
     this.isDefaultCongNo,
     this.scanQRCodeForInvoicePXB,
     this.allowCreateTicketShipping,
+    this.percentQuantityImage,
   });
 
   MasterAppSettings.fromJson(Map<String, dynamic> json) {
@@ -285,6 +287,7 @@ class MasterAppSettings {
     isDefaultCongNo = json['isDefaultCongNo'];
     scanQRCodeForInvoicePXB = json['scanQRCodeForInvoicePXB'];
     allowCreateTicketShipping = json['allowCreateTicketShipping'];
+    percentQuantityImage = json['percentQuantityImage'];
   }
 
   Map<String, dynamic> toJson() {
@@ -347,6 +350,7 @@ class MasterAppSettings {
     data['isDefaultCongNo'] = isDefaultCongNo;
     data['scanQRCodeForInvoicePXB'] = scanQRCodeForInvoicePXB;
     data['allowCreateTicketShipping'] = allowCreateTicketShipping;
+    data['percentQuantityImage'] = percentQuantityImage;
     return data;
   }
 }

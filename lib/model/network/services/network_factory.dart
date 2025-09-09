@@ -560,6 +560,59 @@ class NetWorkFactory{
     return await requestApi(_dio!.post('/api/v1/report/report-result', options: Options(headers: {"Authorization": "Bearer $token"}), data: request.toJson()));
   }
 
+  /// Survey API Methods
+  Future<Object> getSurveyQuestions(String token, {
+    String? searchKey,
+    int pageIndex = 1,
+    int pageCount = 10,
+  }) async {
+    final queryParams = <String, dynamic>{
+      'page_index': pageIndex,
+      'page_count': pageCount,
+    };
+    
+    if (searchKey != null && searchKey.isNotEmpty) {
+      queryParams['searchKey'] = searchKey;
+    }
+
+    return await requestApi(_dio!.get(
+      '/api/v1/todos/danh-sach-cau-hoi',
+      queryParameters: queryParams,
+      options: Options(headers: {"Authorization": "Bearer $token"}),
+    ));
+  }
+
+  Future<Object> getSurveyAnswers(String token, {
+    required String sttRec,
+    required String maCauHoi,
+  }) async {
+    final queryParams = <String, dynamic>{
+      'stt_rec': sttRec,
+      'ma_cau_hoi': maCauHoi,
+    };
+
+    return await requestApi(_dio!.get(
+      '/api/v1/todos/danh-sach-cau-tra-loi',
+      queryParameters: queryParams,
+      options: Options(headers: {"Authorization": "Bearer $token"}),
+    ));
+  }
+
+  Future<Object> submitSurvey(String token, {
+    required String customerId,
+    required Map<String, dynamic> surveyResults,
+  }) async {
+    return await requestApi(_dio!.post(
+      '/api/v1/todos/submit-survey',
+      data: {
+        'customerId': customerId,
+        'surveyResults': surveyResults,
+        'timestamp': DateTime.now().toIso8601String(),
+      },
+      options: Options(headers: {"Authorization": "Bearer $token"}),
+    ));
+  }
+
   Future<Object> getPermissionUser(String token) async {
     return await requestApi(_dio!.get('/api/v1/users/get-permission-user-v2', options: Options(headers: {"Authorization": "Bearer $token"}))); //["Authorization"] = "Bearer " + token
     //return await requestApi(_dio!.get('/api/v1/users/get-permission-user-v2', options: Options(headers: {"Authorization": "Bearer $token"}))); //["Authorization"] = "Bearer " + token

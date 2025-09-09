@@ -194,6 +194,72 @@ class GetTotalUnreadNotificationSuccess extends DMSState {
     return 'GetTotalUnreadNotificationSuccess{}';
   }
 }
+class FindingProvinceSuccess extends DMSState {
+
+  @override
+  String toString() {
+    return 'FindingProvinceSuccess{}';
+  }
+}class FindingDistrictSuccess extends DMSState {
+
+  @override
+  String toString() {
+    return 'FindingDistrictSuccess{}';
+  }
+}class FindingCommuneSuccess extends DMSState {
+
+  @override
+  String toString() {
+    return 'FindingCommuneSuccess{}';
+  }
+}class FindingAreaSuccess extends DMSState {
+
+  @override
+  String toString() {
+    return 'FindingAreaSuccess{}';
+  }
+}
+
+class AutoMapAddressSuccess extends DMSState {
+  final String provinceName;
+  final String districtName;
+  final String communeName;
+  final String provinceId;
+  final String districtId;
+  final String communeId;
+
+  AutoMapAddressSuccess({
+    required this.provinceName,
+    required this.districtName,
+    required this.communeName,
+    required this.provinceId,
+    required this.districtId,
+    required this.communeId,
+  });
+
+  @override
+  String toString() {
+    return 'AutoMapAddressSuccess{province: $provinceName, district: $districtName, commune: $communeName}';
+  }
+}
+
+class AutoMapAddressError extends DMSState {
+  final String errorTitle;
+  final String errorMessage;
+  final String? suggestion;
+
+  AutoMapAddressError({
+    required this.errorTitle,
+    required this.errorMessage,
+    this.suggestion,
+  });
+
+  @override
+  String toString() {
+    return 'AutoMapAddressError{title: $errorTitle, message: $errorMessage}';
+  }
+}
+
 class DMSInventoryState extends DMSState {
   final List<ListItemInventoryResponseData> listItemInventory;
   final int? selectedIndex;

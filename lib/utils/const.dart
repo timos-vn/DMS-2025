@@ -35,7 +35,7 @@ class Const {
   ///Migration db
   static const bool migrationDB = true;
   ///version app
-  static String versionApp = '1.0.75';
+  static String versionApp = '1.0.77';
 
   static const int MAX_COUNT_ITEM = 20;
   static const kDefaultPadding = 20.0;
@@ -92,6 +92,10 @@ class Const {
   static const String REMAINING_DAYS_OFF = "REMAINING_DAYS_OF";
   static const String ROLES = "roles";
   static const String TOTAL_UNREAD_NOTIFICATION = "TOTAL_UNREAD_NOTIFICATION";
+  
+  // ✅ Survey data storage keys
+  static const String SURVEY_DATA = "SURVEY_DATA";
+  static const String SURVEY_PROGRESS = "SURVEY_PROGRESS";
 
   static const String SEND_OTP_SUCCESS = "Send OTP Success";
 
@@ -143,6 +147,7 @@ class Const {
   static String idTypeAdvOrder = ''; /// Tuỳ chọn loại hàng hoá - In Quang Trung
   static String nameTypeAdvOrder = ''; /// Tuỳ chọn loại hàng hoá - In Quang Trung
   ///
+  static int percentQuantityImage = 70; /// Chất lượng ảnh
   static bool inStockCheck = false; /// cho phép đặt tồn âm
   static bool isGiaGui = false;
   static bool isVvHd = false;

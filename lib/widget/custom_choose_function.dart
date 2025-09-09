@@ -100,7 +100,7 @@ class _CustomChooseFunctionState extends State<CustomChooseFunction> {
                                         if(function.contains('Tạo phiếu giao hàng')){
                                           keyFunction = '#6';
                                         }else{
-                                          keyFunction = '#2';
+                                          keyFunction = '#4';
                                         }
                                         setState(() {});
                                       }

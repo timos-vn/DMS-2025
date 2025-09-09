@@ -43,6 +43,7 @@ class ContractBloc extends Bloc<ContractEvent,ContractState>{
     on<GetListContractEvent>(_getListContractEvent);
     on<GetDetailContractEvent>(_getDetailContractEvent);
     on<AddCartEvent>(_addCartEvent);
+    on<AddCartWithSttRec0ReplaceEvent>(_addCartWithSttRec0ReplaceEvent);
     on<DeleteProductInCartEvent>(_deleteProductInCartEvent);
     on<GetCountProductEvent>(_getCountProductEvent);
     on<GetListOrderFormContractEvent>(_getListOrderFormContractEvent);
@@ -68,6 +69,12 @@ class ContractBloc extends Bloc<ContractEvent,ContractState>{
   void _addCartEvent(AddCartEvent event, Emitter<ContractState> emitter)async{
     emitter(ContractLoading());
     await db.addProduct(event.productItem!);
+    emitter(AddCartSuccess());
+  }
+
+  void _addCartWithSttRec0ReplaceEvent(AddCartWithSttRec0ReplaceEvent event, Emitter<ContractState> emitter)async{
+    emitter(ContractLoading());
+    await db.addProductWithSttRec0Replace(event.productItem!);
     emitter(AddCartSuccess());
   }
 

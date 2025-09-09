@@ -62,6 +62,11 @@ class _OrderScreenState extends State<OrderScreen> with TickerProviderStateMixin
     if(Const.listKeyGroupProduct.isNotEmpty){
       Const.listKeyGroupProduct.clear();
     }
+    if(Const.listTransactionsOrder.isNotEmpty){
+      _orderBloc.typePriceName = Const.listTransactionsOrder[indexIsWoPrice].tenGd.toString();
+    }else{
+      _orderBloc.typePriceName = Const.isWoPrice == true ? 'Bán buôn' : 'Bán lẻ';
+    }
     _orderBloc.add(GetPrefs());
 
   }
@@ -1104,7 +1109,6 @@ class _OrderScreenState extends State<OrderScreen> with TickerProviderStateMixin
                     ),
                     InkWell(
                       onTap: (){
-                        _orderBloc.typePriceName = Const.isWoPrice == true ? 'Bán buôn' : 'Bán lẻ';
                         showModalBottomSheet(
                             context: context,
                             isDismissible: true,

@@ -1,9 +1,12 @@
 import 'dart:io';
-import 'dart:math';
 
 import 'package:dio/dio.dart';
 import 'package:dms/extension/extension_compare_date.dart';
 import 'package:dms/model/database/data_local.dart';
+import 'package:dms/model/network/response/list_area_response.dart';
+import 'package:dms/model/network/response/list_commune_respons.dart';
+import 'package:dms/model/network/response/list_district_response.dart';
+import 'package:dms/model/network/response/list_province_response.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geocoding/geocoding.dart';
@@ -25,6 +28,7 @@ import '../../model/network/response/list_request_open_store_response.dart';
 import '../../model/network/response/list_status_order_response.dart';
 import '../../model/network/response/list_task_offline_response.dart';
 import '../../model/network/response/list_tax_response.dart';
+
 import '../../model/network/services/network_factory.dart';
 import '../../utils/utils.dart';
 import 'dms_event.dart';
@@ -128,6 +132,8 @@ class DMSBloc extends Bloc<DMSEvent,DMSState>{
     on<UpdateUIEvent>(_updateUIEvent);
     on<UpdateInventoryEvent>(_updateInventoryEvent);
     on<UpdateHistoryInventoryEvent>(_updateHistoryInventoryEvent);
+    on<FindProvinceEvent>(_findProvinceEvent);
+    on<AutoMapAddressFromGPSEvent>(_autoMapAddressFromGPSEvent);
   }
 
   void _onSelectItemInventory(SelectItemInventory event, Emitter<DMSState> emitter) {
@@ -143,6 +149,56 @@ class DMSBloc extends Bloc<DMSEvent,DMSState>{
 
     emitter(GetPrefsSuccess());
   }
+
+  void _findProvinceEvent(FindProvinceEvent event, Emitter<DMSState> emitter)async{
+    emitter(DMSLoading());
+    DMSState state;
+    if(event.typeGetList == 0){
+      if(event.province.toString().isEmpty && event.district.toString().isEmpty){
+        state = _handleFindingProvince(await networkFactory!.getListProvince(_accessToken!,event.province.toString().trim(),event.district.toString().trim(),1,100,event.idArea.toString()),0);
+      }
+      else if(event.province.toString().isNotEmpty && event.district.toString().isEmpty){
+        state = _handleFindingProvince(await networkFactory!.getListProvince(_accessToken!,event.province.toString().trim(),event.district.toString().trim(),1,150,event.idArea.toString()),1);
+      }
+      else{
+        state = _handleFindingProvince(await networkFactory!.getListProvince(_accessToken!,event.province.toString().trim(),event.district.toString().trim(),1,150,event.idArea.toString()),2);
+      }
+    }
+    else {
+      state = _handleFindingProvince(await networkFactory!.getListArea(_accessToken!,1,_maxPage,event.keysText),3);
+    }
+    emitter(state);
+  }
+
+  List<ListProvinceResponseData> listProvince = [];
+  List<ListDistrictResponseData> listDistrict = [];
+  List<ListCommuneResponseData> listCommune = [];
+  List<ListAreaResponseData> listArea = [];
+  DMSState _handleFindingProvince(Object data, int typeSearch) {
+    if (data is String) return DMSFailure('Úi, ${data.toString()}');
+    try {
+      if(typeSearch == 0){
+        ListProvinceResponse response = ListProvinceResponse.fromJson(data as Map<String,dynamic>);
+        listProvince = response.data??[];
+        return FindingProvinceSuccess();
+      }else if(typeSearch == 1){
+        ListDistrictResponse response = ListDistrictResponse.fromJson(data as Map<String,dynamic>);
+        listDistrict = response.data??[];
+        return FindingDistrictSuccess();
+      }else if(typeSearch == 2){
+        ListCommuneResponse response = ListCommuneResponse.fromJson(data as Map<String,dynamic>);
+        listCommune = response.data??[];
+        return FindingCommuneSuccess();
+      }else {
+        ListAreaResponse response = ListAreaResponse.fromJson(data as Map<String,dynamic>);
+        listArea = response.data??[];
+        return FindingAreaSuccess();
+      }
+    } catch (e) {
+      return DMSFailure('Úi, ${e.toString()}');
+    }
+  }
+
   void _updateInventoryEvent(UpdateInventoryEvent event, Emitter<DMSState> emitter)async{
     emitter(DMSLoading());
     /// Hàm build InventoryRequest từ currentDraft
@@ -776,6 +832,30 @@ class DMSBloc extends Bloc<DMSEvent,DMSState>{
   String nameQuanHuyen = '';
   String nameTinhThanh = '';
 
+  // Helper function để chuẩn hóa tên địa chỉ
+  String _normalizeAddressName(String addressName) {
+    if (addressName.isEmpty) return '';
+    
+    // Chỉ chuẩn hóa khoảng trắng và trim
+    String normalized = addressName
+        .replaceAll(RegExp(r'\s+'), ' ') // Chuẩn hóa khoảng trắng
+        .trim();
+    
+    // Xử lý các trường hợp viết tắt phổ biến
+    Map<String, String> replacements = {
+      'tp.': 'thành phố',
+      'tp ': 'thành phố ',
+      'Tp.': 'Thành phố',
+      'Tp ': 'Thành phố ',
+    };
+    
+    for (var entry in replacements.entries) {
+      normalized = normalized.replaceAll(entry.key, entry.value);
+    }
+    
+    return normalized.trim();
+  }
+
   getUserLocation() async {
     currentLocation = await locateUser();
     List<Placemark> placePoint = await placemarkFromCoordinates(currentLocation.latitude,currentLocation.longitude);
@@ -836,6 +916,330 @@ class DMSBloc extends Bloc<DMSEvent,DMSState>{
       }
     } catch (e) {
       emitter(DMSFailure('Úi: ${e.toString()}'));
+    }
+  }
+
+  void _autoMapAddressFromGPSEvent(AutoMapAddressFromGPSEvent event, Emitter<DMSState> emitter) async {
+    emitter(DMSLoading());
+    
+    try {
+      // Lấy vị trí hiện tại
+      await getUserLocation();
+      
+      // Bắt đầu quá trình map tuần tự
+      await _mapAddressSequentially(emitter);
+      
+    } catch (e) {
+      emitter(AutoMapAddressError(
+        errorTitle: 'Lỗi GPS',
+        errorMessage: 'Không thể lấy vị trí GPS hiện tại: ${e.toString()}',
+        suggestion: 'Vui lòng kiểm tra quyền truy cập vị trí hoặc nhập thông tin thủ công.',
+      ));
+    }
+  }
+
+  Future<void> _mapAddressSequentially(Emitter<DMSState> emitter) async {
+    try {
+      // Bắt đầu auto map address từ GPS
+      print('Bắt đầu auto map address từ GPS...');
+      print('Tỉnh/Thành từ GPS: $nameTinhThanh');
+      print('Quận/Huyện từ GPS: $nameQuanHuyen');
+      print('Phường/Xã từ GPS: $namePhuongXa');
+      print('📋 Luồng API: Tỉnh → Quận (với ID tỉnh) → Phường (với ID tỉnh + ID quận)');
+      
+      // Bước 1: Tìm tỉnh/thành phố (API: province='', district='')
+      String provinceName = nameTinhThanh; // Thử với tên gốc trước
+      print('🔍 Bước 1 - Tìm tỉnh/thành: "$provinceName"');
+      String? provinceId = await _findProvinceByName(provinceName, emitter);
+      
+      if (provinceId == null) {
+        // Thử với tên đã chuẩn hóa
+        String normalizedProvinceName = _normalizeAddressName(nameTinhThanh);
+        print('🔄 Thử với tên chuẩn hóa: "$normalizedProvinceName"');
+        provinceId = await _findProvinceByName(normalizedProvinceName, emitter);
+      }
+      
+      if (provinceId == null) {
+        emitter(AutoMapAddressError(
+          errorTitle: 'Không tìm thấy tỉnh/thành',
+          errorMessage: 'Không thể tìm thấy tỉnh/thành: "$provinceName" trong hệ thống.',
+          suggestion: 'Vui lòng kiểm tra lại địa chỉ hoặc chọn thủ công.',
+        ));
+        return;
+      }
+      print('✅ Tìm thấy tỉnh/thành: $provinceName (ID: $provinceId)');
+
+      // Bước 2: Tìm quận/huyện (API: province=ID, district='')
+      String districtName = nameQuanHuyen; // Thử với tên gốc trước
+      print('🔍 Bước 2 - Tìm quận/huyện: "$districtName" (tỉnh ID: $provinceId)');
+      String? districtId = await _findDistrictByName(districtName, provinceId, emitter);
+      
+      if (districtId == null) {
+        // Thử với tên đã chuẩn hóa
+        String normalizedDistrictName = _normalizeAddressName(nameQuanHuyen);
+        print('🔄 Thử với tên chuẩn hóa: "$normalizedDistrictName"');
+        districtId = await _findDistrictByName(normalizedDistrictName, provinceId, emitter);
+      }
+      
+      if (districtId == null) {
+        emitter(AutoMapAddressError(
+          errorTitle: 'Không tìm thấy quận/huyện',
+          errorMessage: 'Không thể tìm thấy quận/huyện: "$districtName" trong tỉnh "$provinceName".',
+          suggestion: 'Vui lòng kiểm tra lại địa chỉ hoặc chọn thủ công.',
+        ));
+        return;
+      }
+      print('✅ Tìm thấy quận/huyện: $districtName (ID: $districtId)');
+
+      // Bước 3: Tìm phường/xã (API: province=ID, district=ID)
+      String communeName = namePhuongXa; // Thử với tên gốc trước
+      print('🔍 Bước 3 - Tìm phường/xã: "$communeName" (tỉnh ID: $provinceId, quận ID: $districtId)');
+      String? communeId = await _findCommuneByName(communeName, provinceId, districtId, emitter);
+      
+      if (communeId == null) {
+        // Thử với tên đã chuẩn hóa
+        String normalizedCommuneName = _normalizeAddressName(namePhuongXa);
+        print('🔄 Thử với tên chuẩn hóa: "$normalizedCommuneName"');
+        communeId = await _findCommuneByName(normalizedCommuneName, provinceId, districtId, emitter);
+      }
+      
+      if (communeId == null) {
+        // Thử tìm phường/xã mặc định
+        print('⚠️ Không tìm thấy phường/xã, thử tìm phường/xã mặc định...');
+        communeId = await _findFirstCommuneInDistrict(provinceId, districtId, emitter);
+        
+        if (communeId == null) {
+          emitter(AutoMapAddressError(
+            errorTitle: 'Không tìm thấy phường/xã',
+            errorMessage: 'Không thể tìm thấy phường/xã: "$communeName" trong quận "$districtName".',
+            suggestion: 'Đã tự động chọn phường/xã đầu tiên trong quận này.',
+          ));
+          return;
+        }
+      }
+      print('✅ Tìm thấy phường/xã: $communeName (ID: $communeId)');
+
+      // Thành công - emit state với dữ liệu đã map
+      emitter(AutoMapAddressSuccess(
+        provinceName: nameTinhThanh, // Sử dụng tên gốc từ GPS
+        districtName: nameQuanHuyen, // Sử dụng tên gốc từ GPS
+        communeName: namePhuongXa, // Sử dụng tên gốc từ GPS
+        provinceId: provinceId,
+        districtId: districtId,
+        communeId: communeId,
+      ));
+      
+      print('🎉 Auto map address thành công!');
+
+    } catch (e) {
+      print('❌ Lỗi khi map địa chỉ: $e');
+      emitter(AutoMapAddressError(
+        errorTitle: 'Lỗi hệ thống',
+        errorMessage: 'Đã xảy ra lỗi khi tự động map địa chỉ: ${e.toString()}',
+        suggestion: 'Vui lòng thử lại hoặc nhập thông tin thủ công.',
+      ));
+    }
+  }
+
+  Future<String?> _findProvinceByName(String provinceName, Emitter<DMSState> emitter) async {
+    try {
+      print('🔍 Tìm kiếm tỉnh/thành: $provinceName');
+      
+      // API Call: getListProvince(province='', district='') - lấy danh sách tỉnh/thành
+      Object data = await networkFactory!.getListProvince(
+        _accessToken!,
+        '', // province rỗng
+        '', // district rỗng
+        1,
+        100,
+        ''
+      );
+      
+      DMSState state = _handleFindingProvince(data, 0);
+      if (state is FindingProvinceSuccess) {
+        print('📋 Danh sách tỉnh/thành có ${listProvince.length} items');
+        
+        // Tìm kiếm chính xác trước
+        for (var province in listProvince) {
+          String? tenTinh = province.tenTinh?.toLowerCase();
+          String searchName = provinceName.toLowerCase();
+          
+          print('  - So sánh: "$tenTinh" với "$searchName"');
+          
+          if (tenTinh != null && (tenTinh.contains(searchName) || searchName.contains(tenTinh))) {
+            print('  ✅ Tìm thấy: ${province.tenTinh} (ID: ${province.maTinh})');
+            return province.maTinh;
+          }
+        }
+        
+        // Fallback: Tìm kiếm theo từ khóa
+        print('🔄 Thử tìm kiếm theo từ khóa...');
+        for (var province in listProvince) {
+          String? tenTinh = province.tenTinh?.toLowerCase();
+          String searchName = provinceName.toLowerCase();
+          
+          // Tách từ khóa và tìm kiếm
+          List<String> keywords = searchName.split(' ');
+          for (String keyword in keywords) {
+            if (keyword.length > 2 && tenTinh != null && tenTinh.contains(keyword)) {
+              print('  ✅ Tìm thấy theo từ khóa "$keyword": ${province.tenTinh} (ID: ${province.maTinh})');
+              return province.maTinh;
+            }
+          }
+        }
+        
+        print('❌ Không tìm thấy tỉnh/thành phù hợp');
+      } else {
+        print('❌ API call tỉnh/thành thất bại');
+      }
+      return null;
+    } catch (e) {
+      print('❌ Lỗi tìm tỉnh: $e');
+      return null;
+    }
+  }
+
+  Future<String?> _findDistrictByName(String districtName, String provinceId, Emitter<DMSState> emitter) async {
+    try {
+      print('🔍 Tìm kiếm quận/huyện: $districtName (tỉnh ID: $provinceId)');
+      
+      // API Call: getListProvince(province=ID, district='') - lấy danh sách quận/huyện theo tỉnh
+      Object data = await networkFactory!.getListProvince(
+        _accessToken!,
+        provinceId, // truyền ID province
+        '', // district rỗng
+        1,
+        150,
+        ''
+      );
+      
+      DMSState state = _handleFindingProvince(data, 1);
+      if (state is FindingDistrictSuccess) {
+        print('📋 Danh sách quận/huyện có ${listDistrict.length} items');
+        
+        // Tìm kiếm chính xác trước
+        for (var district in listDistrict) {
+          String? tenQuan = district.tenQuan?.toLowerCase();
+          String searchName = districtName.toLowerCase();
+          
+          print('  - So sánh: "$tenQuan" với "$searchName"');
+          
+          if (tenQuan != null && (tenQuan.contains(searchName) || searchName.contains(tenQuan))) {
+            print('  ✅ Tìm thấy: ${district.tenQuan} (ID: ${district.maQuan})');
+            return district.maQuan;
+          }
+        }
+        
+        // Fallback: Tìm kiếm theo từ khóa
+        print('🔄 Thử tìm kiếm theo từ khóa...');
+        for (var district in listDistrict) {
+          String? tenQuan = district.tenQuan?.toLowerCase();
+          String searchName = districtName.toLowerCase();
+          
+          // Tách từ khóa và tìm kiếm
+          List<String> keywords = searchName.split(' ');
+          for (String keyword in keywords) {
+            if (keyword.length > 2 && tenQuan != null && tenQuan.contains(keyword)) {
+              print('  ✅ Tìm thấy theo từ khóa "$keyword": ${district.tenQuan} (ID: ${district.maQuan})');
+              return district.maQuan;
+            }
+          }
+        }
+        
+        print('❌ Không tìm thấy quận/huyện phù hợp');
+      } else {
+        print('❌ API call quận/huyện thất bại');
+      }
+      return null;
+    } catch (e) {
+      print('❌ Lỗi tìm quận/huyện: $e');
+      return null;
+    }
+  }
+
+  Future<String?> _findCommuneByName(String communeName, String provinceId, String districtId, Emitter<DMSState> emitter) async {
+    try {
+      print('🔍 Tìm kiếm phường/xã: $communeName (tỉnh ID: $provinceId, quận ID: $districtId)');
+      
+      // API Call: getListProvince(province=ID, district=ID) - lấy danh sách phường/xã theo quận/huyện
+      Object data = await networkFactory!.getListProvince(
+        _accessToken!,
+        provinceId, // truyền ID province
+        districtId, // truyền ID district
+        1,
+        150,
+        ''
+      );
+      
+      DMSState state = _handleFindingProvince(data, 2);
+      if (state is FindingCommuneSuccess) {
+        print('📋 Danh sách phường/xã có ${listCommune.length} items');
+        
+        // Tìm kiếm chính xác trước
+        for (var commune in listCommune) {
+          String? tenPhuong = commune.tenPhuong?.toLowerCase();
+          String searchName = communeName.toLowerCase();
+          
+          print('  - So sánh: "$tenPhuong" với "$searchName"');
+          
+          if (tenPhuong != null && (tenPhuong.contains(searchName) || searchName.contains(tenPhuong))) {
+            print('  ✅ Tìm thấy: ${commune.tenPhuong} (ID: ${commune.maPhuong})');
+            return commune.maPhuong;
+          }
+        }
+        
+        // Fallback: Tìm kiếm theo từ khóa
+        print('🔄 Thử tìm kiếm theo từ khóa...');
+        for (var commune in listCommune) {
+          String? tenPhuong = commune.tenPhuong?.toLowerCase();
+          String searchName = communeName.toLowerCase();
+          
+          // Tách từ khóa và tìm kiếm
+          List<String> keywords = searchName.split(' ');
+          for (String keyword in keywords) {
+            if (keyword.length > 2 && tenPhuong != null && tenPhuong.contains(keyword)) {
+              print('  ✅ Tìm thấy theo từ khóa "$keyword": ${commune.tenPhuong} (ID: ${commune.maPhuong})');
+              return commune.maPhuong;
+            }
+          }
+        }
+        
+        print('❌ Không tìm thấy phường/xã phù hợp');
+      } else {
+        print('❌ API call phường/xã thất bại');
+      }
+      return null;
+    } catch (e) {
+      print('❌ Lỗi tìm phường/xã: $e');
+      return null;
+    }
+  }
+
+  // Hàm helper để tìm phường/xã đầu tiên trong quận/huyện
+  Future<String?> _findFirstCommuneInDistrict(String provinceId, String districtId, Emitter<DMSState> emitter) async {
+    try {
+      print('🔍 Tìm phường/xã đầu tiên trong quận/huyện (tỉnh ID: $provinceId, quận ID: $districtId)...');
+      
+      Object data = await networkFactory!.getListProvince(
+        _accessToken!,
+        provinceId, // truyền ID province
+        districtId, // truyền ID district
+        1,
+        150,
+        ''
+      );
+      
+      DMSState state = _handleFindingProvince(data, 2);
+      if (state is FindingCommuneSuccess && listCommune.isNotEmpty) {
+        String firstCommuneId = listCommune.first.maPhuong ?? '';
+        String firstCommuneName = listCommune.first.tenPhuong ?? '';
+        print('✅ Sử dụng phường/xã đầu tiên: $firstCommuneName (ID: $firstCommuneId)');
+        return firstCommuneId;
+      }
+      return null;
+    } catch (e) {
+      print('❌ Lỗi tìm phường/xã mặc định: $e');
+      return null;
     }
   }
 }

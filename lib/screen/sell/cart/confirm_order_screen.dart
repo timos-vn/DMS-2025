@@ -335,7 +335,7 @@ class _ConfirmScreenState extends State<ConfirmScreen>with TickerProviderStateMi
                   _bloc.listOrder[index].ckntByHand = (price * sl * _bloc.listOrder[index].discountPercentByHand )/100;
                   _bloc.listOrder[index].priceAfter2 = price;//_bloc.listOrder[index].priceAfter;
                   _bloc.listOrder[index].priceAfter =
-                  (_bloc.listOrder[index].price! - ((_bloc.listOrder[index].price! * 1) * _bloc.listOrder[index].discountPercentByHand)/100);
+                  ((_bloc.listOrder[index].price ?? 0) - (((_bloc.listOrder[index].price ?? 0) * 1) * _bloc.listOrder[index].discountPercentByHand)/100);
                  print('1234A ${ _bloc.listOrder[index].priceAfter}');
                   if(_bloc.listOrder[index].discountPercentByHand > 0){
                     Utils.showCustomToast(context, Icons.check_circle_outline, 'Đã áp dụng chiết khấu tự do');
@@ -738,10 +738,10 @@ class _ConfirmScreenState extends State<ConfirmScreen>with TickerProviderStateMi
       if(element.isMark == 1){
         _bloc.totalProductBuy += 1;
         _bloc.totalProductView += element.count!;
-        double x = (element.price! * element.count!);
+        double x = ((element.price ?? 0) * element.count!);
         listItem = listItem == '' ? element.code.toString() : '$listItem,${element.code.toString()}';
         listQty = listQty == '' ? element.count.toString() : '$listQty,${element.count.toString()}';
-        listPrice = listPrice == '' ?  element.price.toString() : '$listPrice,${element.price.toString()}';
+        listPrice = listPrice == '' ?  (element.price ?? 0).toString() : '$listPrice,${(element.price ?? 0).toString()}';
         listMoney = listMoney == '' ? x.toString() : '$listMoney,${x.toString()}';
       }
       else if(element.isMark == 0){
@@ -1396,7 +1396,7 @@ class _ConfirmScreenState extends State<ConfirmScreen>with TickerProviderStateMi
                             if(_bloc.allowTaxPercent == true){
                               price = _bloc.listOrder[index].priceAfterTax!;
                             }else{
-                              price = _bloc.listOrder[index].price!;
+                              price = _bloc.listOrder[index].price ?? 0;
                             }
                             double a = ((price * sl) * _bloc.listOrder[index].discountPercentByHand)/100;
                             _bloc.listOrder[index].discountByHand = false;
@@ -1404,7 +1404,7 @@ class _ConfirmScreenState extends State<ConfirmScreen>with TickerProviderStateMi
                             _bloc.totalPayment  = _bloc.totalPayment   + a;
                             _bloc.listOrder[index].discountPercentByHand = 0;
                             _bloc.listOrder[index].ckntByHand = 0;
-                            _bloc.listOrder[index].priceAfter = _bloc.listOrder[index].price;
+                            _bloc.listOrder[index].priceAfter = _bloc.listOrder[index].price ?? 0;
                             _bloc.add(CalculatorDiscountEvent(addOnProduct: false,product: _bloc.listOrder[index],reLoad: false, addTax: false));
                             Utils.showCustomToast(context, Icons.check_circle_outline, 'Huỷ áp dụng chiết khấu tự do');
                           }
@@ -1423,12 +1423,12 @@ class _ConfirmScreenState extends State<ConfirmScreen>with TickerProviderStateMi
                               if(value[0] == 'BACK'){
                                 _bloc.listOrder[index].discountByHand = true;
                                 double sl = _bloc.listOrder[index].count!;
-                                double price = _bloc.allowTaxPercent == true ?  _bloc.listOrder[index].priceAfterTax! : _bloc.listOrder[index].price!;
+                                double price = _bloc.allowTaxPercent == true ?  _bloc.listOrder[index].priceAfterTax! : (_bloc.listOrder[index].price ?? 0);
                                 _bloc.listOrder[index].discountPercentByHand = double.parse(value[1].toString());
                                 _bloc.totalPayment = _bloc.totalPayment -  (price * sl * value[1] )/100;
                                 _bloc.listOrder[index].ckntByHand = (price * sl * value[1] )/100;
                                 _bloc.listOrder[index].priceAfter2 = price;//_bloc.listOrder[index].priceAfter;
-                                _bloc.listOrder[index].priceAfter = (_bloc.listOrder[index].price! - ((_bloc.listOrder[index].price! * 1) * value[1])/100);
+                                _bloc.listOrder[index].priceAfter = ((_bloc.listOrder[index].price ?? 0) - (((_bloc.listOrder[index].price ?? 0) * 1) * value[1])/100);
 
                                 Utils.showCustomToast(context, Icons.check_circle_outline, 'Đã áp dụng chiết khấu tự do');
                                 _bloc.add(CalculatorDiscountEvent(addOnProduct: true,product: _bloc.listOrder[index],reLoad: false, addTax: false));
@@ -1825,7 +1825,7 @@ class _ConfirmScreenState extends State<ConfirmScreen>with TickerProviderStateMi
                                       visible: _bloc.listOrder[index].gifProduct != true  && _bloc.listOrder[index].gifProductByHand != true,
                                       child: Column(
                                         children: [
-                                          (_bloc.listOrder[index].price! > 0 && _bloc.listOrder[index].price == _bloc.listOrder[index].priceAfter ) ?
+                                          ((_bloc.listOrder[index].price ?? 0) > 0 && _bloc.listOrder[index].price == _bloc.listOrder[index].priceAfter ) ?
                                               Container()
                                               :
                                           Text(

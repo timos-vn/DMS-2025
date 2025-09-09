@@ -5,7 +5,7 @@ import 'dart:io';
 
 import 'package:dms/widget/custom_camera.dart';
 import 'package:dms/widget/pending_action.dart';
-import 'package:dms/widget/text_field_widget2.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -21,7 +21,6 @@ import '../dms_state.dart';
 import '../check_in/search_province/search_province_screen.dart';
 import '../check_in/search_tour/search_tour_screen.dart';
 
-
 class AddNewRequestOpenStoreScreen extends StatefulWidget {
   const AddNewRequestOpenStoreScreen({Key? key}) : super(key: key);
 
@@ -30,96 +29,109 @@ class AddNewRequestOpenStoreScreen extends StatefulWidget {
 }
 
 class _AddNewRequestOpenStoreScreenState extends State<AddNewRequestOpenStoreScreen> {
-
   late DMSBloc _bloc;
 
+  // Controllers
   final _addressController = TextEditingController();
   final FocusNode _addressFocus = FocusNode();
-
   final _nameCustomerController = TextEditingController();
   final FocusNode _nameCustomerFocus = FocusNode();
-
   final _phoneCustomerController = TextEditingController();
   final FocusNode _phoneCustomerFocus = FocusNode();
-
   final _phoneCustomer2Controller = TextEditingController();
   final FocusNode _phoneCustomer2Focus = FocusNode();
-
   final _nameStoreController = TextEditingController();
   final FocusNode _nameStoreFocus = FocusNode();
-
   final _noteController = TextEditingController();
   final FocusNode _noteFocus = FocusNode();
-
   final _descController = TextEditingController();
   final FocusNode _descFocus = FocusNode();
-
   final _nameTourController = TextEditingController();
-  final FocusNode _nameTourFocus = FocusNode();
-
   final _nameStateController = TextEditingController();
-  final FocusNode _nameStateFocus = FocusNode();
-
   final _emailController = TextEditingController();
   final FocusNode _emailFocus = FocusNode();
-
   final _mstController = TextEditingController();
   final FocusNode _mstFocus = FocusNode();
-
   final _birthDayController = TextEditingController();
-  final FocusNode _birthDayFocus = FocusNode();
-
   final _provinceController = TextEditingController();
-  String idProvince = '';
-
   final _districtController = TextEditingController();
-  String idDistrict = '';
-
   final _communeController = TextEditingController();
-  String idCommune = '';
-
   final _areaController = TextEditingController();
-  String idArea = '';
-
   final _typeStoreController = TextEditingController();
-  String idTypeStore = '';
-
   final _storeFormController = TextEditingController();
+
+  // IDs
+  String idProvince = '';
+  String idDistrict = '';
+  String idCommune = '';
+  String idArea = '';
+  String idTypeStore = '';
   String idStoreForm = '';
+  String idTour = '';
+  String idState = '';
 
-  String idTour =''; String idState ='';
-
-
+  // State variables
   late Timer _timer = Timer(const Duration(milliseconds: 1), () {});
   int start = 3;
-
   bool waitingLoad = false;
+
+  // Cache for step completion status
+  final Map<int, bool> _stepCompletionCache = {};
 
   void startTimer() {
     const oneSec = Duration(seconds: 1);
-    _timer =  Timer.periodic(
-      oneSec,
-          (Timer timer) {
-        if (start == 0) {
-          waitingLoad = false;
-          setState(() {});
-          timer.cancel();
-        } else {
-          start--;
-        }
-      },
-    );
+    _timer = Timer.periodic(oneSec, (Timer timer) {
+      if (start == 0) {
+        waitingLoad = false;
+        setState(() {});
+        timer.cancel();
+      } else {
+        start--;
+      }
+    });
   }
 
   @override
   void dispose() {
     _timer.cancel();
+
+    // Dispose tất cả controllers
+    _addressController.dispose();
+    _addressFocus.dispose();
+    _nameCustomerController.dispose();
+    _nameCustomerFocus.dispose();
+    _phoneCustomerController.dispose();
+    _phoneCustomerFocus.dispose();
+    _phoneCustomer2Controller.dispose();
+    _phoneCustomer2Focus.dispose();
+    _nameStoreController.dispose();
+    _nameStoreFocus.dispose();
+    _noteController.dispose();
+    _noteFocus.dispose();
+    _descController.dispose();
+    _descFocus.dispose();
+    _nameTourController.dispose();
+    _nameStateController.dispose();
+    _emailController.dispose();
+    _emailFocus.dispose();
+    _mstController.dispose();
+    _mstFocus.dispose();
+    _birthDayController.dispose();
+    _provinceController.dispose();
+    _districtController.dispose();
+    _communeController.dispose();
+    _areaController.dispose();
+    _typeStoreController.dispose();
+    _storeFormController.dispose();
+
+    // Clear cache
+    _stepCompletionCache.clear();
+
     super.dispose();
   }
 
   @override
   void initState() {
-    // TODO: implement initState
     super.initState();
     _bloc = DMSBloc(context);
     _bloc.add(GetPrefsDMSEvent());
@@ -127,445 +139,1444 @@ class _AddNewRequestOpenStoreScreenState extends State<AddNewRequestOpenStoreScr
 
   final imagePicker = ImagePicker();
 
-  Future getImage()async {
-    // final image = await imagePicker.pickImage(source: ImageSource.camera,imageQuality: 65,);
+  Future getImage() async {
+    try {
+      var result = await PersistentNavBarNavigator.pushNewScreen(
+          context,
+          screen: const CameraCustomUI()
+      );
 
-    PersistentNavBarNavigator.pushNewScreen(context, screen: const CameraCustomUI()).then((value){
-      if(value != null){
-        XFile image = value;
+      if (result != null) {
+        XFile image = result;
         setState(() {
-          if(image != null){
-            start = 2;waitingLoad  = true;
-            startTimer();
-            _bloc.listFileInvoice.add(File(image.path));
-          }
-          if(_addressController.text.toString().replaceAll('null', '').isEmpty){
-            _addressController.text = _bloc.currentAddress.toString();
+          start = 2;
+          waitingLoad = true;
+          startTimer();
+          _bloc.listFileInvoice.add(File(image.path));
 
+          if (_addressController.text.toString().replaceAll('null', '').isEmpty) {
+            _addressController.text = _bloc.currentAddress.toString();
           }
+          
+          // Clear cache để update progress indicator
+          _clearStepCompletionCache();
         });
+        
+        // Auto map address từ GPS sau khi chụp ảnh
+        _triggerAutoMapAddress();
       }
-    });
+    } catch (e) {
+      print('Error getting image: $e');
+      Utils.showCustomToast(context, Icons.error, 'Không thể chụp ảnh. Vui lòng thử lại.');
+    }
   }
 
+  void _triggerAutoMapAddress() {
+    // Chỉ auto map nếu chưa có dữ liệu địa chỉ
+    if (idProvince.isEmpty && idDistrict.isEmpty && idCommune.isEmpty) {
+      _bloc.add(AutoMapAddressFromGPSEvent());
+    }
+  }
 
+  void _showAutoMapErrorDialog(AutoMapAddressError state) {
+    showDialog(
+      context: context,
+      barrierDismissible: false, // Không cho phép đóng bằng cách tap bên ngoài
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
+            children: [
+              Icon(
+                Icons.warning_amber_rounded,
+                color: Colors.orange,
+                size: 28,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  state.errorTitle,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                state.errorMessage,
+                style: const TextStyle(
+                  fontSize: 16,
+                  color: Colors.black87,
+                ),
+              ),
+              if (state.suggestion != null) ...[
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.lightbulb_outline,
+                        color: Colors.blue,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          state.suggestion!,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Colors.blue,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                'Đã hiểu',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.blue,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Validation helper
+  bool _isFormValid() {
+    _clearStepCompletionCache();
+
+    bool customerInfoValid = _nameCustomerController.text.isNotEmpty &&
+        _phoneCustomerController.text.isNotEmpty &&
+        _phoneCustomerController.text.length == 10 &&
+        _birthDayController.text.isNotEmpty;
+
+    bool storeInfoValid = _nameStoreController.text.isNotEmpty &&
+        _phoneCustomer2Controller.text.isNotEmpty &&
+        _phoneCustomer2Controller.text.length == 10 &&
+        _bloc.listFileInvoice.isNotEmpty;
+
+    bool locationValid = _addressController.text.isNotEmpty &&
+        idArea.isNotEmpty &&
+        idProvince.isNotEmpty &&
+        idDistrict.isNotEmpty &&
+        idCommune.isNotEmpty;
+
+    bool additionalInfoValid = idTour.isNotEmpty &&
+        (Const.chooseStateWhenCreateNewOpenStore == true ? idState.isNotEmpty : true);
+
+    return customerInfoValid && storeInfoValid && locationValid && additionalInfoValid;
+  }
+
+  void _showValidationError() {
+    String errorMessage = 'Vui lòng nhập đầy đủ thông tin bắt buộc:\n';
+    List<String> missingFields = [];
+
+    if (_nameCustomerController.text.isEmpty) missingFields.add('• Tên người liên hệ');
+    if (_phoneCustomerController.text.isEmpty) missingFields.add('• SĐT người liên hệ');
+    if (_phoneCustomerController.text.isNotEmpty && _phoneCustomerController.text.length != 10) {
+      missingFields.add('• SĐT người liên hệ phải có 10 chữ số');
+    }
+    if (_birthDayController.text.isEmpty) missingFields.add('• Ngày sinh');
+    if (_nameStoreController.text.isEmpty) missingFields.add('• Tên cửa hàng');
+    if (_phoneCustomer2Controller.text.isEmpty) missingFields.add('• SĐT cửa hàng');
+    if (_phoneCustomer2Controller.text.isNotEmpty && _phoneCustomer2Controller.text.length != 10) {
+      missingFields.add('• SĐT cửa hàng phải có 10 chữ số');
+    }
+    if (_addressController.text.isEmpty) missingFields.add('• Địa chỉ');
+    if (idArea.isEmpty) missingFields.add('• Khu vực');
+    if (idProvince.isEmpty) missingFields.add('• Tỉnh/Thành');
+    if (idDistrict.isEmpty) missingFields.add('• Quận/Huyện');
+    if (idCommune.isEmpty) missingFields.add('• Xã/Phường');
+    if (idTour.isEmpty) missingFields.add('• Tour/Tuyến');
+    if (Const.chooseStateWhenCreateNewOpenStore == true && idState.isEmpty) {
+      missingFields.add('• Trạng thái');
+    }
+    if (_bloc.listFileInvoice.isEmpty) missingFields.add('• Ảnh cửa hàng');
+
+    errorMessage += missingFields.join('\n');
+    Utils.showCustomToast(context, Icons.warning_amber_outlined, errorMessage);
+  }
+
+  void _validateAndSubmit() {
+    if (_isFormValid()) {
+      _bloc.add(AddNewRequestOpenStoreEvent(
+        nameCustomer: _nameCustomerController.text,
+        phoneCustomer: _phoneCustomerController.text,
+        email: _emailController.text,
+        address: _addressController.text,
+        note: _noteController.text,
+        idTour: idTour,
+        nameStore: _nameStoreController.text,
+        mst: _mstController.text,
+        desc: _descController.text,
+        phoneStore: _phoneCustomer2Controller.text,
+        idProvince: idProvince,
+        idDistrict: idDistrict,
+        idCommune: idCommune,
+        gps: "",
+        idArea: idArea,
+        idTypeStore: idTypeStore,
+        idStoreForm: idStoreForm,
+        birthDay: _birthDayController.text,
+        idState: idState,
+      ));
+    } else {
+      _showValidationError();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: subColor,
-        onPressed: ()async{
-          print(idArea);
-          print(idStoreForm);
-          print(idProvince);
-          print(idDistrict);
-          print('${idCommune} - 1');
-          print(idTour);
-          print(_bloc.listFileInvoice.isNotEmpty);
-          print(Const.chooseStateWhenCreateNewOpenStore == true ? idState.isNotEmpty : _bloc.listFileInvoice.isNotEmpty);
-
-          if(_nameStoreController.text.isNotEmpty &&
-              _nameCustomerController.text.isNotEmpty &&
-              _addressController.text.isNotEmpty &&
-              // _phoneCustomerController.text.isNotEmpty &&
-              // _phoneCustomer2Controller.text.isNotEmpty &&
-              idArea.isNotEmpty &&
-              // idTypeStore.isNotEmpty &&
-              idStoreForm.isNotEmpty && idProvince.isNotEmpty && idDistrict.isNotEmpty
-              && idCommune.isNotEmpty && idTour.isNotEmpty && _bloc.listFileInvoice.isNotEmpty
-              && (Const.chooseStateWhenCreateNewOpenStore == true ? idState.isNotEmpty : _bloc.listFileInvoice.isNotEmpty)
-          ){
-            _bloc.add(AddNewRequestOpenStoreEvent(
-                nameCustomer: _nameCustomerController.text,
-                phoneCustomer: _phoneCustomerController.text,
-                email:_emailController.text,
-                address: _addressController.text,
-                note: _noteController.text,
-                idTour: idTour,
-                nameStore: _nameStoreController.text,
-                mst:_mstController.text,
-                desc:_descController.text,
-                phoneStore:_phoneCustomer2Controller.text,
-                idProvince:idProvince,
-                idDistrict:idDistrict,
-                idCommune:idCommune,
-                gps:"",
-                idArea:idArea,
-                idTypeStore:idTypeStore,
-                idStoreForm:idStoreForm,
-                birthDay: _birthDayController.text,
-                idState: idState
-            ));
-          }else{
-            Utils.showCustomToast(context, Icons.warning_amber_outlined, 'Úi, Vui lòng nhập đầy đủ nội dung bắt buộc và chụp ảnh');
-          }
-        },
-        child: const Icon(Icons.add_business,color: Colors.white,),
-      ),
-      body: BlocListener<DMSBloc,DMSState>(
+    return GestureDetector(
+      onTap: () {
+        // Ẩn bàn phím khi click ra ngoài
+        FocusScope.of(context).unfocus();
+      },
+      behavior: HitTestBehavior.translucent, // Đảm bảo gesture được detect ngay cả khi có widget con
+      child: Scaffold(
+        backgroundColor: Colors.grey[50],
+        body: BlocListener<DMSBloc, DMSState>(
         bloc: _bloc,
-        listener: (context,state){
-          if(state is GetPrefsSuccess){
+        listener: (context, state) {
+          if (state is GetPrefsSuccess) {
+            // Initialized successfully
+          } else if (state is GrantCameraPermission) {
             _bloc.getUserLocation();
-          }
-          else if(state is GrantCameraPermission){
-            _bloc.getUserLocation();
-            getImage().then((value){
-              if(_addressController.text.toString().replaceAll('null', '').isEmpty){
+            getImage().then((value) {
+              if (_addressController.text.toString().replaceAll('null', '').isEmpty) {
                 _addressController.text = _bloc.currentAddress.toString();
               }
             });
-          }else if(state is AddNewRequestOpenStoreSuccess){
-            Utils.showCustomToast(context, Icons.check_circle_outline, 'Yeah, Thêm mới yêu cầu thành công');
-            Navigator.pop(context,'RELOAD');
-          }else if(state is DMSFailure){
+          } else if (state is AutoMapAddressSuccess) {
+            // Auto fill các trường địa chỉ
+            setState(() {
+              idProvince = state.provinceId;
+              idDistrict = state.districtId;
+              idCommune = state.communeId;
+              _provinceController.text = state.provinceName;
+              _districtController.text = state.districtName;
+              _communeController.text = state.communeName;
+              _addressController.text = _bloc.currentAddress.toString();
+              // Clear cache để update progress indicator
+              _clearStepCompletionCache();
+            });
+            
+            print('🔄 Progress indicator sẽ được update sau khi auto map address');
+            
+            Utils.showCustomToast(context, Icons.check_circle_outline, 'Đã tự động điền địa chỉ từ GPS!');
+          } else if (state is AutoMapAddressError) {
+            // Hiển thị popup lỗi
+            _showAutoMapErrorDialog(state);
+          } else if (state is AddNewRequestOpenStoreSuccess) {
+            Utils.showCustomToast(context, Icons.check_circle_outline, 'Thêm mới yêu cầu thành công!');
+            Navigator.pop(context, 'RELOAD');
+          } else if (state is DMSFailure) {
             Utils.showCustomToast(context, Icons.warning_amber_outlined, state.error);
           }
         },
-        child: BlocBuilder<DMSBloc,DMSState>(
+        child: BlocBuilder<DMSBloc, DMSState>(
           bloc: _bloc,
-          builder: (BuildContext context, DMSState state){
+          builder: (BuildContext context, DMSState state) {
             return Stack(
               children: [
-                buildBody(context,state),
-                Visibility(
-                  visible: state is DMSLoading,
-                  child: const PendingAction(),
-                )
+                buildBody(context, state),
+                if (state is DMSLoading) const PendingAction(),
               ],
             );
           },
         ),
       ),
+      bottomNavigationBar: _buildBottomBar(),
+    ),
     );
   }
 
-  buildBody(BuildContext context,DMSState state){
+  Widget _buildBottomBar() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: Row(
+          children: [
+            Expanded(
+              child: ElevatedButton(
+                onPressed: _validateAndSubmit,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: subColor,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 2,
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.add_business, size: 20),
+                    SizedBox(width: 8),
+                    Text(
+                      'Tạo yêu cầu',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget buildBody(BuildContext context, DMSState state) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        buildAppBar(),
-        const SizedBox(height: 10,),
+        _buildAppBar(),
+        // Force rebuild progress indicator khi state thay đổi
+        _buildProgressIndicator(),
         Expanded(
           child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Padding(
-                  padding: EdgeInsets.only(left: 10,top: 10,bottom: 10),
-                  child: Text('Thông tin khách hàng',style: TextStyle(color: subColor,fontWeight: FontWeight.bold),),
-                ),
-                inputWidget(title: "Tên người liên hệ",hideText: 'Tên khách hàng',controller: _nameCustomerController,focusNode: _nameCustomerFocus,
-                  textInputAction: TextInputAction.next, onTapSuffix: (){},note: true,isNull: true,colors:  Colors.grey,
-                  onSubmitted: ()=>Utils.navigateNextFocusChange(context,  _nameCustomerFocus, _phoneCustomerFocus),),
-                inputWidget(title: "SĐT người liên hệ",hideText: 'Số điện thoại',controller: _phoneCustomerController,focusNode: _phoneCustomerFocus,enableMaxLine: true,
-                    textInputAction: TextInputAction.done, onTapSuffix: (){},note: false,inputNumber: true,isPhone: true,maxLength: 10,customContainer: true,isNull: true,colors:  Colors.grey,
-                    onSubmitted: ()=>{}),
-
-                GestureDetector(
-                    onTap: (){
-                      FocusScope.of(context).requestFocus(FocusNode());
-                      Utils.dateTimePickerCustom(context).then((value){
-                        if(value != null){
-                          setState(() {
-                            _birthDayController.text = Utils.parseStringDateToString(value.toString(), Const.DATE_TIME_FORMAT,Const.DATE_SV_FORMAT);
-                          });
-                        }
-                      });
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 0,left: 10,right: 10,bottom:  10),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                'Ngày sinh',
-                                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12,color: Colors.black),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 5,),
-                          Container(
-                            height: 40,
-                            decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(12)
-                            ),
-                            child: Stack(
-                              children: [
-                                const Positioned(
-                                  right: 6,top: 0,
-                                    child: Icon(Icons.arrow_drop_down_outlined,size: 20,color: Colors.black,)
-                                ),
-                                TextFieldWidget2(
-                                  controller: _birthDayController,
-                                  isEnable: false,
-                                  keyboardType: TextInputType.text,
-                                  hintText: '1995/03/04',
-                                  isNull: true,
-                                  color: Colors.grey,
-                                  focusNode: _birthDayFocus,
-                                  onChanged: (string){},
-                                  isPassword: false,
-                                  inputFormatter:  [FilteringTextInputFormatter.digitsOnly],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                ),
-
-                inputWidget(title: "Tên cửa hàng",hideText: 'Tên cửa hàng',controller: _nameStoreController,focusNode: _nameStoreFocus,
-                  textInputAction: TextInputAction.next, onTapSuffix: (){},note: true,isNull: true,colors:  Colors.grey,
-                  onSubmitted: ()=>Utils.navigateNextFocusChange(context, _nameStoreFocus, _phoneCustomer2Focus),),
-
-                inputWidget(title: "SĐT cửa hàng",hideText: 'Số điện thoại',controller: _phoneCustomer2Controller,focusNode: _phoneCustomer2Focus,enableMaxLine: true,
-                    textInputAction: TextInputAction.next, onTapSuffix: (){},note: false,inputNumber: true,isPhone: true,maxLength: 10,customContainer: true,isNull: true,colors:  Colors.grey,
-                    onSubmitted: ()=>Utils.navigateNextFocusChange(context, _phoneCustomer2Focus, _addressFocus)),
-
-                inputWidget(title: "Địa chỉ",hideText: 'Địa chỉ',controller: _addressController,focusNode: _addressFocus,
-                  textInputAction: TextInputAction.next, onTapSuffix: (){},note: true,isNull: true,colors:  Colors.grey,
-                  onSubmitted: ()=>Utils.navigateNextFocusChange(context,  _addressFocus, _emailFocus),),
-
-                Row(
-                  children: [
-                    Expanded(
-                      child: InkWell(
-                          onTap: (){
-                            FocusScope.of(context).unfocus();
-                            PersistentNavBarNavigator.pushNewScreen(context, screen: SearchProvinceScreen( idArea: idArea.toString(),
-                              idProvince: '',idDistrict: '',title:'Danh sách Khu vực',typeGetList: 1,
-                            ),withNavBar: false).then((value){
-                              if(value != null){
-                                if(value[0] == 'Yeah'){
-                                  idArea = value[1].toString().trim();
-                                  _areaController.text = value[2].toString().trim();
-                                }
-                                setState(() {});
-                              }
-                            });
-                          },
-                          child: inputWidget(title: "Chọn Khu vực",hideText: 'Vui lòng chọn khu vực',controller: _areaController,
-                            textInputAction: TextInputAction.done, onTapSuffix: (){},note: true,isEnable: false,iconPrefix: Icons.search_outlined,isNull: true,colors:  Colors.grey,
-                            onSubmitted: ()=>null,)
-                      ),
-                    ),
-                    Expanded(
-                      child: InkWell(
-                          onTap: (){
-                            FocusScope.of(context).unfocus();
-                            PersistentNavBarNavigator.pushNewScreen(context, screen: SearchProvinceScreen(
-                              idArea:idArea.toString(),
-                              idProvince: '',idDistrict: '',title:'Danh sách Tỉnh thành',typeGetList: 0,
-                            ),withNavBar: false).then((value){
-                              if(value[0] == 'Yeah'){
-                                idProvince = value[1].toString().trim();
-                                _provinceController.text = value[2].toString().trim();
-                              }
-                              setState(() {});
-                            });
-                          },
-                          child: inputWidget(title: "Chọn Tỉnh/Thành",hideText: 'Vui lòng chọn tỉnh/thành',controller: _provinceController,
-                            textInputAction: TextInputAction.done, onTapSuffix: (){},note: true,isEnable: false,iconPrefix: Icons.search_outlined,isNull: true,colors:  Colors.grey,
-                            onSubmitted: ()=>null,)
-                      ),
-                    ),
-                  ],
-                ),
-                Row(
-                 children: [
-                   Expanded(
-                     child: InkWell(
-                         onTap: (){
-                           FocusScope.of(context).unfocus();
-                           if(idProvince.isNotEmpty){
-                             PersistentNavBarNavigator.pushNewScreen(context, screen: SearchProvinceScreen(idArea: idArea.toString(),
-                               idProvince: idProvince,idDistrict: '',title:'Danh sách Quận huyện',typeGetList: 0,
-                             ),withNavBar: false).then((value){
-                               if(value[0] == 'Yeah'){
-                                 idDistrict = value[1].toString().trim();
-                                 _districtController.text = value[2].toString().trim();
-                               }
-                               setState(() {});
-                             });
-                           }else{
-                             Utils.showCustomToast(context, Icons.warning_amber_outlined, 'Vui lòng chọn Tỉnh/Thành trước');
-                           }
-                         },
-                         child: inputWidget(title: "Chọn Quận/Huyện",hideText: 'Vui lòng chọn Quân/Huyện',controller: _districtController,
-                           textInputAction: TextInputAction.done, onTapSuffix: (){},note: true,isEnable: false,iconPrefix: Icons.search_outlined,isNull: true,colors:  Colors.grey,
-                           onSubmitted: ()=>null,)
-                     ),
-                   ),
-                   Expanded(
-                     child: InkWell(
-                         onTap: (){
-                           FocusScope.of(context).unfocus();
-                           if(idDistrict.isNotEmpty){
-                             PersistentNavBarNavigator.pushNewScreen(context, screen: SearchProvinceScreen(idArea: idArea.toString(),
-                               idProvince: idProvince,idDistrict: idDistrict,title:'Danh sách Xã phường',typeGetList: 0,
-                             ),withNavBar: false).then((value){
-                               if(value[0] == 'Yeah'){
-                                 print(value);
-                                 idCommune = value[1].toString().trim();
-                                 _communeController.text = value[2].toString().trim();
-                               }
-                               setState(() {});
-                             });
-                           }else{
-                             Utils.showCustomToast(context, Icons.warning_amber_outlined, 'Vui lòng chọn Quân/Huyện trước');
-                           }
-                         },
-                         child: inputWidget(title: "Chọn Xã/Phường",hideText: 'Vui lòng chọn Xã/Phường',controller: _communeController,
-                           textInputAction: TextInputAction.done, onTapSuffix: (){},note: true,isEnable: false,iconPrefix: Icons.search_outlined,isNull: true,colors:  Colors.grey,
-                           onSubmitted: ()=>null,)
-                     ),
-                   ),
-                 ],
-               ),
-                Row(
-                  children: [
-                    Expanded(
-                      child: InkWell(
-                          onTap: (){
-                            FocusScope.of(context).unfocus();
-                            PersistentNavBarNavigator.pushNewScreen(context, screen: SearchProvinceScreen(idArea: idArea.toString(),
-                              idProvince: idProvince,idDistrict: '',title:'Danh sách Phân loại',typeGetList: 3,
-                            ),withNavBar: false).then((value){
-                              if(value[0] == 'Yeah'){
-                                idTypeStore = value[1].toString().trim();
-                                _typeStoreController.text = value[2].toString().trim();
-                              }
-                              setState(() {});
-                            });
-                          },
-                          child: inputWidget(title: "Chọn Phân loại",hideText: 'Vui lòng chọn phân loại',controller: _typeStoreController,
-                            textInputAction: TextInputAction.done, onTapSuffix: (){},note: false,isEnable: false,iconPrefix: Icons.search_outlined,isNull: true,colors:  Colors.grey,
-                            onSubmitted: ()=>null,)
-                      ),
-                    ),
-                    Expanded(
-                      child: InkWell(
-                          onTap: (){
-                            FocusScope.of(context).unfocus();
-                            PersistentNavBarNavigator.pushNewScreen(context, screen: SearchProvinceScreen(idArea: idArea.toString(),
-                              idProvince: idProvince,idDistrict: idDistrict,title:'Danh sách Hình thức',typeGetList: 2,
-                            ),withNavBar: false).then((value){
-                             if(value != null){
-                               if(value[0] == 'Yeah'){
-                                 idStoreForm = value[1].toString().trim();
-                                 _storeFormController.text = value[2].toString().trim();
-                               }
-                               setState(() {});
-                             }
-                            });
-                          },
-                          child: inputWidget(title: "Chọn Hình thức",hideText: 'Vui lòng chọn hình thức',controller: _storeFormController,
-                            textInputAction: TextInputAction.done, onTapSuffix: (){},note: true,isEnable: false,iconPrefix: Icons.search_outlined,isNull: true,colors:  Colors.grey,
-                            onSubmitted: ()=>null,)
-                      ),
-                    ),
-                  ],
-                ),
-                inputWidget(title: "Email",hideText: 'Email',controller: _emailController,focusNode: _emailFocus,
-                  textInputAction: TextInputAction.next, onTapSuffix: (){},note: false,isNull: true,colors:  Colors.grey,
-                  onSubmitted: ()=>Utils.navigateNextFocusChange(context,  _emailFocus, _mstFocus),),
-
-                inputWidget(title: "Mã số thuế",hideText: 'Mã số thuế',controller: _mstController,focusNode: _mstFocus,
-                  textInputAction: TextInputAction.next, onTapSuffix: (){},note: false,isNull: true,colors:  Colors.grey,
-                  onSubmitted: ()=>Utils.navigateNextFocusChange(context,  _mstFocus, _noteFocus),),
-
-                inputWidget(title: "Ghi chú",hideText: 'Vui lòng nhập ghi chú nếu có',controller: _noteController,focusNode: _noteFocus,
-                  textInputAction: TextInputAction.done, onTapSuffix: (){},note: false,isNull: true,colors:  Colors.grey,
-                  onSubmitted: ()=>Utils.navigateNextFocusChange(context,  _noteFocus, _descFocus),),
-
-                inputWidget(title: "Mô tả",hideText: 'Vui lòng nhập ghi chú nếu có',controller: _descController,focusNode: _descFocus,
-                  textInputAction: TextInputAction.done, onTapSuffix: (){},note: false,isNull: true,colors:  Colors.grey,
-                  onSubmitted: ()=>null,),
-                InkWell(
-                  onTap: (){
-                    FocusScope.of(context).unfocus();
-                    PersistentNavBarNavigator.pushNewScreen(context, screen: const SearchTourScreen(
-                      idTour: '', idState: '',
-                      title: 'Tìm kiếm Tour/Tuyến', isTour: true,
-                    ),withNavBar: false).then((value){
-                      if(value != null && value[0] == 'Yeah'){
-                        idTour = value[1].toString().trim();
-                        _nameTourController.text = value[2].toString().trim();
-                      }
-                      setState(() {});
-                    });
-                  },
-                  child: inputWidget(title: "Chọn Tour/Tuyến",hideText: 'Vui lòng chọn Tour',controller: _nameTourController,focusNode: _nameTourFocus,
-                    textInputAction: TextInputAction.done, onTapSuffix: (){},note: true,isEnable: false,iconPrefix: Icons.search_outlined,isNull: true,colors:  Colors.grey,
-                    onSubmitted: ()=>null,)
-                ),
-                Visibility(
-                  visible: Const.chooseStateWhenCreateNewOpenStore == true,
-                  child: InkWell(
-                      onTap: (){
-                        FocusScope.of(context).unfocus();
-                        PersistentNavBarNavigator.pushNewScreen(context, screen:  const SearchTourScreen(
-                          idState: '',
-                          title: 'Tìm kiếm Trạng thái', idTour: '', isTour: false,
-                        ),withNavBar: false).then((value){
-                          if(value != null && value[0] == 'Yeah'){
-                            idState = value[1].toString().trim();
-                            _nameStateController.text = value[2].toString().trim();
-                          }
-                          setState(() {});
-                        });
-                      },
-                      child: inputWidget(title: "Chọn Trạng thái",hideText: 'Vui lòng chọn Trạng thái',controller: _nameStateController,focusNode: _nameStateFocus,
-                        textInputAction: TextInputAction.done, onTapSuffix: (){},note: true,isEnable: false,iconPrefix: Icons.search_outlined,isNull: true,colors:  Colors.grey,
-                        onSubmitted: ()=>null,)
-                  ),
-                ),
-                buildAttachFileInvoice()
+                _buildCustomerInfoSection(),
+                const SizedBox(height: 16),
+                _buildStoreInfoSection(),
+                const SizedBox(height: 16),
+                _buildLocationSection(),
+                const SizedBox(height: 16),
+                _buildAdditionalInfoSection(),
+                const SizedBox(height: 16),
+                if (_bloc.listFileInvoice.length > 1) _buildAdditionalImagesSection(),
+                const SizedBox(height: 100), // Bottom padding for bottom bar
               ],
             ),
           ),
         ),
-        const SizedBox(height: 10,),
       ],
     );
   }
 
-  buildAppBar(){
+  Widget _buildProgressIndicator() {
+    const int totalSteps = 4;
     return Container(
-      height: 83,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: List.generate(totalSteps, (index) {
+          bool isCompleted = _getStepCompletionStatus(index);
+          
+          // Debug log để kiểm tra
+          print('Step $index completed: $isCompleted');
+
+          return Expanded(
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 2),
+              height: 4,
+              decoration: BoxDecoration(
+                color: isCompleted ? subColor : Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+
+  bool _getStepCompletionStatus(int step) {
+    if (_stepCompletionCache.containsKey(step)) {
+      return _stepCompletionCache[step]!;
+    }
+
+    bool isCompleted;
+    switch (step) {
+      case 0: // Customer Info
+        isCompleted = _nameCustomerController.text.isNotEmpty &&
+            _phoneCustomerController.text.isNotEmpty &&
+            _birthDayController.text.isNotEmpty;
+        break;
+      case 1: // Store Info (including store image)
+        isCompleted = _nameStoreController.text.isNotEmpty &&
+            _phoneCustomer2Controller.text.isNotEmpty &&
+            _bloc.listFileInvoice.isNotEmpty;
+        break;
+      case 2: // Location
+        isCompleted = idArea.isNotEmpty && idProvince.isNotEmpty &&
+            idDistrict.isNotEmpty && idCommune.isNotEmpty;
+        break;
+      case 3: // Additional
+        isCompleted = idTour.isNotEmpty &&
+            (Const.chooseStateWhenCreateNewOpenStore == true ? idState.isNotEmpty : true);
+        break;
+      default:
+        isCompleted = false;
+    }
+
+    _stepCompletionCache[step] = isCompleted;
+    return isCompleted;
+  }
+
+  void _clearStepCompletionCache() {
+    _stepCompletionCache.clear();
+  }
+
+  // Helper functions để xác định màu border dựa trên validation
+  Color _getBorderColor(String title, String value) {
+    if (title.contains('SĐT') && value.isNotEmpty && value.length != 10) {
+      return Colors.red; // Màu đỏ cho số điện thoại không hợp lệ
+    }
+    return Colors.grey[300]!; // Màu xám mặc định
+  }
+
+  double _getBorderWidth(String title, String value) {
+    if (title.contains('SĐT') && value.isNotEmpty && value.length != 10) {
+      return 2.0; // Border dày hơn cho số điện thoại không hợp lệ
+    }
+    return 1.0; // Border mặc định
+  }
+
+  Widget _buildCustomerInfoSection() {
+    return _buildSectionCard(
+      title: 'Thông tin khách hàng',
+      icon: Icons.person_outline,
+      children: [
+        _buildInputField(
+          title: "Tên người liên hệ",
+          hint: 'Tên khách hàng',
+          controller: _nameCustomerController,
+          focusNode: _nameCustomerFocus,
+          isRequired: true,
+          onSubmitted: () => Utils.navigateNextFocusChange(context, _nameCustomerFocus, _phoneCustomerFocus),
+        ),
+        _buildInputField(
+          title: "SĐT người liên hệ",
+          hint: 'Số điện thoại',
+          controller: _phoneCustomerController,
+          focusNode: _phoneCustomerFocus,
+          isRequired: true,
+          inputType: TextInputType.phone,
+          maxLength: 10,
+        ),
+        _buildDatePickerField(),
+      ],
+    );
+  }
+
+  Widget _buildStoreInfoSection() {
+    return _buildSectionCard(
+      title: 'Thông tin cửa hàng',
+      icon: Icons.store_outlined,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              flex: 2,
+              child: _buildInputField(
+                title: "Tên cửa hàng",
+                hint: 'Tên cửa hàng',
+                controller: _nameStoreController,
+                focusNode: _nameStoreFocus,
+                isRequired: true,
+                onSubmitted: () => Utils.navigateNextFocusChange(context, _nameStoreFocus, _phoneCustomer2Focus),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              flex: 1,
+              child: _buildStoreImagePicker(),
+            ),
+          ],
+        ),
+        _buildInputField(
+          title: "SĐT cửa hàng",
+          hint: 'Số điện thoại',
+          controller: _phoneCustomer2Controller,
+          focusNode: _phoneCustomer2Focus,
+          isRequired: true,
+          inputType: TextInputType.phone,
+          maxLength: 10,
+          onSubmitted: () => Utils.navigateNextFocusChange(context, _phoneCustomer2Focus, _addressFocus),
+        ),
+        _buildInputField(
+          title: "Email",
+          hint: 'Email',
+          controller: _emailController,
+          focusNode: _emailFocus,
+          inputType: TextInputType.emailAddress,
+          onSubmitted: () => Utils.navigateNextFocusChange(context, _emailFocus, _mstFocus),
+        ),
+        _buildInputField(
+          title: "Mã số thuế",
+          hint: 'Mã số thuế',
+          controller: _mstController,
+          focusNode: _mstFocus,
+          onSubmitted: () => Utils.navigateNextFocusChange(context, _mstFocus, _noteFocus),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLocationSection() {
+    return _buildSectionCard(
+      title: 'Thông tin địa chỉ',
+      icon: Icons.location_on_outlined,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _buildInputField(
+                title: "Địa chỉ",
+                hint: 'Địa chỉ chi tiết',
+                controller: _addressController,
+                focusNode: _addressFocus,
+                isRequired: true,
+                onSubmitted: () => Utils.navigateNextFocusChange(context, _addressFocus, _emailFocus),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  _bloc.getUserLocation();
+                  _triggerAutoMapAddress();
+                },
+                icon: const Icon(Icons.my_location, size: 16),
+                label: const Text('Auto', style: TextStyle(fontSize: 12)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: subColor,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        Row(
+          children: [
+            Expanded(
+              child: _buildSelectionField(
+                title: "Khu vực",
+                hint: 'Chọn khu vực',
+                controller: _areaController,
+                onTap: () => _selectArea(),
+                isRequired: true,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildSelectionField(
+                title: "Tỉnh/Thành",
+                hint: 'Chọn tỉnh/thành',
+                controller: _provinceController,
+                onTap: () => _selectProvince(),
+                isRequired: true,
+              ),
+            ),
+          ],
+        ),
+        Row(
+          children: [
+            Expanded(
+              child: _buildSelectionField(
+                title: "Quận/Huyện",
+                hint: 'Chọn quận/huyện',
+                controller: _districtController,
+                onTap: () => _selectDistrict(),
+                enabled: idProvince.isNotEmpty,
+                isRequired: true,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildSelectionField(
+                title: "Xã/Phường",
+                hint: 'Chọn xã/phường',
+                controller: _communeController,
+                onTap: () => _selectCommune(),
+                enabled: idDistrict.isNotEmpty,
+                isRequired: true,
+              ),
+            ),
+          ],
+        ),
+        Row(
+          children: [
+            Expanded(
+              child: _buildSelectionField(
+                title: "Phân loại",
+                hint: 'Chọn phân loại',
+                controller: _typeStoreController,
+                onTap: () => _selectTypeStore(),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildSelectionField(
+                title: "Hình thức",
+                hint: 'Chọn hình thức',
+                controller: _storeFormController,
+                onTap: () => _selectStoreForm(),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAdditionalInfoSection() {
+    return _buildSectionCard(
+      title: 'Thông tin bổ sung',
+      icon: Icons.info_outline,
+      children: [
+        _buildInputField(
+          title: "Ghi chú",
+          hint: 'Vui lòng nhập ghi chú nếu có',
+          controller: _noteController,
+          focusNode: _noteFocus,
+          maxLines: 3,
+          onSubmitted: () => Utils.navigateNextFocusChange(context, _noteFocus, _descFocus),
+        ),
+        _buildInputField(
+          title: "Mô tả",
+          hint: 'Vui lòng nhập mô tả nếu có',
+          controller: _descController,
+          focusNode: _descFocus,
+          maxLines: 3,
+        ),
+        _buildSelectionField(
+          title: "Tour/Tuyến",
+          hint: 'Chọn tour/tuyến',
+          controller: _nameTourController,
+          onTap: () => _selectTour(),
+        ),
+        if (Const.chooseStateWhenCreateNewOpenStore == true)
+          _buildSelectionField(
+            title: "Trạng thái",
+            hint: 'Chọn trạng thái',
+            controller: _nameStateController,
+            onTap: () => _selectState(),
+            isRequired: true,
+          ),
+      ],
+    );
+  }
+
+  Widget _buildSectionCard({
+    required String title,
+    required IconData icon,
+    required List<Widget> children,
+  }) {
+    return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-          boxShadow: <BoxShadow>[
-            BoxShadow(
-                color: Colors.grey.shade200,
-                offset: const Offset(2, 4),
-                blurRadius: 5,
-                spreadRadius: 2)
-          ],
-          gradient: const LinearGradient(
-              begin: Alignment.centerLeft,
-              end: Alignment.centerRight,
-              colors: [subColor,Color.fromARGB(255, 150, 185, 229)])),
-      padding: const EdgeInsets.fromLTRB(5, 35, 12,0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: subColor.withOpacity(0.1),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(icon, color: subColor, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: subColor,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: children,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static const _requiredText = Text(
+    ' *',
+    style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+  );
+
+  final _spacing8 = SizedBox(height: 8);
+
+  Widget _buildInputField({
+    required String title,
+    required String hint,
+    required TextEditingController controller,
+    required FocusNode focusNode,
+    bool isRequired = false,
+    TextInputType? inputType,
+    int? maxLength,
+    int maxLines = 1,
+    VoidCallback? onSubmitted,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  color: Colors.black87,
+                ),
+              ),
+              if (isRequired) _requiredText,
+            ],
+          ),
+          _spacing8,
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.grey[50],
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: _getBorderColor(title, controller.text),
+                width: _getBorderWidth(title, controller.text),
+              ),
+            ),
+            child: TextField(
+              controller: controller,
+              focusNode: focusNode,
+              keyboardType: inputType ?? TextInputType.text,
+              maxLength: maxLength,
+              maxLines: maxLines,
+              inputFormatters: inputType == TextInputType.phone 
+                  ? [FilteringTextInputFormatter.digitsOnly] // Chỉ cho phép nhập số cho phone
+                  : null,
+              decoration: InputDecoration(
+                hintText: hint,
+                hintStyle: TextStyle(color: Colors.grey[500]),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                counterText: '',
+              ),
+              onChanged: (value) {
+                // Clear cache khi text thay đổi để update progress indicator
+                _clearStepCompletionCache();
+                setState(() {}); // Force rebuild để update progress
+              },
+              onSubmitted: onSubmitted != null ? (_) => onSubmitted() : null,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSelectionField({
+    required String title,
+    required String hint,
+    required TextEditingController controller,
+    required VoidCallback onTap,
+    bool enabled = true,
+    bool isRequired = false,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  color: Colors.black87,
+                ),
+              ),
+              if (isRequired) _requiredText,
+            ],
+          ),
+          const SizedBox(height: 8),
           InkWell(
-            onTap: ()=> Navigator.pop(context,),
-            child: const SizedBox(
-              width: 40,
-              height: 50,
-              child: Icon(
+            onTap: enabled ? onTap : null,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: enabled ? Colors.grey[50] : Colors.grey[200],
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: enabled ? Colors.grey[300]! : Colors.grey[400]!),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      controller.text.isEmpty ? hint : controller.text,
+                      style: TextStyle(
+                        color: controller.text.isEmpty ? Colors.grey[500] : Colors.black87,
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    Icons.arrow_drop_down,
+                    color: enabled ? Colors.grey[600] : Colors.grey[400],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDatePickerField() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Ngày sinh',
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 8),
+          InkWell(
+            onTap: () {
+              FocusScope.of(context).requestFocus(FocusNode());
+              Utils.dateTimePickerCustom(context).then((value) {
+                if (value != null) {
+                  setState(() {
+                    _birthDayController.text = Utils.parseStringDateToString(
+                      value.toString(),
+                      Const.DATE_TIME_FORMAT,
+                      Const.DATE_SV_FORMAT,
+                    );
+                    // Clear cache để update progress indicator
+                    _clearStepCompletionCache();
+                  });
+                }
+              });
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey[300]!),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _birthDayController.text.isEmpty ? '1995/03/04' : _birthDayController.text,
+                      style: TextStyle(
+                        color: _birthDayController.text.isEmpty ? Colors.grey[500] : Colors.black87,
+                      ),
+                    ),
+                  ),
+                  const Icon(Icons.calendar_today, color: Colors.grey, size: 20),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStoreImagePicker() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Ảnh cửa hàng',
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            height: 100,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: _bloc.listFileInvoice.isNotEmpty ? subColor : Colors.grey[300]!,
+                width: _bloc.listFileInvoice.isNotEmpty ? 2 : 1,
+              ),
+            ),
+            child: _bloc.listFileInvoice.isEmpty
+                ? _buildEmptyImagePicker()
+                : _buildStoreImagePreview(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyImagePicker() {
+    return InkWell(
+      onTap: () {
+        _bloc.getUserLocation();
+        getImage();
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        decoration: BoxDecoration(
+          color: subColor.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.add_a_photo_outlined,
+              size: 24,
+              color: subColor,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Thêm ảnh',
+              style: TextStyle(
+                fontSize: 12,
+                color: subColor,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStoreImagePreview() {
+    return Stack(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: InkWell(
+            onTap: () => openImageFullScreen(0, _bloc.listFileInvoice.first),
+            child: Container(
+              width: double.infinity,
+              height: double.infinity,
+              child: _bloc.listFileInvoice.isNotEmpty
+                  ? Image.file(
+                _bloc.listFileInvoice.first,
+                fit: BoxFit.cover,
+              )
+                  : Container(
+                color: Colors.grey[200],
+                child: const Icon(
+                  Icons.image,
+                  size: 40,
+                  color: Colors.grey,
+                ),
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          top: 4,
+          right: 4,
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.6),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                InkWell(
+                  onTap: () {
+                    _bloc.getUserLocation();
+                    getImage();
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    child: const Icon(
+                      Icons.edit,
+                      color: Colors.white,
+                      size: 16,
+                    ),
+                  ),
+                ),
+                InkWell(
+                  onTap: () {
+                    setState(() {
+                      _bloc.listFileInvoice.clear();
+                      // Clear cache để update progress indicator
+                      _clearStepCompletionCache();
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    child: const Icon(
+                      Icons.delete,
+                      color: Colors.white,
+                      size: 16,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (_bloc.listFileInvoice.length > 1)
+          Positioned(
+            bottom: 4,
+            right: 4,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: subColor,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '${_bloc.listFileInvoice.length}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildAdditionalImagesSection() {
+    return _buildSectionCard(
+      title: 'Ảnh bổ sung',
+      icon: Icons.photo_library_outlined,
+      children: [
+        Text(
+          'Bạn có thể thêm nhiều ảnh khác của cửa hàng',
+          style: TextStyle(
+            fontSize: 13,
+            color: Colors.grey[600],
+            fontStyle: FontStyle.italic,
+          ),
+        ),
+        const SizedBox(height: 12),
+        InkWell(
+          onTap: () {
+            _bloc.getUserLocation();
+            getImage();
+          },
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            decoration: BoxDecoration(
+              color: subColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: subColor.withOpacity(0.3), style: BorderStyle.solid),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.add_a_photo_outlined,
+                  size: 20,
+                  color: subColor,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Thêm ảnh khác',
+                  style: TextStyle(
+                    color: subColor,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          height: 120,
+          width: double.infinity,
+          child: ListView.builder(
+            padding: EdgeInsets.zero,
+            shrinkWrap: true,
+            scrollDirection: Axis.horizontal,
+            itemCount: _bloc.listFileInvoice.length,
+            itemBuilder: (context, index) {
+              return (start > 1 && waitingLoad == true && _bloc.listFileInvoice.length == (index + 1))
+                  ? const SizedBox(
+                height: 100,
+                width: 80,
+                child: PendingAction(),
+              )
+                  : _buildImageItem(index, _bloc.listFileInvoice[index]);
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildImageItem(int index, File file) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 12),
+      child: Stack(
+        children: [
+          GestureDetector(
+            onTap: () => openImageFullScreen(index, file),
+            child: Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.file(
+                  file,
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            top: 4,
+            right: 4,
+            child: GestureDetector(
+              onTap: () {
+                setState(() {
+                  _bloc.listFileInvoice.removeAt(index);
+                  // Clear cache để update progress indicator
+                  _clearStepCompletionCache();
+                });
+              },
+              child: Container(
+                height: 24,
+                width: 24,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.red,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.2),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.close,
+                  color: Colors.white,
+                  size: 16,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _handleSelection({
+    required String title,
+    required int typeGetList,
+    String? idProvince,
+    String? idDistrict,
+    String? idArea,
+    required Function(String id, String name) onSuccess,
+    String? errorMessage,
+  }) {
+    FocusScope.of(context).unfocus();
+
+    if (errorMessage != null) {
+      Utils.showCustomToast(context, Icons.warning_amber_outlined, errorMessage);
+      return;
+    }
+
+    PersistentNavBarNavigator.pushNewScreen(
+      context,
+      screen: SearchProvinceScreen(
+        idArea: idArea ?? '',
+        idProvince: idProvince ?? '',
+        idDistrict: idDistrict ?? '',
+        title: title,
+        typeGetList: typeGetList,
+      ),
+      withNavBar: false,
+    ).then((value) {
+      if (value != null && value[0] == 'Yeah') {
+        setState(() {
+          String id = value[1].toString().trim();
+          String name = value[2].toString().trim();
+          onSuccess(id, name);
+          _clearStepCompletionCache();
+        });
+      }
+    });
+  }
+
+  void _selectArea() {
+    _handleSelection(
+      title: 'Danh sách Khu vực',
+      typeGetList: 1,
+      onSuccess: (id, name) {
+        idArea = id;
+        _areaController.text = name;
+      },
+    );
+  }
+
+  void _selectProvince() {
+    _handleSelection(
+      title: 'Danh sách Tỉnh thành',
+      typeGetList: 0,
+      onSuccess: (id, name) {
+        idProvince = id;
+        _provinceController.text = name;
+        idDistrict = '';
+        idCommune = '';
+        _districtController.clear();
+        _communeController.clear();
+      },
+    );
+  }
+
+  void _selectDistrict() {
+    if (idProvince.isEmpty) {
+      Utils.showCustomToast(context, Icons.warning_amber_outlined, 'Vui lòng chọn Tỉnh/Thành trước');
+      return;
+    }
+
+    _handleSelection(
+      title: 'Danh sách Quận huyện',
+      typeGetList: 0,
+      idProvince: idProvince,
+      onSuccess: (id, name) {
+        idDistrict = id;
+        _districtController.text = name;
+        idCommune = '';
+        _communeController.clear();
+      },
+    );
+  }
+
+  void _selectCommune() {
+    if (idDistrict.isEmpty) {
+      Utils.showCustomToast(context, Icons.warning_amber_outlined, 'Vui lòng chọn Quận/Huyện trước');
+      return;
+    }
+
+    _handleSelection(
+      title: 'Danh sách Xã phường',
+      typeGetList: 0,
+      idProvince: idProvince,
+      idDistrict: idDistrict,
+      onSuccess: (id, name) {
+        idCommune = id;
+        _communeController.text = name;
+      },
+    );
+  }
+
+  void _selectTypeStore() {
+    _handleSelection(
+      title: 'Danh sách Phân loại',
+      typeGetList: 3,
+      idProvince: idProvince,
+      onSuccess: (id, name) {
+        idTypeStore = id;
+        _typeStoreController.text = name;
+      },
+    );
+  }
+
+  void _selectStoreForm() {
+    _handleSelection(
+      title: 'Danh sách Hình thức',
+      typeGetList: 2,
+      idProvince: idProvince,
+      idDistrict: idDistrict,
+      onSuccess: (id, name) {
+        idStoreForm = id;
+        _storeFormController.text = name;
+      },
+    );
+  }
+
+  void _selectTour() {
+    FocusScope.of(context).unfocus();
+    PersistentNavBarNavigator.pushNewScreen(
+      context,
+      screen: const SearchTourScreen(
+        idTour: '',
+        idState: '',
+        title: 'Tìm kiếm Tour/Tuyến',
+        isTour: true,
+      ),
+      withNavBar: false,
+    ).then((value) {
+      if (value != null && value[0] == 'Yeah') {
+        setState(() {
+          idTour = value[1].toString().trim();
+          _nameTourController.text = value[2].toString().trim();
+          // Clear cache để update progress indicator
+          _clearStepCompletionCache();
+        });
+      }
+    });
+  }
+
+  void _selectState() {
+    FocusScope.of(context).unfocus();
+    PersistentNavBarNavigator.pushNewScreen(
+      context,
+      screen: const SearchTourScreen(
+        idState: '',
+        title: 'Tìm kiếm Trạng thái',
+        idTour: '',
+        isTour: false,
+      ),
+      withNavBar: false,
+    ).then((value) {
+      if (value != null && value[0] == 'Yeah') {
+        setState(() {
+          idState = value[1].toString().trim();
+          _nameStateController.text = value[2].toString().trim();
+          // Clear cache để update progress indicator
+          _clearStepCompletionCache();
+        });
+      }
+    });
+  }
+
+  Widget _buildAppBar() {
+    return Container(
+      padding: EdgeInsets.only(
+        top: MediaQuery.of(context).padding.top + 8,
+        left: 16,
+        right: 16,
+        bottom: 16,
+      ),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [subColor, Color.fromARGB(255, 150, 185, 229)],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          InkWell(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(
                 Icons.arrow_back_rounded,
-                size: 25,
                 color: Colors.white,
+                size: 20,
               ),
             ),
           ),
@@ -573,175 +1584,21 @@ class _AddNewRequestOpenStoreScreenState extends State<AddNewRequestOpenStoreScr
             child: Center(
               child: Text(
                 "Thêm mới KH đề xuất mở điểm",
-                style: TextStyle(fontWeight: FontWeight.bold,fontSize: 17,color: Colors.white,),
-                maxLines: 1,overflow: TextOverflow.fade,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                  color: Colors.white,
+                ),
+                textAlign: TextAlign.center,
               ),
             ),
           ),
-          const SizedBox(width: 10,),
-          const SizedBox(
-            width: 40,
-            height: 50,
-            child: Icon(
-              Icons.event,
-              size: 25,
-              color: Colors.transparent,
-            ),
-          )
+          const SizedBox(width: 40),
         ],
       ),
     );
   }
 
-  Widget inputWidget({String? title,String? hideText,IconData? iconPrefix,IconData? iconSuffix, bool? isEnable,
-    TextEditingController? controller,Function? onTapSuffix, Function? onSubmitted,FocusNode? focusNode,bool? isNull,Color? colors,bool? enableMaxLine,
-    TextInputAction? textInputAction,bool inputNumber = false,bool isPhone = false,bool note = false,bool isPassWord = false, bool cod = true,int? maxLength, bool customContainer = false,}){
-    return Padding(
-      padding: EdgeInsets.only(top: 10,left: 10,right: 10,bottom: customContainer == true ? 0 : 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                title??'',
-                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12,color: Colors.black),
-              ),
-              Visibility(
-                visible: note == true,
-                child: const Text(' *',style: TextStyle(color: Colors.red),),
-              )
-            ],
-          ),
-          const SizedBox(height: 5,),
-          Container(
-            height: customContainer == true ? 60 : 40,
-            decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12)
-            ),
-            child: TextFieldWidget2(
-              controller: controller!,
-              suffix: iconSuffix,
-              textInputAction: textInputAction!,
-              isEnable: isEnable ?? true,
-              keyboardType: inputNumber == true ? TextInputType.phone : TextInputType.text,
-              hintText: hideText,
-              isNull: isNull,
-              color: colors,
-              enableMaxLine: enableMaxLine,
-              focusNode: focusNode,
-              onChanged: (string){},
-              onSubmitted: (text)=> onSubmitted,
-              isPassword: isPassWord,
-              inputFormatter: customContainer == true ? [FilteringTextInputFormatter.digitsOnly]: [],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  buildAttachFileInvoice(){
-    return Padding(
-      padding: const EdgeInsets.only(top: 10,left: 10,right: 10),
-      child: Container(
-        decoration: BoxDecoration(
-          border: Border.all(color: subColor),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Column(
-          children: [
-            InkWell(
-              onTap: (){_bloc.getUserLocation();
-                getImage();
-
-              },
-              child: Container(padding: const EdgeInsets.only(left: 10,right: 15,top: 8,bottom: 8),
-                height: 40,
-                width: double.infinity,
-                color: Colors.amber.withOpacity(0.4),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Ảnh của bạn',style: TextStyle(color: Colors.black,fontSize: 13),),
-                    Icon(Icons.add_a_photo_outlined,size: 20,),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 16,),
-            _bloc.listFileInvoice.isEmpty ? const SizedBox(height: 100,child: Center(child: Text('Hãy chọn thêm hình của bạn từ thư viện ảnh hoặc camera',style: TextStyle(color: Colors.blueGrey,fontSize: 12),),),) :
-            SizedBox(
-              height: 120,
-              width: double.infinity,
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: ListView.builder(
-                    padding: EdgeInsets.zero,
-                    shrinkWrap: true,
-                    scrollDirection: Axis.horizontal,
-                    itemCount: _bloc.listFileInvoice.length,
-                    itemBuilder: (context,index){
-                      return (start > 1 && waitingLoad == true && _bloc.listFileInvoice.length == (index + 1))
-                          ?
-                      const SizedBox(height: 100,width: 80,child: PendingAction())
-                          :
-                      GestureDetector(
-                        onTap: (){
-                          openImageFullScreen(index,_bloc.listFileInvoice[index]);
-                        },
-                        child: Padding(
-                          padding: const EdgeInsets.only(left: 10.0),
-                          child: Stack(
-                            children: [
-                              SizedBox(
-                                width: 115,
-                                child: ClipRRect(
-                                  borderRadius: const BorderRadius.all(Radius.circular(8)),
-                                  child: Hero(
-                                    tag: index,
-                                    /*semanticContainer: true,
-                                    margin: const EdgeInsets.only(left: 10,right: 10,top: 5,bottom: 5),*/
-                                    child: Image.file(
-                                      _bloc.listFileInvoice[index],
-                                      fit: BoxFit.cover,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              Positioned(
-                                top: 6,right: 6,
-                                child: InkWell(
-                                  onTap: (){
-                                    setState(() {
-                                      _bloc.listFileInvoice.removeAt(index);
-                                    });
-                                  },
-                                  child: Container(
-                                    height: 20,width: 20,
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(12),
-                                      color: Colors.black.withOpacity(.7),
-                                    ),
-                                    child: const Icon(Icons.clear,color: Colors.white,size: 12,),
-                                  ),
-                                ),
-                              )
-                            ],
-                          ),
-                        ),
-                      );
-                    }
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-  // to open gallery image in full screen
   void openImageFullScreen(final int indexOfImage, File fileImage) {
     Navigator.push(
       context,

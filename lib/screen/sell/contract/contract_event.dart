@@ -45,6 +45,18 @@ class AddCartEvent extends ContractEvent {
     return 'AddCartEvent{productItem: $productItem}';
   }
 }
+
+class AddCartWithSttRec0ReplaceEvent extends ContractEvent {
+
+  final Product? productItem;
+
+  AddCartWithSttRec0ReplaceEvent({this.productItem});
+
+  @override
+  String toString() {
+    return 'AddCartWithSttRec0ReplaceEvent{productItem: $productItem}';
+  }
+}
 class DeleteProductInCartEvent extends ContractEvent{
 
   @override
