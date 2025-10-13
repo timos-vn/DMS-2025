@@ -155,6 +155,14 @@ class PickInfoAgentSuccess extends SaleOutState {
   }
 }
 
+class AutoLoadAgentSuccess extends SaleOutState {
+
+  @override
+  String toString() {
+    return 'AutoLoadAgentSuccess{}';
+  }
+}
+
 class GetListStockEventSuccess extends SaleOutState{
 
   @override

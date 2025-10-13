@@ -86,24 +86,9 @@ class _ProposalScreenState extends State<ProposalScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
+          // Kiểm tra điều kiện đặc biệt cho nghỉ phép (DayOff)
           if (widget.controller == 'DayOff') {
-            if (Const.phepCL > 0) {
-              navigateToCreate();
-            } else {
-              showDialog(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  title: const Text('Cảnh báo'),
-                  content: const Text('Bạn đã nghỉ hết số phép năm này rồi :('),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.of(ctx).pop(),
-                      child: const Text('OK'),
-                    )
-                  ],
-                ),
-              );
-            }
+            _handleDayOffCreation();
           } else {
             navigateToCreate();
           }
@@ -113,6 +98,39 @@ class _ProposalScreenState extends State<ProposalScreen> {
           Icons.post_add,
           color: Colors.white,
         ),
+      ),
+    );
+  }
+
+  /// Xử lý tạo phiếu nghỉ phép với các điều kiện kiểm tra
+  void _handleDayOffCreation() {
+    // Nếu cho phép bỏ qua kiểm tra phép -> tạo thẳng
+    if (Const.noCheckDayOff == true) {
+      navigateToCreate();
+      return;
+    }
+    
+    // Kiểm tra số phép còn lại
+    if (Const.phepCL > 0) {
+      navigateToCreate();
+    } else {
+      _showDayOffWarningDialog();
+    }
+  }
+  
+  /// Hiển thị dialog cảnh báo hết phép
+  void _showDayOffWarningDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cảnh báo'),
+        content: const Text('Bạn đã nghỉ hết số phép năm này rồi :('),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('OK'),
+          )
+        ],
       ),
     );
   }

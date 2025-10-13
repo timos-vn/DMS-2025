@@ -1,17 +1,14 @@
 import 'dart:async';
-import 'dart:io';
-
-import 'package:dio/dio.dart';
 import 'package:dms/model/database/data_local.dart';
 import 'package:dms/model/entity/image_check_in.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import 'package:dms/model/network/services/network_factory.dart';
+import 'package:dms/services/location_service.dart';
 import 'package:dms/utils/const.dart';
 
 import '../../../../model/database/dbhelper.dart';
@@ -238,16 +235,30 @@ class AlbumBloc extends Bloc<AlbumEvent,AlbumState>{
   late StreamSubscription<Position> positionStream;
 
   getUserLocation() async {
-    positionStream =
-        Utils.getPositionStream().listen((Position position) async{
-          List<Placemark> placePoint = await placemarkFromCoordinates(position.latitude,position.longitude);
-          String currentAddress1 = "${placePoint[0].name}, ${placePoint[0].thoroughfare}, ${placePoint[0].subAdministrativeArea}, ${placePoint[0].administrativeArea}";
-          DataLocal.addressCheckInCustomer = currentAddress1;
-          DataLocal.latLongLocation = '${position.latitude},${position.longitude}';
-          currentAddress = currentAddress1;
-          currentLocation = position;
-          stopListenLocation();
-        });
+    print('📍 AlbumBloc: Getting location using LocationService...');
+    
+    try {
+      // Sử dụng LocationService thay vì logic cũ
+      LocationResult result = await LocationService.getLocationWithRetry(
+        forceFresh: true,
+        maxRetries: 3,
+      );
+      
+      if (result.isSuccess) {
+        currentLocation = result.position!;
+        currentAddress = result.address ?? 'Địa chỉ không xác định';
+        DataLocal.addressCheckInCustomer = currentAddress;
+        DataLocal.latLongLocation = '${result.position!.latitude},${result.position!.longitude}';
+        print('📍 AlbumBloc: Location success - accuracy=${result.accuracy}m');
+      } else {
+        print('❌ AlbumBloc: Location failed - ${result.error}');
+        // Fallback: sử dụng vị trí mặc định hoặc thông báo lỗi
+        // emit(AlbumFailure(result.error ?? 'Không thể lấy vị trí GPS'));
+      }
+    } catch (e) {
+      print('❌ AlbumBloc: Location error - $e');
+      // emit(AlbumFailure('Lỗi hệ thống khi lấy vị trí GPS: $e'));
+    }
   }
 
   void stopListenLocation(){

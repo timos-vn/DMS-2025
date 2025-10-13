@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart';
 import 'package:dms/model/network/request/order_create_checkin_request.dart';
 import 'package:dms/screen/dms/detail_shipping/widget/barcode_scanner_popup.dart';
 import 'package:dms/widget/custom_camera.dart';
@@ -107,6 +108,23 @@ class _DetailShippingScreenState extends State<DetailShippingScreen> {
             setState(() {});
           }else if(state is DetailShippingFailure){
             Utils.showCustomToast(context, Icons.check_circle_outline, state.error.toString().trim());
+          }
+          else if(state is UpdateLocationAndImageSuccess){
+            _bloc.add(ConfirmShippingEvent(
+                sstRec:  _bloc.masterItem?.sttRec,
+                status: int.parse(idStatus),
+                typePayment: idTypePayment,
+                desc: _noteController.text,
+                soPhieuXuat: _bloc.masterItem?.qrYN == 1 ? soPhieuXuat : ''
+            ));
+          }
+          else if(state is UploadImageProgress){
+            // ✅ Hiển thị progress dialog khi upload ảnh
+            _showUploadProgressDialog(context, state.progress, state.message);
+          }
+          else if(state is UploadImageFailure){
+            // ✅ Hiển thị popup retry khi upload thất bại
+            _showUploadRetryDialog(context, state.error);
           }
         },
         child: BlocBuilder<DetailShippingBloc, DetailShippingState>(
@@ -576,12 +594,14 @@ class _DetailShippingScreenState extends State<DetailShippingScreen> {
                                 Padding(
                                   padding: const EdgeInsets.only(left: 16,right: 16,top: 30,bottom: 30),
                                   child: GestureDetector(
-                                    onTap: (){
-                                      if(Const.isDeliveryPhotoRange == true){
-                                        if(idStatus != '4'){
+                                    onTap: _isImageLoading ? null : (){ // ✅ Disable khi đang loading
+                                      if(Const.isDeliveryPhotoRange == true) {
+                                        if (idStatus != '4') {
                                           if(_bloc.listFileInvoice.isNotEmpty){
-                                            String? latLong = '';
-                                            latLong = _bloc.masterItem?.latLong.toString().replaceAll('null', '');
+                                          String? latLong = '';
+                                          latLong = _bloc.masterItem?.latLong
+                                              .toString().replaceAll(
+                                              'null', '');
                                             if(latLong.toString().trim().isNotEmpty){
                                               if((Utils.getDistance(double.parse(_bloc.masterItem!.latLong.toString().split(',')[0]), double.parse(_bloc.masterItem!.latLong.toString().split(',')[1]),current) < Const.deliveryPhotoRange)){
                                                 Navigator.pop(context,['Accepted']);
@@ -596,14 +616,13 @@ class _DetailShippingScreenState extends State<DetailShippingScreen> {
                                           else{
                                             Utils.showCustomToast(context, Icons.warning_amber, 'Vui lòng chụp ảnh trước khi xác nhận phiếu');
                                           }
-                                        }else{
-                                          Navigator.pop(context,['Accepted']);
+                                          }else{
+                                          Navigator.pop(context, ['Accepted']);    
+                                          }
+                                          }
+                                          else{
+                                            Navigator.pop(context,['Accepted','NoDelivery']);
                                         }
-                                      }
-                                      else{
-                                        Navigator.pop(context,['Accepted','NoDelivery']);
-                                      }
-
                                     },
                                     child: Align(
                                       alignment: Alignment.centerRight,
@@ -611,14 +630,33 @@ class _DetailShippingScreenState extends State<DetailShippingScreen> {
                                         height: 45.0,
                                         decoration: BoxDecoration(
                                             borderRadius: BorderRadius.circular(18.0),
-                                            color: subColor
+                                            color: _isImageLoading ? Colors.grey : subColor // ✅ Đổi màu khi loading
                                         ),
-                                        child: const Center(
-                                          child: Text(
-                                            'Xác nhận',
-                                            style: TextStyle(fontSize: 16, color: white,),
-                                            textAlign: TextAlign.left,
-                                          ),
+                                        child: Center(
+                                          child: _isImageLoading 
+                                            ? Row( // ✅ Hiển thị loading indicator
+                                                mainAxisAlignment: MainAxisAlignment.center,
+                                                children: [
+                                                  SizedBox(
+                                                    width: 16,
+                                                    height: 16,
+                                                    child: CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  const Text(
+                                                    'Đang xử lý ảnh...',
+                                                    style: TextStyle(fontSize: 14, color: white),
+                                                  ),
+                                                ],
+                                              )
+                                            : const Text(
+                                                'Xác nhận',
+                                                style: TextStyle(fontSize: 16, color: white,),
+                                                textAlign: TextAlign.left,
+                                              ),
                                         ),
                                       ),
                                     ),
@@ -654,18 +692,126 @@ class _DetailShippingScreenState extends State<DetailShippingScreen> {
 
   void createTicket(){
     if(Const.isDeliveryPhotoRange){
+      // ✅ Sử dụng method validation
+      if (!_validateImageData()) {
+        Utils.showCustomToast(context, Icons.warning_amber, 'Dữ liệu ảnh không hợp lệ, vui lòng chụp lại');
+        return;
+      }
+      
+      debugPrint('✅ Validation passed, calling UpdateLocationAndImageEvent');
       _bloc.add(UpdateLocationAndImageEvent(sstRec: _bloc.masterItem!.sttRec.toString()));
+    }else{
+      debugPrint('✅ Validation passed, calling ConfirmShippingEvent');
+      _bloc.add(ConfirmShippingEvent(
+          sstRec:  _bloc.masterItem?.sttRec,
+          status: int.parse(idStatus),
+          typePayment: idTypePayment,
+          desc: _noteController.text,
+          soPhieuXuat: _bloc.masterItem?.qrYN == 1 ? soPhieuXuat : ''
+      ));
     }
-    _bloc.add(ConfirmShippingEvent(
-        sstRec:  _bloc.masterItem?.sttRec,
-        status: int.parse(idStatus),
-        typePayment: idTypePayment,
-        desc: _noteController.text,
-        soPhieuXuat: _bloc.masterItem?.qrYN == 1 ? soPhieuXuat : ''
-    ));
   }
 
   String soPhieuXuat = '';
+
+
+  /// ✅ Kiểm tra file ảnh có hợp lệ không (ngay sau khi chụp)
+  Future<bool> _validateImageFile(File file) async {
+    try {
+      debugPrint('🔍 Validating image file: ${file.path}');
+      
+      // ✅ Kiểm tra file có tồn tại không
+      if (!await file.exists()) {
+        debugPrint('❌ File does not exist');
+        return false;
+      }
+      
+      // ✅ Kiểm tra file size
+      final fileSize = await file.length();
+      if (fileSize == 0) {
+        debugPrint('❌ File is empty');
+        return false;
+      }
+      
+      if (fileSize < 1024) { // < 1KB
+        debugPrint('❌ File too small: $fileSize bytes');
+        return false;
+      }
+      
+      if (fileSize > 10 * 1024 * 1024) { // > 10MB
+        debugPrint('❌ File too large: $fileSize bytes');
+        return false;
+      }
+      
+      // ✅ Kiểm tra file có thể đọc được bytes không
+      final bytes = await file.readAsBytes();
+      if (bytes.isEmpty) {
+        debugPrint('❌ File bytes is empty');
+        return false;
+      }
+      
+      // ✅ Kiểm tra base64 encoding có thành công không (chỉ test, không lưu)
+      String? base64Result = Utils.base64Image(file);
+      if (base64Result == null || base64Result.isEmpty) {
+        debugPrint('❌ Base64 encoding test failed');
+        return false;
+      }
+      
+      if (base64Result.length < 100) {
+        debugPrint('❌ Base64 test result too short: ${base64Result.length} chars');
+        return false;
+      }
+      
+      debugPrint('✅ Image file validation passed:');
+      debugPrint('   - File size: $fileSize bytes');
+      debugPrint('   - Bytes length: ${bytes.length}');
+      debugPrint('   - Base64 test length: ${base64Result.length} (will be regenerated on upload)');
+      
+      return true;
+      
+    } catch (e) {
+      debugPrint('❌ Error validating image file: $e');
+      return false;
+    }
+  }
+
+  /// ✅ Kiểm tra tính hợp lệ của dữ liệu ảnh
+  bool _validateImageData() {
+    debugPrint('🔍 Validating image data:');
+    debugPrint('   - Files count: ${_bloc.listFileInvoice.length}');
+    debugPrint('   - Base64 count: ${_bloc.listFileInvoiceSave.length}');
+    
+    // Kiểm tra có ảnh không
+    if (_bloc.listFileInvoice.isEmpty) {
+      debugPrint('❌ No images found');
+      return false;
+    }
+    
+    // Kiểm tra có base64 data không
+    if (_bloc.listFileInvoiceSave.isEmpty) {
+      debugPrint('❌ No base64 data found');
+      return false;
+    }
+    
+    // Kiểm tra tính nhất quán
+    if (_bloc.listFileInvoice.length != _bloc.listFileInvoiceSave.length) {
+      debugPrint('❌ Data inconsistency detected');
+      return false;
+    }
+    
+    // ✅ Kiểm tra từng base64 có hợp lệ không (có thể null nếu chưa gen)
+    for (int i = 0; i < _bloc.listFileInvoiceSave.length; i++) {
+      final base64Data = _bloc.listFileInvoiceSave[i].pathBase64;
+      // ✅ Base64 có thể null nếu chưa được gen (lazy loading)
+      if (base64Data != null && base64Data.isEmpty) {
+        debugPrint('❌ Empty base64 data at index $i');
+        return false;
+      }
+    }
+    
+    debugPrint('✅ All image data is valid');
+    return true;
+  }
 
   void openScanner(BuildContext context,StateSetter myState) async {
     final result = await showDialog<String>(
@@ -683,7 +829,7 @@ class _DetailShippingScreenState extends State<DetailShippingScreen> {
 
 
   final imagePicker = ImagePicker();
-  late Timer _timer = Timer(const Duration(milliseconds: 1), () {});
+  Timer? _timer;
   int start = 3;
 
   bool waitingLoad = false;
@@ -695,6 +841,7 @@ class _DetailShippingScreenState extends State<DetailShippingScreen> {
           (Timer timer) {
         if (start == 0) {
           waitingLoad = false;
+          _isImageLoading = false; // ✅ Reset loading state khi hoàn thành
           myState(() {});
           timer.cancel();
         } else {
@@ -704,27 +851,108 @@ class _DetailShippingScreenState extends State<DetailShippingScreen> {
     );
   }
 
-  Future getImage(StateSetter myState)async {
-    PersistentNavBarNavigator.pushNewScreen(context, screen: const CameraCustomUI()).then((value){
-      if(value != null){
+  Future getImage(StateSetter myState) async {
+    try {
+      // ✅ Sử dụng await thay vì .then() để code dễ đọc hơn
+      final value = await PersistentNavBarNavigator.pushNewScreen(
+        context, 
+        screen: const CameraCustomUI(
+          showZoomControls: true, // ✅ Hiển thị zoom controls để user có thể tùy chỉnh
+        )
+      );
+      
+      if (value != null) {
         XFile image = value;
-        myState(() {
-          if(image != null){
-            start = 2;waitingLoad  = true;
-            startTimer(myState);
-            _bloc.listFileInvoice.add(File(image.path));
-            ListImageInvoice itemImage = ListImageInvoice(
-                pathBase64: Utils.base64Image(File(image.path)).toString(),
-                nameImage: image.name
-            );
-            _bloc.listFileInvoiceSave.add(itemImage);
+        
+        // ✅ Kiểm tra XFile có hợp lệ không
+        if (image.path.isEmpty) {
+          Utils.showCustomToast(context, Icons.error_outline, 'Đường dẫn ảnh không hợp lệ');
+          return;
+        }
+
+        // ✅ Kiểm tra file có tồn tại không
+        final file = File(image.path);
+        if (!await file.exists()) {
+          Utils.showCustomToast(context, Icons.error_outline, 'File ảnh không tồn tại');
+          return;
+        }
+        
+        // ✅ Kiểm tra file có thể đọc được không
+        try {
+          final fileSize = await file.length();
+
+          if (fileSize == 0) {
+
+            Utils.showCustomToast(context, Icons.error_outline, 'File ảnh bị lỗi (rỗng)');
+            return;
           }
-          if(_bloc.currentAddress.toString().isEmpty){
-            init(myState);
+          
+          // ✅ Kiểm tra file size quá lớn (ví dụ: > 10MB)
+          if (fileSize > 10 * 1024 * 1024) {
+
+            Utils.showCustomToast(context, Icons.error_outline, 'File ảnh quá lớn (>10MB)');
+            return;
+          }
+          
+          // ✅ Kiểm tra file size quá nhỏ (có thể là file lỗi)
+          if (fileSize < 1024) { // < 1KB
+            Utils.showCustomToast(context, Icons.error_outline, 'File ảnh quá nhỏ, có thể bị lỗi');
+            return;
+          }
+          
+        } catch (e) {
+          Utils.showCustomToast(context, Icons.error_outline, 'Không thể đọc file ảnh');
+          return;
+        }
+        
+        // ✅ Sử dụng method validation tổng hợp
+        bool isValidFile = await _validateImageFile(file);
+        if (!isValidFile) {
+          Utils.showCustomToast(context, Icons.error_outline, 'File ảnh không hợp lệ, vui lòng chụp lại');
+          return;
+        }
+
+        myState(() {
+          try {
+            // ✅ Set loading state
+            _isImageLoading = true;
+            start = 2;
+            waitingLoad = true;
+            startTimer(myState);
+            
+            // ✅ Chỉ lưu file, không gen base64 ngay (tối ưu performance)
+            try {
+              // ✅ Thêm file vào danh sách
+              _bloc.listFileInvoice.add(file);
+              
+              // ✅ Tạo placeholder cho base64 (sẽ gen khi upload)
+              ListImageInvoice itemImage = ListImageInvoice(
+                pathBase64: null, // ✅ Không gen base64 ngay
+                nameImage: image.name
+              );
+              _bloc.listFileInvoiceSave.add(itemImage);
+              
+              // ✅ Log để debug
+              file.length().then((size) => debugPrint('   - File size: $size bytes'));
+              
+            } catch (e) {
+              debugPrint('❌ Error adding image to list: $e');
+              Utils.showCustomToast(context, Icons.error_outline, 'Lỗi khi lưu ảnh, vui lòng thử lại');
+            }
+            
+          } catch (e) {
+            Utils.showCustomToast(context, Icons.error_outline, 'Lỗi khi xử lý ảnh: ${e.toString()}');
           }
         });
+        
+        // ✅ Kiểm tra và init location nếu cần
+        if (_bloc.currentAddress.toString().isEmpty) {
+          init(myState);
+        }
       }
-    });
+    } catch (e) {
+      Utils.showCustomToast(context, Icons.error_outline, 'Lỗi khi chọn ảnh: ${e.toString()}');
+    }
   }
 
   buildAttachFileInvoice(StateSetter myState){
@@ -760,7 +988,7 @@ class _DetailShippingScreenState extends State<DetailShippingScreen> {
             _bloc.listFileInvoice.isEmpty ? const SizedBox(height: 100,width: double.infinity,child: Center(child: Text('Hãy chọn thêm hình ảnh của bạn từ thư viện ảnh hoặc từ camera',style: TextStyle(color: Colors.blueGrey,fontSize: 12),textAlign: TextAlign.center,),),) :
             SizedBox(
               height: 120,
-              width: double.infinity,
+              width: double.infinity, 
               child: Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: ListView.builder(
@@ -797,8 +1025,19 @@ class _DetailShippingScreenState extends State<DetailShippingScreen> {
                                 child: InkWell(
                                   onTap: (){
                                     myState(() {
+                                      // ✅ Xóa file và base64 data
                                       _bloc.listFileInvoice.removeAt(index);
                                       _bloc.listFileInvoiceSave.removeAt(index);
+                                      
+                                      // ✅ Reset loading state nếu không còn ảnh nào đang load
+                                      if (_bloc.listFileInvoice.isEmpty) {
+                                        _isImageLoading = false;
+                                        waitingLoad = false;
+                                      }
+                                      
+                                      debugPrint('🗑️ Image deleted:');
+                                      debugPrint('   - Remaining files: ${_bloc.listFileInvoice.length}');
+                                      debugPrint('   - Remaining base64: ${_bloc.listFileInvoiceSave.length}');
                                     });
                                   },
                                   child: Container(
@@ -858,5 +1097,198 @@ class _DetailShippingScreenState extends State<DetailShippingScreen> {
   String idStatus = "";
   final _noteController = TextEditingController();
   final FocusNode _noteFocus = FocusNode();
+  bool _isUploadProgressDialogShowing = false; // ✅ Flag để tránh hiển thị nhiều dialog
+  double _currentProgress = 0.0; // ✅ Lưu progress hiện tại
+  String _currentMessage = ''; // ✅ Lưu message hiện tại
+  bool _isImageLoading = false; // ✅ Flag để track trạng thái loading ảnh
+
+  /// Hiển thị dialog progress khi upload ảnh
+  void _showUploadProgressDialog(BuildContext context, double progress, String message) {
+    // ✅ Cập nhật progress và message hiện tại
+    _currentProgress = progress;
+    _currentMessage = message;
+    
+    // ✅ Chỉ hiển thị dialog nếu chưa có dialog nào đang hiển thị
+    if (!_isUploadProgressDialogShowing) {
+      _isUploadProgressDialogShowing = true;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return StatefulBuilder(
+            builder: (context, setDialogState) {
+              // ✅ Cập nhật dialog state khi progress thay đổi
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                setDialogState(() {});
+              });
+              
+              return AlertDialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // ✅ Sử dụng AnimatedBuilder để smooth progress
+                    AnimatedBuilder(
+                      animation: AlwaysStoppedAnimation(_currentProgress),
+                      builder: (context, child) {
+                        return CircularProgressIndicator(
+                          value: _currentProgress,
+                          backgroundColor: Colors.grey[300],
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            _currentProgress >= 1.0 ? Colors.green : Colors.blue
+                          ),
+                          strokeWidth: 4.0,
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      _currentMessage,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: _currentProgress >= 1.0 ? Colors.green : Colors.black87,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    // ✅ Hiển thị percentage với animation
+                    AnimatedBuilder(
+                      animation: AlwaysStoppedAnimation(_currentProgress),
+                      builder: (context, child) {
+                        return Text(
+                          '${(_currentProgress * 100).toInt()}%',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: _currentProgress >= 1.0 ? Colors.green : Colors.grey[600],
+                            fontWeight: FontWeight.w600,
+                          ),
+                        );
+                      },
+                    ),
+                    // ✅ Hiển thị checkmark khi hoàn thành
+                    if (_currentProgress >= 1.0) ...[
+                      const SizedBox(height: 8),
+                      const Icon(
+                        Icons.check_circle,
+                        color: Colors.green,
+                        size: 24,
+                      ),
+                    ],
+                  ],
+                ),
+              );
+            },
+          );
+        },
+      ).then((_) {
+        _isUploadProgressDialogShowing = false; // ✅ Reset flag khi dialog đóng
+        _currentProgress = 0.0; // ✅ Reset progress
+        _currentMessage = ''; // ✅ Reset message
+      });
+    } else {
+      // ✅ Nếu dialog đã hiển thị, chỉ cần trigger rebuild
+      // Dialog sẽ tự động cập nhật với _currentProgress và _currentMessage mới
+    }
+  }
+
+  /// Hiển thị dialog retry khi upload ảnh thất bại
+  void _showUploadRetryDialog(BuildContext context, String error) {
+    // Đóng progress dialog trước và reset flag
+    Navigator.of(context).pop();
+    _isUploadProgressDialogShowing = false;
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Row(
+            children: [
+              Icon(
+                Icons.error_outline,
+                color: Colors.red,
+                size: 28,
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Lỗi upload ảnh',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Bạn hãy upload lại',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey[700],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Chi tiết lỗi: $error',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                // Không retry, user chọn hủy
+              },
+              child: Text(
+                'Hủy',
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontSize: 16,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                // ✅ Retry upload ảnh
+                _bloc.add(UpdateLocationAndImageEvent(sstRec: _bloc.masterItem!.sttRec.toString()));
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+              child: const Text(
+                'Xác nhận',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
 }

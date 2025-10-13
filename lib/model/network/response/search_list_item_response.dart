@@ -118,6 +118,10 @@ class SearchItemResponseData {
   double? thueSuat = 0;
   String? maVt2; // Mã vật tư 2 (dùng cho contract)
   double so_luong_kd = 0; // Số lượng cho phép đặt hàng (dùng cho contract)
+  
+  // Runtime-only field - KHÔNG lưu vào SQLite/API
+  // Dùng để lưu số lượng khả dụng khi add từ contract
+  double? availableQuantity;
 
   SearchItemResponseData({ this.code,this.sttRec0, this.name, this.name2, this.dvt, this.descript, this.price = 0,this.applyPriceAfterTax,this.priceAfterTax,this.woPrice,
     this.woPriceAfter,this.totalMoneyDiscount,this.totalMoneyProduct,this.valuesTax,
@@ -127,13 +131,14 @@ class SearchItemResponseData {
     this.ck = 0,this.cknt, this.sttRecCK,this.typeCK, this.gifProduct, this.gifProductByHand, this.discountByHand,this.discountPercentByHand = 0,
     this.stockCode, this.stockName, this.chooseVuViec, this.idHd, this.idVv,this.nameVv,this.nameHd, this.idHdForVv,this.sctGoc,
     this.isCheBien, this.isSanXuat, this.giaSuaDoi = 0, this.giaGui = 0, this.priceMin = 0, this.codeUnit, this.nameUnit, this.note, this.jsonOtherInfo,
-    this.isChecked, this.heSo,this.idNVKD,this.nameNVKD,this.nuocsx,this.quycach,this.maThue,this.tenThue,this.thueSuat = 0, this.maVt2, this.so_luong_kd = 0
+    this.isChecked, this.heSo,this.idNVKD,this.nameNVKD,this.nuocsx,this.quycach,this.maThue,this.tenThue,this.thueSuat = 0, this.maVt2, this.so_luong_kd = 0,
+    this.availableQuantity, // Runtime-only, không từ API
   });
 
   SearchItemResponseData.fromJson(Map<String, dynamic> json) {
     maThue = json['ma_thue'];
     tenThue = json['ten_thue'];
-    thueSuat = json['thue_suat'];
+    thueSuat = (json['thue_suat'] as num?)?.toDouble() ?? 0;
 
     code = json['code'];
     sttRec0 = json['sttRec0'];

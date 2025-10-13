@@ -1907,7 +1907,7 @@ class _ConfirmScreenState extends State<ConfirmScreen>with TickerProviderStateMi
                                           const SizedBox(
                                             width: 5,
                                           ),
-                                          Text("${_bloc.listOrder[index].count?.toInt()??0} (${_bloc.listOrder[index].dvt.toString().trim()})",
+                                          Text("${Utils.formatQuantity(_bloc.listOrder[index].count??0)} (${_bloc.listOrder[index].dvt.toString().trim()})",
                                             style: TextStyle(color: _bloc.listOrder[index].gifProduct == true ? Colors.red : blue, fontSize: 12),
                                             textAlign: TextAlign.left,
                                           ),

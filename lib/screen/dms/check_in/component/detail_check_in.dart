@@ -1,5 +1,3 @@
-import 'package:dms/driver_transfer/api/models/direction_data.dart';
-import 'package:dms/model/entity/image_check_in.dart';
 import 'package:dms/screen/dms/check_in/component/map.dart';
 import 'package:dms/screen/dms/check_in/component/rolling_switch_custom.dart';
 import 'package:dms/widget/custom_check_out.dart';
@@ -16,6 +14,7 @@ import 'package:material_design_icons_flutter/material_design_icons_flutter.dart
 import 'package:dms/model/entity/app_settings.dart';
 import 'package:dms/screen/dms/check_in/check_in_bloc.dart';
 import 'package:dms/screen/dms/check_in/check_in_event.dart';
+import 'package:dms/services/location_service.dart';
 import 'package:dms/utils/const.dart';
 import 'package:dms/utils/extension/upper_case_to_title.dart';
 import 'package:dms/utils/utils.dart';
@@ -27,6 +26,7 @@ import '../../../../model/network/response/list_checkin_response.dart';
 import '../../../../themes/colors.dart';
 import '../../../../utils/images.dart';
 import '../album/album_screen.dart';
+import '../check_in_bloc.dart';
 import '../check_in_state.dart';
 import '../inventory/inventory_screen.dart';
 import '../order/order_from_check_in_screen.dart';
@@ -168,24 +168,7 @@ class _DetailCheckInScreenState extends State<DetailCheckInScreen> with TickerPr
             logic();
           }
           else if(state is CheckLocationSuccessState){
-            print('CheckLocationSuccessState');
-            if(Utils.getDistance(double.parse(widget.item.gps.toString().split(',').first), double.parse(widget.item.gps.toString().split(',').last),_bloc.currentLocation) < Const.distanceLocationCheckIn){}
-            else{
-              Utils.showCustomToast(context, Icons.warning_amber_outlined, 'Úi, Vị trí của bạn đang cách quá xa vị trí đã được lưu trước đó');
-              showDialog(
-                  barrierDismissible: false,
-                  context: context,
-                  builder: (BuildContext context)=>BlocProvider.value(value: _bloc,
-                    child: MapView(
-                      latStart: widget.item.gps.toString().split(',').first,
-                      longStart: widget.item.gps.toString().split(',').last,
-                      latEnd: _bloc.currentLocation?.latitude??0,
-                      longEnd: _bloc.currentLocation?.longitude??0,
-                      title: 'Bạn không thể check-in khi khoảng cách quá xa',
-                      metter: Utils.getDistance(double.parse(widget.item.gps.toString().split(',').first), double.parse(widget.item.gps.toString().split(',').last),_bloc.currentLocation),
-                    ),)
-              ).then((v)=>Navigator.pop(context));
-            }
+            _handleLocationValidationInDetail();
           }
         },
         child: BlocBuilder<CheckInBloc,CheckInState>(
@@ -474,25 +457,7 @@ class _DetailCheckInScreenState extends State<DetailCheckInScreen> with TickerPr
               onTap: ()async{
                 if(widget.isCheckInSuccess == false && widget.view == false){
                   if(widget.isGpsFormCustomer && widget.item.gps.toString().replaceAll('null', '').isNotEmpty){
-                    if(Utils.getDistance(double.parse(widget.item.gps.toString().split(',').first), double.parse(widget.item.gps.toString().split(',').last),_bloc.currentLocation) < Const.distanceLocationCheckIn){
-                    _bloc.add(GetImageLocalEvent());
-                    }
-                    else{
-                      Utils.showCustomToast(context, Icons.warning_amber_outlined, 'Úi, Vị trí của bạn đang cách quá xa vị trí đã được lưu trước đó');
-                      showDialog(
-                          barrierDismissible: false,
-                          context: context,
-                          builder: (BuildContext context)=>BlocProvider.value(value: _bloc,
-                            child: MapView(
-                              latStart: widget.item.gps.toString().split(',').first,
-                              longStart: widget.item.gps.toString().split(',').last,
-                              latEnd: _bloc.currentLocation?.latitude??0,
-                              longEnd: _bloc.currentLocation?.longitude??0,
-                              title: 'Bạn không thể check-in khi khoảng cách quá xa',
-                              metter: Utils.getDistance(double.parse(widget.item.gps.toString().split(',').first), double.parse(widget.item.gps.toString().split(',').last),_bloc.currentLocation),
-                            ),)
-                      );
-                    }
+                    _handleCheckInWithLocationValidation();
                   }else{
                     _bloc.add(GetImageLocalEvent());
                   }
@@ -589,6 +554,118 @@ class _DetailCheckInScreenState extends State<DetailCheckInScreen> with TickerPr
         }
       }
     });
+  }
+
+  // Method xử lý validation vị trí trong detail check-in
+  void _handleLocationValidationInDetail() {
+    try {
+      print('📍 Detail: Starting location validation...');
+      
+      if (widget.item.gps.toString().isEmpty || 
+          widget.item.gps.toString() == 'null') {
+        print('📍 Detail: No customer coordinates, proceeding without location check');
+        _bloc.add(GetImageLocalEvent());
+        return;
+      }
+      
+      // Validate check-in với LocationService
+      CheckInValidationResult validation = LocationService.validateCheckIn(
+        customerLatLong: widget.item.gps.toString(),
+        currentPosition: _bloc.currentLocation,
+        maxAllowedDistance: Const.distanceLocationCheckIn,
+      );
+      
+      if (validation.isSuccess) {
+        print('📍 Detail: Check-in validation successful: distance=${validation.distance!.toStringAsFixed(2)}m');
+        _bloc.add(GetImageLocalEvent());
+        
+      } else if (validation.isDistanceExceeded) {
+        print('📍 Detail: Distance exceeded: ${validation.distance!.toStringAsFixed(2)}m > ${validation.maxAllowed}m');
+        _showDistanceExceededDialogInDetail(validation);
+        
+      } else {
+        print('📍 Detail: Check-in validation failed: ${validation.error}');
+        _showLocationErrorDialogInDetail(validation);
+      }
+      
+    } catch (e) {
+      print('❌ Detail: Check-in validation error: $e');
+      Utils.showCustomToast(context, Icons.error_outline, 
+        'Lỗi kiểm tra vị trí. Vui lòng thử lại.');
+    }
+  }
+
+  // Method xử lý check-in với validation vị trí
+  void _handleCheckInWithLocationValidation() {
+    _handleLocationValidationInDetail();
+  }
+  
+  // Hiển thị dialog khi khoảng cách vượt quá trong detail
+  void _showDistanceExceededDialogInDetail(CheckInValidationResult validation) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) => BlocProvider.value(
+        value: _bloc,
+        child: MapView(
+          latStart: widget.item.gps.toString().split(',')[0],
+          longStart: widget.item.gps.toString().split(',')[1],
+          latEnd: _bloc.currentLocation?.latitude??0,
+          longEnd: _bloc.currentLocation?.longitude??0,
+          metter: validation.distance!,
+          title: 'Khoảng cách vượt quá cho phép',
+        ),
+      ),
+    ).then((value) {
+      if(value != null && value[0] == "Accepted"){
+        _bloc.add(GetImageLocalEvent());
+      }
+    });
+  }
+  
+  // Hiển thị dialog lỗi vị trí trong detail
+  void _showLocationErrorDialogInDetail(CheckInValidationResult validation) {
+    String message = validation.error ?? 'Lỗi không xác định';
+    bool showRetry = validation.showRetry;
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_outlined, color: Colors.orange),
+            SizedBox(width: 8),
+            Text('Lỗi vị trí GPS'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(message),
+            if (validation.accuracy != null) ...[
+              const SizedBox(height: 8),
+              Text('Độ chính xác GPS: ${validation.accuracy!.toStringAsFixed(0)}m', 
+                style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Đóng'),
+          ),
+          if (showRetry)
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _bloc.getFreshLocation();
+              },
+              child: const Text('Thử lại'),
+            ),
+        ],
+      ),
+    );
   }
 }
 

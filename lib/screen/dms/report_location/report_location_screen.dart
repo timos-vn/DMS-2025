@@ -16,6 +16,7 @@ import 'package:persistent_bottom_nav_bar/persistent_bottom_nav_bar.dart';
 import '../../../custom_lib/view_only_image.dart';
 import '../../../model/network/response/manager_customer_response.dart';
 import '../../../themes/colors.dart';
+import '../../../utils/const.dart';
 import '../../../utils/utils.dart';
 import 'report_location_bloc.dart';
 import 'report_location_event.dart';
@@ -141,11 +142,39 @@ class _ReportLocationScreenState extends State<ReportLocationScreen> {
         backgroundColor: subColor,
         onPressed: () {
           _noteFocus.unfocus();
-          if(_bloc.codeCustomer != null){
-            reportLocation();
-          }else{
-            Utils.showCustomToast(context, Icons.warning_amber_outlined, 'Vui lòng chọn thông tin khách hàng');
+          
+          // Kiểm tra điều kiện có cần chọn khách hàng không
+          final bool needCustomerSelection = Const.reportLocationNoChooseCustomer != true;
+          
+          // Nếu cần chọn KH và chưa chọn -> hiển thị thông báo
+          if (needCustomerSelection && _bloc.codeCustomer == null) {
+            _showValidationDialog(
+              'Thiếu thông tin',
+              'Vui lòng chọn thông tin khách hàng để tiếp tục.'
+            );
+            return;
           }
+          
+          // Validate Nội dung
+          if (_noteController.text.trim().isEmpty) {
+            _showValidationDialog(
+              'Thiếu nội dung',
+              'Vui lòng nhập nội dung báo cáo để tiếp tục.'
+            );
+            return;
+          }
+          
+          // Validate Image
+          if (_bloc.listFileInvoice.isEmpty) {
+            _showValidationDialog(
+              'Thiếu hình ảnh',
+              'Vui lòng chọn ít nhất 1 hình ảnh để tiếp tục.'
+            );
+            return;
+          }
+          
+          // Thực hiện báo cáo vị trí
+          reportLocation();
         },
         child: const Icon(Icons.check,color: Colors.white,),
       ),
@@ -388,6 +417,40 @@ class _ReportLocationScreenState extends State<ReportLocationScreen> {
           )
         ],
       ),
+    );
+  }
+
+  /// Hiển thị dialog cảnh báo validation
+  void _showValidationDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          title: Row(
+            children: [
+              const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
+              const SizedBox(width: 10),
+              Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: Text(
+            message,
+            style: const TextStyle(fontSize: 14, color: Colors.black87),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.blue,
+              ),
+              child: const Text('Đóng', style: TextStyle(fontSize: 15)),
+            ),
+          ],
+        );
+      },
     );
   }
 

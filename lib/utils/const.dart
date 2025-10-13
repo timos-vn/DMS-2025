@@ -17,6 +17,8 @@ class Const {
   static  String HOST_URL = "";
   static  String token = "";
   // ignore: non_constant_identifier_names
+  static  String NAME_URL = "";
+  // ignore: non_constant_identifier_names
   static  int PORT_URL = 0;
 
   static const String HOST_GOOGLE_MAP_URL = "https://maps.googleapis.com/maps/api/";
@@ -113,6 +115,8 @@ class Const {
   static String storeName = '';
   static String uId = '';
   static String userName = '';
+  static String maNvbh = '';
+  static String maNPP = '';
   static int userId = 0;
   static int phepCL = 0;
   static String currencyCode = '';
@@ -136,7 +140,7 @@ class Const {
 
   static DateTime dateFrom = DateTime.now().add(const Duration(days: -7));
   static DateTime dateTo = DateTime.now();
-  static int distanceLocationCheckIn = 300; ///met
+  static int distanceLocationCheckIn = 500; ///met - Tăng từ 300m lên 500m để giảm khó chịu cho user
   static bool freeDiscount = false; /// Khoá CTCK tự do
   static bool discountSpecial = false; /// Khoá CTCK đặc biệt: chiết khấu tổng đơn tặng hàng
   static bool woPrice = false; /// Khoá giá bán buôn
@@ -176,7 +180,8 @@ class Const {
   static bool allowViewPriceAndTotalPriceProductGift = false;
   static bool chooseStateWhenCreateNewOpenStore = false; ///Thêm thông tin trạng thái khi mở mới điểm bán
   static bool dateEstDelivery = false; ///Ngày dự kiến giao hàng
-  static bool editPrice = false; /// Cho phép sửa giá
+  static bool editPrice = false; /// Cho phép sửa giá (không giới hạn)
+  static bool editPriceWidthValuesEmptyOrZero = false; /// Chỉ cho phép sửa giá khi giá = 0 hoặc null
   static bool editNameProduction = false; /// Cho phép sửa tên sản phẩm
   static bool typeProduction = false; /// Loại của sản phẩm: Thường - Chế biến - Sản xuất
   static bool giaGui = false; /// Cho phép nhập thêm giá gửi
@@ -197,6 +202,9 @@ class Const {
   static int deliveryPhotoRange = -1; /// Khoảng cách giao hàng
   static bool scanQRCodeForInvoicePXB = false; /// cho phép quét phiếu PXB khi xác nhận giao hàng
   static bool allowCreateTicketShipping = false; /// Kiểm tra sl thực giao và sl yêu cầu, nếu nhỏ hơn cho phép tạo phiu giao hàng
+  static bool reportLocationNoChooseCustomer = false; /// Yêu cầu phải chọn khách hàng - Báo cáo vị trí
+  static bool noCheckDayOff = false; /// Yêu cầu phải chọn khách hàng - Báo cáo vị trí
+  static bool autoAddAgentFromSaleOut = false; /// Cho phép tự động add NPP/ĐL theo nhân viên sale ở trong SALE OUT
 
 
   ///Data format
@@ -234,6 +242,8 @@ class Const {
   static bool tKSX = false;
   static bool refundOrder = false;
   static bool isDefaultCongNo = false;
+  static bool createOrderFormStore = false;
+  static bool downFileFromDetailOrder = false;
 
   //DMS
   static bool checkIn = false;

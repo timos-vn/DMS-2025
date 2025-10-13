@@ -189,15 +189,20 @@ class LoginBloc extends Bloc<LoginEvent,LoginState>{
         token: _accessToken.toString()
       );
       user  = _user;
-      userName = response.user!.userName!;
-      Const.userName = response.user!.userName!;
-      Const.userId = response.user!.userId!;
-      Const.phepCL = response.user?.nghiCL??0;
+      // Safe handling với giá trị mặc định
+      userName = response.user?.userName ?? '';
+      Const.userName = response.user?.userName ?? '';
+      Const.userId = response.user?.userId ?? 0;
+      Const.phepCL = response.user?.nghiCL ?? 0;
+      Const.maNvbh = response.user?.maNvbh?.toString() ?? '';
+      Const.maNPP = response.user?.maNPP?.toString() ?? '';
       // Utils.saveDataLogin(_prefs, loginResponseUser!,_accessToken!,_refreshToken!);
       pushService(
           hostURLPORT:hostURL.toString().trim().replaceAll('https://', '').replaceAll('-cloud.sse.net.vn', '')
           ,username:username,pass:pass,accessToken: _accessToken.toString(),refreshToken: _refreshToken.toString(),
-      userId: response.user!.userId.toString(),userName: response.user!.userName.toString(),fullName: response.user!.fullName.toString());
+      userId: (response.user?.userId ?? 0).toString(),
+      userName: response.user?.userName ?? '',
+      fullName: response.user?.fullName ?? '');
 
       return LoginSuccess();
     } catch (e) {

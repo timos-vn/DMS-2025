@@ -13,9 +13,11 @@ import '../../../model/entity/entity_request.dart';
 import '../../../model/entity/product.dart';
 import '../../../model/network/request/create_order_request.dart';
 import '../../../model/network/request/discount_request.dart';
+import '../../../model/network/request/manager_customer_request.dart';
 import '../../../model/network/request/order_create_checkin_request.dart';
 import '../../../model/network/request/save_inventory_control_request.dart';
 import '../../../model/network/response/detail_history_sale_out_response.dart';
+import '../../../model/network/response/manager_customer_response.dart';
 import '../../../model/network/response/list_history_sale_out_response.dart';
 import '../../../model/network/response/list_stock_response.dart';
 import '../../../model/network/response/search_list_item_response.dart';
@@ -91,6 +93,7 @@ class SaleOutBloc extends Bloc<SaleOutEvent,SaleOutState>{
     on<GetListHistorySaleOutEvent>(_getListHistorySaleOutEvent);
     on<GetDetailHistorySaleOutEvent>(_getDetailHistorySaleOutEvent);
     on<UpdateProductCountEvent>(_updateProductCountEvent);
+    on<AutoLoadAgentByNPPEvent>(_autoLoadAgentByNPP);
   }
   final box = GetStorage();
   void _getPrefs(GetSaleOutPrefs event, Emitter<SaleOutState> emitter)async{
@@ -245,6 +248,54 @@ class SaleOutBloc extends Bloc<SaleOutEvent,SaleOutState>{
     agentAddress = event.address;
     agentCode = event.codeCustomer;
     emitter(PickInfoAgentSuccess());
+  }
+
+  /// Auto load agent by maNPP
+  void _autoLoadAgentByNPP(AutoLoadAgentByNPPEvent event, Emitter<SaleOutState> emitter) async {
+    emitter(SaleOutLoading());
+    
+    try {
+      // Tạo request để tìm đại lý theo mã NPP
+      ManagerCustomerRequestBody request = ManagerCustomerRequestBody(
+        type: 1,
+        searchValue: Utils.convertKeySearch(event.maNPP), // ✅ Convert sang SQL LIKE format
+        pageIndex: 1,
+        typeName: 'AGENT', // Tìm đại lý
+      );
+      
+      // Call API
+      Object data = await _networkFactory!.searchListCustomer(request, _accessToken!);
+      
+      // Xử lý response
+      if (data is String) {
+        // API fail -> silent (không làm gì)
+        emitter(SaleOutInitial());
+        return;
+      }
+      
+      ManagerCustomerResponse response = ManagerCustomerResponse.fromJson(data as Map<String, dynamic>);
+      List<ManagerCustomerResponseData> agents = response.data ?? [];
+      
+      if (agents.isEmpty) {
+        // Không tìm thấy đại lý -> silent
+        emitter(SaleOutInitial());
+        return;
+      }
+      
+      // Lấy đại lý đầu tiên
+      ManagerCustomerResponseData firstAgent = agents.first;
+      
+      // Lưu thông tin đại lý vào bloc
+      agentName = firstAgent.customerName;
+      agentPhone = firstAgent.phone;
+      agentAddress = firstAgent.address;
+      agentCode = firstAgent.customerCode;
+      
+      emitter(AutoLoadAgentSuccess());
+    } catch (e) {
+      // Error -> silent (không làm gì)
+      emitter(SaleOutInitial());
+    }
   }
 
   double totalMoney = 0;

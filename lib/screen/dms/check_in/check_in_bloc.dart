@@ -27,6 +27,7 @@ import '../../../model/network/response/list_image_store_response.dart';
 import '../../../model/network/response/list_task_offline_response.dart';
 import 'check_in_event.dart';
 import 'check_in_state.dart';
+import '../../../services/location_service.dart';
 
 
 class CheckInBloc extends Bloc<CheckInEvent,CheckInState>{
@@ -1092,31 +1093,43 @@ class CheckInBloc extends Bloc<CheckInEvent,CheckInState>{
 
   testLocation()async{
     List<Location> locations = await locationFromAddress("36, Phố Đặng Thai Mai, , Hà Nam");
-    List<Placemark> placePoint = await placemarkFromCoordinates(locations[0].latitude,locations[0].longitude).catchError((err)=>stopListenLocation(err),);
-    String currentAddress1 = "${placePoint[0].name}, ${placePoint[0].thoroughfare}, ${placePoint[0].subAdministrativeArea}, ${placePoint[0].administrativeArea}";
+    List<Placemark> placePoint = await placemarkFromCoordinates(locations[0].latitude,locations[0].longitude).catchError((err){
+      stopListenLocation(err.toString());
+      return <Placemark>[];
+    });
     print(placePoint); print(placePoint);
   }
 
   getUserLocation({double? lat, double? long, bool isCheck = false}) async {
-    List<Location> locations = await locationFromAddress("36, Phố Đặng Thai Mai, , Hà Nam");
-    print('join${locations[0]}');
-    positionStream =
-    Utils.getPositionStream().listen((Position position) async{
-      DataLocal.currentLocations = position;
-      // ignore: invalid_return_type_for_catch_error
-      List<Placemark> placePoint = await placemarkFromCoordinates(position.latitude,position.longitude).catchError((err)=>stopListenLocation(err),);
-      String currentAddress1 = "${placePoint[0].name}, ${placePoint[0].thoroughfare}, ${placePoint[0].subAdministrativeArea}, ${placePoint[0].administrativeArea}";
-      DataLocal.addressCheckInCustomer = currentAddress1;
-      DataLocal.latLongLocation = '${position.latitude},${position.longitude}';
-      currentLocation = position;
-      print(placePoint[0]);
-      print('Checking-Location1: ${DataLocal.latLongLocation}');
-      print('Checking-AddressCheckInCustomer1: ${DataLocal.addressCheckInCustomer}');
-      stopListenLocation('');
-      if(isCheck){
-        emit(CheckLocationSuccessState());
+    print('📍 CheckInBloc: getUserLocation called - using LocationService...');
+    
+    try {
+      LocationResult result = await LocationService.getLocationWithRetry(
+        forceFresh: true,
+        maxRetries: 3,
+      );
+      
+      if (result.isSuccess) {
+        currentLocation = result.position!;
+        print('📍 LocationService success: accuracy=${result.accuracy}m, attempt=${result.attempt}');
+        
+        if (result.warning != null) {
+          print('⚠️ ${result.warning}');
+        }
+        
+        if(isCheck){
+          // emit(CheckLocationSuccessState());
+        }
+      } else {
+        print('❌ LocationService failed: ${result.error}');
+        // emit(CheckInFailure(result.error ?? 'Không thể lấy vị trí GPS'));
       }
-    });
+      
+    } catch (e) {
+      print('❌ getUserLocation error: $e');
+      // emit(CheckInFailure('Lỗi hệ thống khi lấy vị trí GPS: $e'));
+    }
+  }
 
     // currentLocation = await locateUser();
     // List<Placemark> placePoint = await placemarkFromCoordinates(currentLocation.latitude,currentLocation.longitude);
@@ -1125,7 +1138,6 @@ class CheckInBloc extends Bloc<CheckInEvent,CheckInState>{
     // DataLocal.latLongLocation = '${currentLocation.latitude},${currentLocation.longitude}';
     // print('Checking-Location1: ${DataLocal.latLongLocation}');
     // print('Checking-AddressCheckInCustomer1: ${DataLocal.addressCheckInCustomer}');
-  }
 
   void stopListenLocation(String err){
     print(err);
@@ -1135,4 +1147,12 @@ class CheckInBloc extends Bloc<CheckInEvent,CheckInState>{
   Future<Position> locateUser() async {
     return Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.best);
   }
+
+  // Public method để các screen khác có thể gọi
+  Future<void> getFreshLocation({bool isCheck = false}) async {
+    await getUserLocation(isCheck: isCheck);
+  }
+
+
+
 }

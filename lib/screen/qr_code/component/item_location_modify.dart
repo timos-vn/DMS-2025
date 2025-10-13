@@ -1,5 +1,3 @@
-import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:dms/screen/qr_code/qr_code_bloc.dart';
 import 'package:dms/screen/qr_code/qr_code_sate.dart';
@@ -41,6 +39,9 @@ class _ItemLocationModifyScreenState extends State<ItemLocationModifyScreen> {
   List<ListItem> listItemCard = [];
   String licensePlates = '';
   int indexSelected = -1;
+  
+  // ✅ Camera instance riêng cho màn hình này
+  final GlobalKey _cameraKey = GlobalKey();
 
   @override
   void initState() {
@@ -49,6 +50,20 @@ class _ItemLocationModifyScreenState extends State<ItemLocationModifyScreen> {
     _bloc = QRCodeBloc(context);
 
     listItemCard.addAll(widget.listItemCard);
+  }
+
+  @override
+  void dispose() {
+    // ✅ Stop camera safely when leaving the screen
+    try {
+      (_cameraKey.currentState as dynamic)?.stopCamera();
+      debugPrint('=== ItemLocationModify: Camera stopped in dispose ===');
+    } catch (e) {
+      debugPrint('=== ItemLocationModify: Error stopping camera in dispose: $e ===');
+    }
+    
+    _bloc.close();
+    super.dispose();
   }
 
   void handleBarcodeScan(String code) async {
@@ -95,7 +110,7 @@ class _ItemLocationModifyScreenState extends State<ItemLocationModifyScreen> {
     else if(widget.keyFunction == '#3'){
       if(!valuesBarcode.contains(code)){
         valuesBarcode = code;
-        _bloc.add(GetInformationItemFromBarCodeEvent(barcode: valuesBarcode.toString()));
+        _bloc.add(GetInformationItemFromBarCodeEvent(barcode: valuesBarcode.toString(), pallet: ''));
       }
     }
 
@@ -758,7 +773,7 @@ class _ItemLocationModifyScreenState extends State<ItemLocationModifyScreen> {
 
   buildCamera(){
     return BarcodeScannerWidget(
-      key: BarcodeScannerWidget.globalKey,
+      key: _cameraKey,
       onBarcodeDetected: handleBarcodeScan,
     );
   }
@@ -805,7 +820,7 @@ class _ItemLocationModifyScreenState extends State<ItemLocationModifyScreen> {
                 onTap: (){
                   setState(() {
                     viewQRCode = false;
-                    BarcodeScannerWidget.globalKey.currentState?.stopCamera();
+                    // ✅ Camera sẽ được quản lý bởi widget riêng của màn hình
                   });
                   var formatter = NumberFormat('#,##,000');
                   print(formatter.format(16987));

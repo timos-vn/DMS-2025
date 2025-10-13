@@ -283,8 +283,8 @@ class _AddNewRequestOpenStoreScreenState extends State<AddNewRequestOpenStoreScr
 
     bool customerInfoValid = _nameCustomerController.text.isNotEmpty &&
         _phoneCustomerController.text.isNotEmpty &&
-        _phoneCustomerController.text.length == 10 &&
-        _birthDayController.text.isNotEmpty;
+        _phoneCustomerController.text.length == 10; /*&&
+        _birthDayController.text.isNotEmpty;*/
 
     bool storeInfoValid = _nameStoreController.text.isNotEmpty &&
         _phoneCustomer2Controller.text.isNotEmpty &&
@@ -312,7 +312,7 @@ class _AddNewRequestOpenStoreScreenState extends State<AddNewRequestOpenStoreScr
     if (_phoneCustomerController.text.isNotEmpty && _phoneCustomerController.text.length != 10) {
       missingFields.add('• SĐT người liên hệ phải có 10 chữ số');
     }
-    if (_birthDayController.text.isEmpty) missingFields.add('• Ngày sinh');
+  //  if (_birthDayController.text.isEmpty) missingFields.add('• Ngày sinh');
     if (_nameStoreController.text.isEmpty) missingFields.add('• Tên cửa hàng');
     if (_phoneCustomer2Controller.text.isEmpty) missingFields.add('• SĐT cửa hàng');
     if (_phoneCustomer2Controller.text.isNotEmpty && _phoneCustomer2Controller.text.length != 10) {
@@ -803,6 +803,7 @@ class _AddNewRequestOpenStoreScreenState extends State<AddNewRequestOpenStoreScr
           hint: 'Chọn tour/tuyến',
           controller: _nameTourController,
           onTap: () => _selectTour(),
+          isRequired: true,
         ),
         if (Const.chooseStateWhenCreateNewOpenStore == true)
           _buildSelectionField(

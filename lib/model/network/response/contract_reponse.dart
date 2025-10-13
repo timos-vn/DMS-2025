@@ -244,6 +244,7 @@ class ListItem {
   String? tenDvt;
   String? maKho;
   String? tenKho;
+  double soLuongTonKho;
   double soLuong;
   double giaBanNt;
   double giaNt2;
@@ -279,7 +280,7 @@ class ListItem {
     this.dvt,
     this.tenDvt,
     this.maKho,
-    this.tenKho,
+    this.tenKho,this.soLuongTonKho = 0,
     this.soLuong = 0,
     this.giaBanNt = 0,
     this.giaNt2 = 0,
@@ -319,6 +320,7 @@ class ListItem {
       maKho: json['ma_kho'],
       tenKho: json['ten_kho'],
       soLuong: (json['so_luong'] as num?)?.toDouble() ?? 0,
+      soLuongTonKho: (json['so_luong_ton_kho'] as num?)?.toDouble() ?? 0,
       giaBanNt: (json['gia_ban_nt'] as num?)?.toDouble() ?? 0,
       giaNt2: (json['gia_nt2'] as num?)?.toDouble() ?? 0,
       tienNt2: (json['tien_nt2'] as num?)?.toDouble() ?? 0,
@@ -356,6 +358,7 @@ class ListItem {
       'ten_dvt': tenDvt,
       'ma_kho': maKho,
       'ten_kho': tenKho,
+      'so_luong_ton_kho': soLuongTonKho,
       'so_luong': soLuong,
       'gia_ban_nt': giaBanNt,
       'gia_nt2': giaNt2,
@@ -392,13 +395,14 @@ class Payment {
   dynamic tongCk;
   dynamic tongThue;
   dynamic tongThanhToan;
+  dynamic soLuongKhaDung;
 
   Payment(
       {this.tongSoLuong,
         this.tongTien,
         this.tongCk,
         this.tongThue,
-        this.tongThanhToan});
+        this.tongThanhToan, this.soLuongKhaDung});
 
   Payment.fromJson(Map<String, dynamic> json) {
     tongSoLuong = json['tong_so_luong'];
@@ -406,6 +410,7 @@ class Payment {
     tongCk = json['tong_ck'];
     tongThue = json['tong_thue'];
     tongThanhToan = json['tong_thanh_toan'];
+    soLuongKhaDung = json['so_luong_kha_dung'];
   }
 
   Map<String, dynamic> toJson() {
@@ -415,6 +420,7 @@ class Payment {
     data['tong_ck'] = tongCk;
     data['tong_thue'] = tongThue;
     data['tong_thanh_toan'] = tongThanhToan;
+    data['so_luong_kha_dung'] = soLuongKhaDung;
     return data;
   }
 }
@@ -456,7 +462,7 @@ class ItemOrderFormContract {
   String? soCt;
   String? sttRecHd;
   String? sttRecDh;
-  int? statusCode;
+  dynamic statusCode;
   String? statusName;
 
   ItemOrderFormContract({

@@ -67,6 +67,19 @@ class InputQuantityPopupOrder extends StatefulWidget {
 
 class _InputQuantityPopupOrderState extends State<InputQuantityPopupOrder> {
 
+  /// Kiểm tra xem có cho phép sửa giá hay không dựa trên các điều kiện:
+  /// - Nếu editPriceWidthValuesEmptyOrZero = true: Chỉ cho sửa khi giá = 0
+  /// - Nếu editPriceWidthValuesEmptyOrZero = false && editPrice = true: Cho phép sửa
+  /// - Nếu editPriceWidthValuesEmptyOrZero = false && editPrice = false: Không cho sửa
+  bool get canEditPrice {
+    if (Const.editPriceWidthValuesEmptyOrZero == true) {
+      // Chỉ cho sửa giá khi giá = 0 hoặc rỗng
+      return widget.price == 0;
+    } else {
+      // Logic cũ: phụ thuộc vào Const.editPrice
+      return Const.editPrice == true;
+    }
+  }
 
   late TextEditingController nuocsxController  =  TextEditingController();
   late TextEditingController quycachController  =  TextEditingController();
@@ -366,7 +379,7 @@ class _InputQuantityPopupOrderState extends State<InputQuantityPopupOrder> {
                                                                       padding: const EdgeInsets.only(right: 6),
                                                                       child: TextField(
                                                                         autofocus: false,
-                                                                        enabled: Const.editPrice,
+                                                                        enabled: canEditPrice,
                                                                         textAlign: TextAlign.left,
                                                                         textAlignVertical: TextAlignVertical.top,
                                                                         style: const TextStyle(color: Colors.black, fontSize: 14,fontWeight: FontWeight.bold),
@@ -406,7 +419,7 @@ class _InputQuantityPopupOrderState extends State<InputQuantityPopupOrder> {
                                                                             fillColor: transparent,
                                                                             hintText: "0",
                                                                             hintStyle: const TextStyle(color: accent),
-                                                                            suffixIcon: Icon(FluentIcons.edit_12_filled,size: 15,color: Const.editPrice == true ? Colors.grey : Colors.transparent,),
+                                                                            suffixIcon: Icon(FluentIcons.edit_12_filled,size: 15,color: canEditPrice ? Colors.grey : Colors.transparent,),
                                                                             suffixIconConstraints: const BoxConstraints(maxWidth: 20),
                                                                             contentPadding: const EdgeInsets.only(
                                                                                 bottom: 14, top: 0,right: 0)

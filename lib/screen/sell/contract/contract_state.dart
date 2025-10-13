@@ -38,6 +38,27 @@ class ContractLoading extends ContractState {
   String toString() => 'ContractLoading';
 }
 
+// Loading states mới cho UX tốt hơn
+class ContractInitialLoading extends ContractState {
+  @override
+  String toString() => 'ContractInitialLoading';
+}
+
+class ContractPaginationLoading extends ContractState {
+  @override
+  String toString() => 'ContractPaginationLoading';
+}
+
+class ContractRefreshLoading extends ContractState {
+  @override
+  String toString() => 'ContractRefreshLoading';
+}
+
+class ContractOrderListLoading extends ContractState {
+  @override
+  String toString() => 'ContractOrderListLoading';
+}
+
 class GetListContractEmpty extends ContractState {
 
   @override

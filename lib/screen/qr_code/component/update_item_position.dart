@@ -1,6 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:dms/screen/qr_code/qr_code_bloc.dart';
 import 'package:dms/screen/qr_code/qr_code_sate.dart';
@@ -51,6 +49,9 @@ class _UpdateItemPositionState extends State<UpdateItemPosition> {
 
   String valuesBarcode = '';
   bool isProcessing = false;
+  
+  // ✅ Camera instance riêng cho màn hình này
+  final GlobalKey _cameraKey = GlobalKey();
 
   @override
   void initState() {
@@ -58,6 +59,20 @@ class _UpdateItemPositionState extends State<UpdateItemPosition> {
     super.initState();
     _bloc = QRCodeBloc(context);
 
+  }
+
+  @override
+  void dispose() {
+    // ✅ Stop camera safely when leaving the screen
+    try {
+      (_cameraKey.currentState as dynamic)?.stopCamera();
+      debugPrint('=== UpdateItemPosition: Camera stopped in dispose ===');
+    } catch (e) {
+      debugPrint('=== UpdateItemPosition: Error stopping camera in dispose: $e ===');
+    }
+    
+    _bloc.close();
+    super.dispose();
   }
 
   void handleBarcodeScan(String code) async {
@@ -70,7 +85,7 @@ class _UpdateItemPositionState extends State<UpdateItemPosition> {
       valuesBarcode = code.toString().trim();
     }
     if(describeEnum(valuesBarcode).toString().trim() != 'qrcode' && valuesBarcode.toString().trim() != code.toString().trim()){
-      _bloc.add(GetInformationItemFromBarCodeEvent(barcode: code.toString()));
+      _bloc.add(GetInformationItemFromBarCodeEvent(barcode: code.toString(), pallet: ''));
     }
     else{
       final body = json.decode(code);
@@ -372,7 +387,7 @@ class _UpdateItemPositionState extends State<UpdateItemPosition> {
             child: GestureDetector(
               onTap: (){
                 if(listItem.isNotEmpty && idLocation.isNotEmpty){
-                  _bloc.add(ItemLocationModifyEvent(listItem: listItem));
+                  _bloc.add(ItemLocationModifyEvent(listItem: listItem, typeFunction: '2'));
                 }else{
                   Utils.showCustomToast(context, Icons.warning_amber, 'Úi, Kiểm tra lại thông tin bạn êi');
                 }
@@ -440,7 +455,7 @@ class _UpdateItemPositionState extends State<UpdateItemPosition> {
 
   buildCamera(){
     return BarcodeScannerWidget(
-      key: BarcodeScannerWidget.globalKey,
+      key: _cameraKey,
       onBarcodeDetected: handleBarcodeScan,
     );
   }
@@ -487,7 +502,7 @@ class _UpdateItemPositionState extends State<UpdateItemPosition> {
                 onTap: (){
                   setState(() {
                     viewQRCode = false;
-                    BarcodeScannerWidget.globalKey.currentState?.stopCamera();
+                    // ✅ Camera sẽ được quản lý bởi widget riêng của màn hình
                   });
                   var formatter = NumberFormat('#,##,000');
                   print(formatter.format(16987));

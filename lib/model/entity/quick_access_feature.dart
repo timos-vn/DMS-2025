@@ -24,7 +24,7 @@ class QuickAccessFeature {
       'id': id,
       'title': title,
       'iconCode': icon.codePoint,
-      'fontFamily': icon.fontFamily,
+      'fontFamily': icon.fontFamily ?? 'MaterialIcons', // Default to MaterialIcons if null
       'fontPackage': icon.fontPackage,
       'route': route,
       'isEnabled': isEnabled,
@@ -47,6 +47,7 @@ class QuickAccessFeature {
 
   // Predefined map of common Material Icons for tree-shaking
   static const Map<int, IconData> _iconMap = {
+    // Material Icons
     0xe3c9: Icons.home,
     0xe3ca: Icons.search,
     0xe3cb: Icons.person,
@@ -110,11 +111,17 @@ class QuickAccessFeature {
     0xe404: Icons.app_registration,
     0xe405: Icons.event_busy,
     0xe406: Icons.schedule,
+    // Enefty Icons - common ones used in SearchService
+    0xe500: Icons.shopping_bag, // bag_2_outline equivalent
+    0xe501: Icons.location_on,  // location_outline equivalent
+    0xe502: Icons.badge,        // personalcard_outline equivalent
+    0xe503: Icons.store,        // shop_add_outline equivalent
+    // MDI Icons - common ones used in SearchService
+    0xe600: Icons.history,      // history equivalent
+    0xe601: Icons.bar_chart,    // chartBar equivalent
+    0xe602: Icons.event_available, // calendarCheckOutline equivalent
+    0xe603: Icons.trending_up,  // chartLine equivalent
   };
-
-  static IconData _getIconData(int codePoint) {
-    return _iconMap[codePoint] ?? Icons.help_outline;
-  }
 
   static IconData _getIconDataFromJson(Map<String, dynamic> json) {
     final codePoint = json['iconCode'] as int?;
@@ -125,17 +132,14 @@ class QuickAccessFeature {
       return Icons.help_outline;
     }
     
-    // Try to get from predefined map first
+    // Try to get from predefined map first (all icons in map are const)
     if (_iconMap.containsKey(codePoint)) {
       return _iconMap[codePoint]!;
     }
     
-    // Create IconData with the saved properties
-    return IconData(
-      codePoint,
-      fontFamily: fontFamily,
-      fontPackage: fontPackage,
-    );
+    // For icons not in predefined map, return a fallback constant icon
+    // This ensures tree-shaking compatibility
+    return Icons.help_outline;
   }
 
   QuickAccessFeature copyWith({

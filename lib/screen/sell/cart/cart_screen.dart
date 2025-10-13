@@ -733,7 +733,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
                     title: 'Cập nhật SL tặng',
                     quantity: DataLocal.listProductGift[indexSelectGift].count??0,
                     quantityStock: DataLocal.listProductGift[indexSelectGift].stockAmount??0,
-                    listDvt: itemSelect.contentDvt.toString().split(',').toList(),inventoryStore: false,
+                    listDvt: DataLocal.listProductGift[indexSelectGift].contentDvt.toString().split(',').toList(),inventoryStore: false,
                     findStock: true,
                     listStock: _bloc.listStockResponse,
                     allowDvt: DataLocal.listProductGift[indexSelectGift].allowDvt,
@@ -742,7 +742,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
                     codeProduction: DataLocal.listProductGift[indexSelectGift].code.toString(),
                     listObjectJson: DataLocal.listProductGift[indexSelectGift].jsonOtherInfo.toString(),
                     updateValues: true, listQuyDoiDonViTinh: _bloc.listQuyDoiDonViTinh,nuocsx: '',quycach: '',
-                    tenThue:  _bloc.listOrder[indexSelect].tenThue,thueSuat:  _bloc.listOrder[indexSelect].thueSuat,
+                    tenThue:  _bloc.listOrder[indexSelectGift].tenThue,thueSuat:  _bloc.listOrder[indexSelectGift].thueSuat,
                   );
                 }).then((value){
               if(double.parse(value[0].toString()) > 0){
@@ -1235,7 +1235,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
                         ),
                       ),
                       const SizedBox(width: 6,),
-                      Text('Sản phẩm (${_bloc.totalProductView})',style: const TextStyle(color: Colors.black,fontSize: 15,fontWeight: FontWeight.bold),),
+                      Text('Sản phẩm (${Utils.formatQuantity(_bloc.totalProductView)})',style: const TextStyle(color: Colors.black,fontSize: 15,fontWeight: FontWeight.bold),),
                     ],
                   ),
                 ),
@@ -2440,12 +2440,44 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
                     child: SlidableAction(
                       onPressed:(_) {
                         if(widget.isContractCreateOrder == true){
-                          // Tính số lượng khả dụng dựa trên maVt2
-                          double availableQuantity = _getAvailableQuantityForItemInCart(_bloc.listOrder[index].code, _bloc.listOrder[index].maVt2);
+                          // Tìm giá trị LỚN NHẤT của availableQuantity trong các items cùng maVt2
+                          // Đây mới là TỔNG khả dụng gốc ban đầu
+                          double totalAvailableForMaVt2 = 0;
+                          for (var item in _bloc.listOrder) {
+                            if (item.maVt2 == _bloc.listOrder[index].maVt2) {
+                              double itemAvailable = item.availableQuantity ?? item.so_luong_kd;
+                              if (itemAvailable > totalAvailableForMaVt2) {
+                                totalAvailableForMaVt2 = itemAvailable;
+                              }
+                            }
+                          }
+                          
+                          // Tính TỔNG số lượng đã đặt của TẤT CẢ items cùng maVt2
+                          double totalOrderedForMaVt2 = 0;
+                          for (var item in _bloc.listOrder) {
+                            if (item.maVt2 == _bloc.listOrder[index].maVt2) {
+                              totalOrderedForMaVt2 += item.count ?? 0;
+                            }
+                          }
+                          
+                          // B = Số còn lại CHUNG = Tổng khả dụng - Tổng đã đặt (TẤT CẢ)
+                          double remainingAvailableForAll = (totalAvailableForMaVt2 - totalOrderedForMaVt2).clamp(0, totalAvailableForMaVt2);
+                          
+                          // Tính TỔNG số lượng đã đặt của các items KHÁC (để tính Max)
+                          double totalOrderedExcludingCurrent = 0;
+                          for (var item in _bloc.listOrder) {
+                            if (item.maVt2 == _bloc.listOrder[index].maVt2 && item.sttRec0 != _bloc.listOrder[index].sttRec0) {
+                              totalOrderedExcludingCurrent += item.count ?? 0;
+                            }
+                          }
+                          
+                          // Max = Tổng khả dụng - Số đã đặt (items KHÁC)
+                          double maxCanOrder = totalAvailableForMaVt2 - totalOrderedExcludingCurrent;
                           
                           showChangeQuantityPopup(
                             context: context,
-                            originalQuantity: _bloc.listOrder[index].countMax!,
+                            originalQuantity: maxCanOrder, // Max validation
+                            productName: _bloc.listOrder[index].name,
                             onConfirmed: (newQty) {
                               gift = false;
                               _bloc.listOrder[index].count = newQty;
@@ -2477,13 +2509,14 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
                                 unitProduct:itemSelect.unitProduct ?? '',
                                 dsCKLineItem:itemSelect.maCk.toString(),
                                 allowDvt: itemSelect.allowDvt == true ? 0 : 1,
+                                availableQuantity: totalAvailableForMaVt2, // Giữ tổng khả dụng gốc cho maVt2
                                 contentDvt: itemSelect.contentDvt,
                                 kColorFormatAlphaB: itemSelect.kColorFormatAlphaB?.value,
                                 codeStock: itemSelect.stockCode,
                                 nameStock: itemSelect.stockName,
                                 editPrice:  0,
                                 isSanXuat: ( 0),
-                                isCheBien: ( 0),
+                                isCheBien: ( 0),   
                                 giaSuaDoi: itemSelect.giaSuaDoi,
                                 giaGui: itemSelect.giaGui,
                                 priceMin: _bloc.listStockResponse.isNotEmpty ? _bloc.listStockResponse[0].priceMin??0 : 0,
@@ -2518,7 +2551,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
                             maVt2: _bloc.listOrder[index].maVt2 ?? '',
                             listOrder: _bloc.listOrder,
                             currentQuantity: _bloc.listOrder[index].count ?? 0,
-                            availableQuantity: availableQuantity,
+                            availableQuantity: maxCanOrder, // A + B = Tối đa có thể đặt
                           );
                         }else{
                           gift = false;
@@ -2597,6 +2630,40 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
                                   maxLines: 2,overflow: TextOverflow.ellipsis,
                                 ),
                                 const SizedBox(height: 5,),
+                                Visibility(
+                                  visible: (_bloc.listOrder[index].thueSuat ?? 0.0) > 0,
+                                  child: Container(
+                                    margin: const EdgeInsets.only(bottom: 5),
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xffdc2626).withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: const Color(0xffdc2626).withOpacity(0.3),
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(
+                                          Icons.account_balance,
+                                          size: 14,
+                                          color: Color(0xffdc2626),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'Thuế: ${_formatTaxRate(_bloc.listOrder[index].thueSuat ?? 0)}%',
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 11,
+                                            color: Color(0xffdc2626),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
                                 Row(
                                   crossAxisAlignment: CrossAxisAlignment.center,
                                   children: [
@@ -2817,9 +2884,37 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
                                         quantity: _bloc.listOrder[index].count?.toString() ?? '0',
                                         unit: _bloc.listOrder[index].dvt.toString(),
                                         isShowInfo: widget.isContractCreateOrder == true ? true : false,
-                                        contractQuantity: widget.isContractCreateOrder == true
-                                            ? '${_bloc.listOrder[index].count}/${_getAvailableQuantityForItemInCart(_bloc.listOrder[index].code, _bloc.listOrder[index].maVt2)}'
-                                            : null,
+                                      contractQuantity: widget.isContractCreateOrder == true
+                                          ? () {
+                                              // A = Số lượng hiện tại của item này
+                                              double currentCount = _bloc.listOrder[index].count ?? 0;
+                                              
+                                              // Tìm giá trị LỚN NHẤT của availableQuantity trong các items cùng maVt2
+                                              // Đây mới là TỔNG khả dụng gốc ban đầu
+                                              double totalAvailableForMaVt2 = 0;
+                                              for (var item in _bloc.listOrder) {
+                                                if (item.maVt2 == _bloc.listOrder[index].maVt2) {
+                                                  double itemAvailable = item.availableQuantity ?? item.so_luong_kd;
+                                                  if (itemAvailable > totalAvailableForMaVt2) {
+                                                    totalAvailableForMaVt2 = itemAvailable;
+                                                  }
+                                                }
+                                              }
+                                              
+                                              // Tính TỔNG số lượng đã đặt của TẤT CẢ items cùng maVt2
+                                              double totalOrderedForMaVt2 = 0;
+                                              for (var item in _bloc.listOrder) {
+                                                if (item.maVt2 == _bloc.listOrder[index].maVt2) {
+                                                  totalOrderedForMaVt2 += item.count ?? 0;
+                                                }
+                                              }
+                                              
+                                              // B = Số lượng còn lại CHUNG = Tổng khả dụng - Tổng đã đặt
+                                              double remainingAvailable = (totalAvailableForMaVt2 - totalOrderedForMaVt2).clamp(0, totalAvailableForMaVt2);
+                                              
+                                              return '${Utils.formatQuantity(currentCount)}/${Utils.formatQuantity(remainingAvailable)}';
+                                            }()
+                                          : null,
                                       ),
                                     ],
                                   ),
@@ -3947,51 +4042,6 @@ customWidgetPayment('Chiết khấu:','- ${Utils.formatMoneyStringToDouble(_bloc
     );
   }
 
-  double _getAvailableQuantityForItemInCart(String? maVt, String? maVt2) {
-    if (maVt == null || maVt2 == null) return 0;
-    
-    // Tìm item đầu tiên có maVt2 này để lấy so_luong_kd gốc
-    var firstItem = _bloc.listOrder.firstWhere(
-      (element) => element.maVt2 == maVt2,
-      orElse: () => SearchItemResponseData(),
-    );
-    
-    if (firstItem.code == null) return 0;
-    
-    // Tính tổng số lượng đã đặt cho maVt2 này
-    double totalOrderedForMaVt2 = 0;
-    for (var item in _bloc.listOrder) {
-      if (item.maVt2 == maVt2) {
-        totalOrderedForMaVt2 += item.count ?? 0;
-      }
-    }
-    
-    // Trả về số lượng khả dụng còn lại
-    return (firstItem.so_luong_kd - totalOrderedForMaVt2).clamp(0, firstItem.so_luong_kd);
-  }
-
-  double _getAvailableQuantityForMaVt2InCart(String? maVt2) {
-    if (maVt2 == null) return 0;
-    
-    // Tìm item đầu tiên có maVt2 này để lấy so_luong_kd gốc
-    var firstItem = _bloc.listOrder.firstWhere(
-      (element) => element.maVt2 == maVt2,
-      orElse: () => SearchItemResponseData(),
-    );
-    
-    if (firstItem.code == null) return 0;
-    
-    // Tính tổng số lượng đã đặt cho maVt2 này
-    double totalOrderedForMaVt2 = 0;
-    for (var item in _bloc.listOrder) {
-      if (item.maVt2 == maVt2) {
-        totalOrderedForMaVt2 += item.count ?? 0;
-      }
-    }
-    
-    // Trả về số lượng khả dụng còn lại
-    return (firstItem.so_luong_kd - totalOrderedForMaVt2).clamp(0, firstItem.so_luong_kd);
-  }
 
   buildAppBar(){
     return Container(
@@ -4080,5 +4130,14 @@ customWidgetPayment('Chiết khấu:','- ${Utils.formatMoneyStringToDouble(_bloc
     );
   }
 
+  String _formatTaxRate(double taxRate) {
+    // Nếu số là số nguyên thì hiển thị không có phần thập phân
+    if (taxRate == taxRate.roundToDouble()) {
+      return taxRate.round().toString();
+    } else {
+      // Nếu có phần thập phân thì hiển thị với 1 chữ số thập phân
+      return taxRate.toStringAsFixed(1);
+    }
+  }
 
 }

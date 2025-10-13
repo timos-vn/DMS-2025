@@ -18,8 +18,9 @@ class ItemLocationModifyRequest {
 
 class ItemLocationModifyRequestData {
   List<ItemLocationModifyRequestDetail>? detail;
+  String? typeFunction;
 
-  ItemLocationModifyRequestData({this.detail});
+  ItemLocationModifyRequestData({this.detail, this.typeFunction});
 
   ItemLocationModifyRequestData.fromJson(Map<String, dynamic> json) {
     if (json['Detail'] != null) {
@@ -28,6 +29,7 @@ class ItemLocationModifyRequestData {
         detail!.add(ItemLocationModifyRequestDetail.fromJson(v));
       });
     }
+    typeFunction = json['type_function'];
   }
 
   Map<String, dynamic> toJson() {
@@ -35,6 +37,7 @@ class ItemLocationModifyRequestData {
     if (detail != null) {
       data['Detail'] = detail!.map((v) => v.toJson()).toList();
     }
+    data['type_function'] = typeFunction;
     return data;
   }
 }

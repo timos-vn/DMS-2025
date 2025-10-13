@@ -15,20 +15,20 @@ class LoginResponse {
 	LoginResponse.fromJson(Map<String, dynamic> json) {
 		accessToken = json['accessToken'];
 		refreshToken = json['refreshToken'];
-		user = json['user'] != null ? new LoginResponseUser.fromJson(json['user']) : null;
+		user = json['user'] != null ? LoginResponseUser.fromJson(json['user']) : null;
 		statusCode = json['statusCode'];
 		message = json['message'];
 	}
 
 	Map<String, dynamic> toJson() {
-		final Map<String, dynamic> data = new Map<String, dynamic>();
-		data['accessToken'] = this.accessToken;
-		data['refreshToken'] = this.refreshToken;
-		if (this.user != null) {
-			data['user'] = this.user!.toJson();
+		final Map<String, dynamic> data = <String, dynamic>{};
+		data['accessToken'] = accessToken;
+		data['refreshToken'] = refreshToken;
+		if (user != null) {
+			data['user'] = user!.toJson();
 		}
-		data['statusCode'] = this.statusCode;
-		data['message'] = this.message;
+		data['statusCode'] = statusCode;
+		data['message'] = message;
 		return data;
 	}
 }
@@ -43,11 +43,12 @@ class LoginResponseUser {
 	String? phoneNumber;
 	String? email;
 	String? fullName;
-
 	int? codeEmployeeSale;
 	String? codeDepartment;
 	String? nameDepartment;
 	String? remainingDaysOff;
+	String? maNvbh;
+	String? maNPP;
 	int? nghiCL;
 
 	LoginResponseUser(
@@ -59,6 +60,8 @@ class LoginResponseUser {
 				this.role,
 				this.phoneNumber,
 				this.email,
+				this.maNvbh,
+				this.maNPP,
 				this.fullName,this.nghiCL});
 
 	LoginResponseUser.fromJson(Map<String, dynamic> json) {
@@ -71,21 +74,25 @@ class LoginResponseUser {
 		phoneNumber = json['phoneNumber'];
 		email = json['email'];
 		fullName = json['fullName'];
+		maNPP = json['maNPP'];
+		maNvbh = json['maNvbh'];
 		nghiCL = json['nghiCl'];
 	}
 
 	Map<String, dynamic> toJson() {
-		final Map<String, dynamic> data = new Map<String, dynamic>();
-		data['userId'] = this.userId;
-		data['userName'] = this.userName;
-		data['hostId'] = this.hostId;
-		data['code'] = this.code;
-		data['codeName'] = this.codeName;
-		data['role'] = this.role;
-		data['phoneNumber'] = this.phoneNumber;
-		data['email'] = this.email;
-		data['fullName'] = this.fullName;
-		data['nghiCl'] = this.nghiCL;
+		final Map<String, dynamic> data = <String, dynamic>{};
+		data['userId'] = userId;
+		data['userName'] = userName;
+		data['hostId'] = hostId;
+		data['code'] = code;
+		data['codeName'] = codeName;
+		data['role'] = role;
+		data['phoneNumber'] = phoneNumber;
+		data['email'] = email;
+		data['maNvbh'] = maNvbh;
+		data['maNPP'] = maNPP;
+		data['fullName'] = fullName;
+		data['nghiCl'] = nghiCL;
 		return data;
 	}
 }

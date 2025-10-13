@@ -23,6 +23,31 @@ class QrcodeResponse {
   }
 }
 
+class QrcodeGenerateResponse {
+  String? barCode;
+  String? kilogram;
+  String? productionDate;
+  String? expirationDate;
+
+  QrcodeGenerateResponse({this.barCode, this.kilogram, this.productionDate, this.expirationDate});
+
+  QrcodeGenerateResponse.fromJson(Map<String, dynamic> json) {
+    barCode = json['barCode'];
+    kilogram = json['kilogram'];
+    productionDate = json['productionDate'];
+    expirationDate = json['expirationDate'];
+  }
+
+  Map<String, dynamic> toJson() {
+    final Map<String, dynamic> data = <String, dynamic>{};
+    data['barCode'] = barCode;
+    data['kilogram'] = kilogram;
+    data['productionDate'] = productionDate;
+    data['expirationDate'] = expirationDate;
+    return data;
+  }
+}
+
 class GetQuantityForTicketResponse {
   Data? data;
   int? statusCode;

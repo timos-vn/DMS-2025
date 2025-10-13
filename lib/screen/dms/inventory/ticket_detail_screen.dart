@@ -13,6 +13,7 @@ import 'package:vibration/vibration.dart';
 import '../../../model/network/response/inventory_response.dart';
 import '../../../themes/colors.dart';
 import '../../../utils/utils.dart';
+import '../../../widget/input_quantity_shipping_popup.dart';
 import '../dms_bloc.dart';
 import '../dms_event.dart';
 import '../dms_state.dart';
@@ -444,11 +445,24 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>with TickerProvi
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Text(
-                                      'KK Thực tế: ${item.so_luong_kk_tt.toString().trim().replaceAll('null', '0')} (${item.dvt?.trim() ?? ''})',
-                                      style:const TextStyle(fontWeight: FontWeight.bold,fontSize: 12,color: Colors.blue),
-                                      maxLines: 5,
-                                      overflow: TextOverflow.ellipsis,
+                                    InkWell(
+                                      onTap: () {
+                                        _showInputQuantityDialog(context, index, item);
+                                      },
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: Colors.blue.withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(4),
+                                          border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                                        ),
+                                        child: Text(
+                                          'KK Thực tế: ${item.so_luong_kk_tt.toString().trim().replaceAll('null', '0')} (${item.dvt?.trim() ?? ''})',
+                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.blue),
+                                          maxLines: 5,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
                                     ),
                                     Text(
                                       'Chênh lệch: ${item.chenh_lech.toString().trim().replaceAll('null', '0')} (${item.dvt?.trim() ?? ''})',
@@ -992,5 +1006,61 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>with TickerProvi
         ),
       ),
     );
+  }
+
+  /// Hiển thị dialog nhập số lượng KK Thực tế
+  void _showInputQuantityDialog(BuildContext context, int index, ListItemInventoryResponseData item) {
+    showDialog(
+      barrierDismissible: true,
+      context: context,
+      builder: (context) {
+        return InputQuantityShipping(
+          title: 'Nhập số lượng KK Thực tế',
+          desc: 'Nhập số lượng kiểm kê thực tế cho sản phẩm: ${item.tenVt}',
+          quantity: double.tryParse(item.so_luong_kk_tt.toString().replaceAll('null', '0')) ?? 0,
+        );
+      },
+    ).then((values) {
+      if (values != null && values[0] != null) {
+        try {
+          final newQuantity = double.parse(values[0]);
+          if (newQuantity >= 0) {
+            setState(() {
+              // Cập nhật số lượng KK thực tế
+              currentDraft.inventoryList[index].so_luong_kk_tt = newQuantity;
+              
+              // Tính lại chênh lệch = Tồn - KK Thực tế
+              final tonHd = currentDraft.inventoryList[index].tonHd;
+              currentDraft.inventoryList[index].chenh_lech = tonHd - newQuantity;
+            });
+            
+            // Hiển thị thông báo
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Đã cập nhật KK Thực tế: ${newQuantity.toStringAsFixed(0)}'),
+                backgroundColor: Colors.green,
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Số lượng không thể âm'),
+                backgroundColor: Colors.red,
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
+        } catch (e) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Số lượng không hợp lệ'),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    });
   }
 }

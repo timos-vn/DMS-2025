@@ -63,6 +63,18 @@ class GetInformationItemFromBarCodeSuccess extends QRCodeState{
     return 'GetInformationItemFromBarCodeSuccess{}';
   }
 }
+
+class GetInformationItemFromBarCodeNotSuccess extends QRCodeState{
+
+  final String barcode;
+
+  GetInformationItemFromBarCodeNotSuccess({required this.barcode});
+
+  @override
+  String toString() {
+    return 'GetInformationItemFromBarCodeNotSuccess{barcode: $barcode}';
+  }
+}
 class GetQuantityForTicketSuccess extends QRCodeState{
 
   final bool allowCreate;
@@ -90,10 +102,13 @@ class QRCodeFailure extends QRCodeState {
   String toString() => error;
 }
 class UpdateQuantityInWarehouseDeliveryCardSuccess extends QRCodeState {
+  final int action;
+
+  UpdateQuantityInWarehouseDeliveryCardSuccess({required this.action});
 
   @override
   String toString() {
-    return 'UpdateQuantityInWarehouseDeliveryCardSuccess{}';
+    return 'UpdateQuantityInWarehouseDeliveryCardSuccess{action: $action}';
   }
 }class UpdateItemBarCodeSuccess extends QRCodeState {
 
@@ -122,5 +137,103 @@ class UpdateQuantityInWarehouseDeliveryCardSuccess extends QRCodeState {
   @override
   String toString() {
     return 'ConfirmPostPNFSuccess{}';
+  }
+}
+
+class StockTransferConfirmSuccess extends QRCodeState {
+  final int action;
+
+  StockTransferConfirmSuccess({required this.action});
+
+  @override
+  String toString() {
+    return 'StockTransferConfirmSuccess{action: $action}';
+  }
+}
+
+class DeleteItemSuccess extends QRCodeState {
+
+  @override
+  String toString() {
+    return 'DeleteItemSuccess{}';
+  }
+}
+
+class DeleteItemFailure extends QRCodeState {
+  final String error;
+
+  DeleteItemFailure(this.error);
+
+  @override
+  String toString() {
+    return 'DeleteItemFailure{error: $error}';
+  }
+}
+
+class GetRuleBarCodeSuccess extends QRCodeState{
+  @override
+  String toString() {
+    return 'GetRuleBarCodeSuccess{}';
+  }
+}
+
+class CreateRefundBarcodeHistorySuccess extends QRCodeState{
+  @override
+  String toString() {
+    return 'CreateRefundBarcodeHistorySuccess{}';
+  }
+}
+
+class GetValueBarcodeSuccess extends QRCodeState{
+  @override
+  String toString() {
+    return 'GetValueBarcodeSuccess{}';
+  }
+}
+
+
+class SearchSuggestSuccess extends QRCodeState{
+  @override
+  String toString() {
+    return 'SearchSuggestSuccess{}';
+  }
+}
+
+class CheckShowCloseSuccess extends QRCodeState{
+  @override
+  String toString() {
+    return 'CheckShowCloseSuccess{}';
+  }
+}
+
+class GetItemBarcodeFromDMINSuccess extends QRCodeState{
+  @override
+  String toString() {
+    return 'GetItemBarcodeFromDMINSuccess{}';
+  }
+}
+
+class GetListHistoryDNNKSuccess extends QRCodeState{
+  @override
+  String toString() {
+    return 'GetListHistoryDNNKSuccess{}';
+  }
+}
+
+
+class GetValueFromBarCodeSuccess extends QRCodeState{
+  final double kilogram;
+  final String expirationDate;
+  final String valueScanBarcode;
+
+  GetValueFromBarCodeSuccess({
+    required this.kilogram,
+    required this.expirationDate,
+    required this.valueScanBarcode
+  });
+
+  @override
+  String toString() {
+    return 'GetValueFromBarCodeSuccess{kilogram: $kilogram, expirationDate: $expirationDate, valueScanBarcode: $valueScanBarcode}';
   }
 }

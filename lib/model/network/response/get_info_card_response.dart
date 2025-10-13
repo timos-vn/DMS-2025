@@ -1,5 +1,3 @@
-import 'package:flutter/cupertino.dart';
-
 class GetKeyBySttRecResponse {
   String? sttRec;
   String? valueKey;
@@ -111,7 +109,10 @@ class MasterInfoCard {
   double? tThue;
   double? tCK;
   String? status;
-  String? statusname;int? maHtvc;String? tenHtvc;
+  String? statusname;
+  int? maHtvc;
+  String? tenHtvc;
+  String? licensePlates;
 
   MasterInfoCard(
       {this.sttRec,this.maKh, this.tenKh,
@@ -126,7 +127,7 @@ class MasterInfoCard {
         this.tSoLuong,
         this.tTien,
         this.status,
-        this.statusname,this.tTT,this.tCK,this.tThue,this.maHtvc, this.tenHtvc});
+        this.statusname,this.tTT,this.tCK,this.tThue,this.maHtvc, this.tenHtvc, this.licensePlates});
 
   MasterInfoCard.fromJson(Map<String, dynamic> json) {
     sttRec = json['stt_rec'];maKh = json['ma_kh'];tenKh = json['ten_kh'];
@@ -141,9 +142,13 @@ class MasterInfoCard {
     tSoLuong = json['t_so_luong'];
     tTien = json['t_tien'];
     status = json['status'];
-    statusname = json['statusname'];    tTT = json['t_tt'];
+    statusname = json['statusname'];
+    tTT = json['t_tt'];
     tCK = json['t_ck'];
-    tThue = json['t_thue'];maHtvc = json['ma_htvc'];tenHtvc = json['ten_htvc'];
+    tThue = json['t_thue'];
+    maHtvc = json['ma_htvc'];
+    tenHtvc = json['ten_htvc'];
+    licensePlates = json['license_plates'];
   }
 
   Map<String, dynamic> toJson() {
@@ -160,9 +165,13 @@ class MasterInfoCard {
     data['t_so_luong'] = tSoLuong;
     data['t_tien'] = tTien;
     data['status'] = status;
-    data['statusname'] = statusname;    data['t_tt'] = tTT;
+    data['statusname'] = statusname;
+    data['t_tt'] = tTT;
     data['t_ck'] = tCK;
-    data['t_thue'] = tThue;data['ma_htvc'] = maHtvc;data['ten_htvc'] = tenHtvc;
+    data['t_thue'] = tThue;
+    data['ma_htvc'] = maHtvc;
+    data['ten_htvc'] = tenHtvc;
+    data['license_plates'] = licensePlates;
     return data;
   }
 }
@@ -177,20 +186,27 @@ class ListItem {
   String? maKho;
   String? tenKho;
   double? soLuong;
+  double? soCan;
+  double? qtyTotal;
   double? ck;
   double? tyLeCK;
   double? tyLeThue;
   double? tienThue;
   String? maViTri;
   String? maLo;
+  String? tenLo; // Tên lô
   bool? qcYn;
+  bool? serialYn;
   double? tien;
   int? cheBien;
   int? sanXuat;
   String? qrCode;
   String? expirationDate;
+  String? productionDate;
   int? isMark = 0;
   int? kmYn = 0;
+  String? pallet;
+  double? actualQuantity; // Số lượng thực tế đã quét
 
   ListItem(
       {this.sttRec,
@@ -202,11 +218,16 @@ class ListItem {
         this.maKho,
         this.tenKho,
         this.soLuong,
+        this.soCan,
+        this.qtyTotal,
+        this.serialYn,
         this.maViTri,
         this.maLo,
+        this.tenLo,
+        this.pallet,
         this.qcYn,
         this.tien,this.cheBien,this.sanXuat,this.ck,this.tienThue,this.tyLeCK,this.kmYn,
-        this.tyLeThue,this.qrCode,this.expirationDate,this.isMark = 0});
+        this.tyLeThue,this.qrCode,this.expirationDate,this.productionDate,this.isMark = 0, this.actualQuantity});
 
   ListItem.fromJson(Map<String, dynamic> json) {
     sttRec = json['stt_rec'];
@@ -218,9 +239,14 @@ class ListItem {
     maKho = json['ma_kho'];
     tenKho = json['ten_kho'];
     soLuong = json['so_luong'];
+    soCan = json['so_can'];
+    qtyTotal = json['qty_total'];
     maViTri = json['ma_vi_tri'];
     maLo = json['ma_lo'];
+    tenLo = json['ten_lo'];
+    pallet = json['pallet'];
     qcYn = json['qc_yn'];
+    serialYn = json['serial_yn'];
     tien = json['tien'];
     cheBien = json['cheBien'];
     sanXuat = json['sanXuat'];
@@ -229,6 +255,10 @@ class ListItem {
     tienThue = json['thue'];
     tyLeThue = json['thue_suat'];
     kmYn = json['km_yn'];
+    qrCode = json['qr_code'];
+    expirationDate = json['expiration_date'];
+    productionDate = json['production_date'];
+    actualQuantity = json['actual_quantity'];
   }
 
   Map<String, dynamic> toJson() {
@@ -242,16 +272,26 @@ class ListItem {
     data['ma_kho'] = maKho;
     data['ten_kho'] = tenKho;
     data['so_luong'] = soLuong;
+    data['so_can'] = soCan;
+    data['qty_total'] = qtyTotal;
     data['ma_vi_tri'] = maViTri;
     data['ma_lo'] = maLo;
+    data['ten_lo'] = tenLo;
+    data['pallet'] = pallet;
     data['qc_yn'] = qcYn;
+    data['serial_yn'] = serialYn;
     data['tien'] = tien;
     data['cheBien'] = cheBien;
-    data['sanXuat'] = sanXuat;    data['ck'] = ck;
+    data['sanXuat'] = sanXuat;
+    data['ck'] = ck;
     data['tl_ck'] = tyLeCK;
     data['thue'] = tienThue;
     data['thue_suat'] = tyLeThue;
     data['km_yn'] = kmYn;
+    data['qr_code'] = qrCode;
+    data['expiration_date'] = expirationDate;
+    data['production_date'] = productionDate;
+    data['actual_quantity'] = actualQuantity;
     return data;
   }
 }

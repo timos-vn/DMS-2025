@@ -67,6 +67,9 @@ class Product extends Equatable {
   double? woPrice = 0;
   double? woPriceAfter = 0;
   String? sttRec0;
+  
+  // Số lượng khả dụng khi add từ contract (lưu vào SQLite)
+  double? availableQuantity;
 
 
   Product({this.code,this.maVt2 = '', this.name, this.name2, this.dvt, this.description, this.price = 0,this.priceAfterTax,this.valuesTax,
@@ -77,6 +80,7 @@ class Product extends Equatable {
     this.isCheBien = 0, this.isSanXuat = 0, this.giaSuaDoi = 0, this.giaGui = 0,this.priceMin = 0, this.codeUnit,this.nameUnit,this.note,this.jsonOtherInfo,this.heSo,
     this.idNVKD,this.nameNVKD,this.nuocsx,this.quycach,this.maThue,this.tenThue,this.thueSuat,
     this.applyPriceAfterTax,this.discountByHand,this.discountPercentByHand,this.ckntByHand,this.priceOk,this.woPrice,this.woPriceAfter,this.sttRec0,
+    this.availableQuantity,
   });
 
 
@@ -140,7 +144,8 @@ class Product extends Equatable {
         ckntByHand = map['ckntByHand'],
         priceOk = map['priceOk'],
         woPrice = map['woPrice'],
-        woPriceAfter = map['woPriceAfter'];
+        woPriceAfter = map['woPriceAfter'],
+        availableQuantity = map['availableQuantity'];
 
   Map<String, dynamic> toMapForDb() {
     final Map<String, dynamic> data = <String, dynamic>{};
@@ -208,6 +213,7 @@ class Product extends Equatable {
     data['priceOk'] = priceOk;
     data['woPrice'] = woPrice;
     data['woPriceAfter'] = woPriceAfter;
+    data['availableQuantity'] = availableQuantity;
     return data;
   }
 

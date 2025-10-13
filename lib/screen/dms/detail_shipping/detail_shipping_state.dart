@@ -65,3 +65,30 @@ class GetPrefsSuccess extends DetailShippingState{
     return 'UpdateLocationAndImageSuccess{}';
   }
 }
+
+class UploadImageProgress extends DetailShippingState {
+  final double progress;
+  final String message;
+
+  UploadImageProgress({required this.progress, required this.message});
+
+  @override
+  String toString() {
+    return 'UploadImageProgress { progress: $progress, message: $message }';
+  }
+
+  @override
+  List<Object> get props => [progress, message];
+}
+
+class UploadImageFailure extends DetailShippingState {
+  final String error;
+
+  UploadImageFailure(this.error);
+
+  @override
+  String toString() => 'UploadImageFailure { error: $error }';
+
+  @override
+  List<Object> get props => [error];
+}

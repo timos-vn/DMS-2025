@@ -236,7 +236,7 @@ class _SellScreenState extends State<SellScreen> with TickerProviderStateMixin{
                       Utils.showUpgradeAccount(context);
                     }
                   },),
-                  buildButton(title: 'Đề nghị xuất bán hàng cho CH',icons: MdiIcons.storeCheckOutline, lock:  Const.createNewOrder == true ? false : true, onTap: (){
+                  buildButton(title: 'Đề nghị xuất bán hàng cho CH',icons: MdiIcons.storeCheckOutline, lock:  Const.createOrderFormStore == true ? false : true, onTap: (){
                     if(Const.createNewOrderForSuggest == true){
                       PersistentNavBarNavigator.pushNewScreen(context, screen: HistoryOrderForSuggestScreen(userId: _bloc.userCode.toString(),),withNavBar: false);
                     }else{

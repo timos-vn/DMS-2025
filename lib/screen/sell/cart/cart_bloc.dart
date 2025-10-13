@@ -969,8 +969,9 @@ class CartBloc extends Bloc<CartEvent,CartState>{
             maCk: element.maCk,
             kmYN: 0,
             stockCode: element.stockCode,
-            taxValues: element.valuesTax ?? element.thueSuat ?? 0,
-            codeTax: DataLocal.taxCode.toString().replaceAll('null', '').isNotEmpty ? DataLocal.taxCode.toString() : (element.maThue?.toString() ?? ''),
+
+            taxValues: ((element.price ?? 0) * (element.valuesTax ?? element.thueSuat ?? 0)) / 100,
+            codeTax: (DataLocal.taxCode != null && DataLocal.taxCode.toString().isNotEmpty) ? DataLocal.taxCode.toString() : (element.maThue?.toString() ?? element.tenThue?.toString() ?? ''),
             priceOk: //element.priceOk.toString().replaceAll('null','').isNotEmpty ? element.priceOk : element.giaSuaDoi,
             Const.editPrice == true ? element.giaSuaDoi : (element.priceOk.toString().replaceAll('null','').isNotEmpty ? element.priceOk : 0),
             taxPercent: element.taxPercent ?? 0,
@@ -1020,7 +1021,12 @@ class CartBloc extends Bloc<CartEvent,CartState>{
             tienGuiNT: element.giaGui * element.count!,
             giaGuiNT: element.giaGui,
             note: element.note,
-            heSo: element.heSo.toString().replaceAll('null', '').isNotEmpty ? element.heSo.toString() : "1",
+            heSo: element.heSo.toString().replaceAll('null', '').isNotEmpty ?
+            (element.heSo.toString().replaceAll('null', '').toUpperCase().contains('TRUE') || element.heSo.toString().replaceAll('null', '').toUpperCase().contains('FALSE'))
+                ?
+            (element.heSo.toString().replaceAll('null', '').toUpperCase().contains('TRUE') ? "1" : "0")
+                :
+            element.heSo.toString() : "1",
             listAdvanceOrderInfo: listEntityClass,
             idNVKD: element.idNVKD,
             ncsx: element.nuocsx,quycach: element.quycach,
@@ -1060,7 +1066,12 @@ class CartBloc extends Bloc<CartEvent,CartState>{
           tienGuiNT: element.giaGui * element.count!,
           giaGuiNT: element.giaGui,
           note: element.note,
-          heSo: element.heSo.toString().replaceAll('null', '').isNotEmpty ? int.parse(element.heSo.toString()) : 1,
+          heSo: element.heSo.toString().replaceAll('null', '').isNotEmpty ?
+          (element.heSo.toString().replaceAll('null', '').toUpperCase().contains('TRUE') || element.heSo.toString().replaceAll('null', '').toUpperCase().contains('FALSE'))
+              ?
+          (element.heSo.toString().replaceAll('null', '').toUpperCase().contains('TRUE') ? 1 : 0)
+              :
+          int.parse(element.heSo.toString()) : 1,
           idNVKD: element.idNVKD,
           ncsx: element.nuocsx,quycach: element.quycach,
       );
@@ -1157,8 +1168,8 @@ class CartBloc extends Bloc<CartEvent,CartState>{
           maCk: element.maCk,
           kmYN: 0,
           stockCode: element.stockCode,
-          taxValues: element.valuesTax ?? element.thueSuat ?? 0,
-          codeTax: DataLocal.taxCode.toString().replaceAll('null', '').isNotEmpty ? DataLocal.taxCode.toString() : (element.maThue?.toString() ?? ''),
+          taxValues: ((element.price ?? 0) * (element.valuesTax ?? element.thueSuat ?? 0)) / 100,
+        codeTax: (DataLocal.taxCode != null && DataLocal.taxCode.toString().isNotEmpty) ? DataLocal.taxCode.toString() : (element.maThue?.toString() ?? element.tenThue?.toString() ?? ''),
           priceOk: Const.editPrice == true ? element.giaSuaDoi : (element.priceOk.toString().replaceAll('null','').isNotEmpty ? element.priceOk : 0),
           taxPercent: element.taxPercent ?? 0,
           idVv: Const.isVv == true ? element.idVv : idVv,
@@ -1667,7 +1678,8 @@ class CartBloc extends Bloc<CartEvent,CartState>{
             giaSuaDoi: element.giaSuaDoi,
             giaGui: element.giaGui,
             isCheBien: element.isCheBien == 1 ? true : false,
-            isSanXuat: element.isSanXuat == 1 ? true : false
+            isSanXuat: element.isSanXuat == 1 ? true : false,
+            availableQuantity: element.availableQuantity
         );
         draft.add(item);
       }
@@ -1728,7 +1740,8 @@ class CartBloc extends Bloc<CartEvent,CartState>{
           giaSuaDoi: element.giaSuaDoi,
           giaGui: element.giaGui,
           isCheBien: element.isCheBien == 1 ? true : false,
-          isSanXuat: element.isSanXuat == 1 ? true : false
+          isSanXuat: element.isSanXuat == 1 ? true : false,
+          availableQuantity: element.availableQuantity
       );
       draft.add(item);
     }
@@ -1988,7 +2001,8 @@ class CartBloc extends Bloc<CartEvent,CartState>{
               quycach: element.quycach,
               maThue: element.maThue,
               tenThue: element.tenThue,
-              thueSuat: element.thueSuat
+              thueSuat: element.thueSuat,
+              availableQuantity: element.availableQuantity
             );
           if(listDiscount.isNotEmpty){
             for (var elements in listDiscount) {

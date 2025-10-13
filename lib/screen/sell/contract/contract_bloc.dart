@@ -54,7 +54,13 @@ class ContractBloc extends Bloc<ContractEvent,ContractState>{
   }
 
   void _getCountProductEvent(GetCountProductEvent event, Emitter<ContractState> emitter)async{
-    emitter(ContractLoading());
+    // Smart loading cho search mode
+    if (listItemProduct.isEmpty) {
+      emitter(ContractInitialLoading());
+    } else {
+      emitter(ContractPaginationLoading());
+    }
+    
     listProduct = await getListFromDb();
     Const.numberProductInCart = listProduct.length;
     emitter(GetCountProductSuccess(event.isNextScreen));
@@ -85,21 +91,33 @@ class ContractBloc extends Bloc<ContractEvent,ContractState>{
   }
 
   void _getListContractEvent(GetListContractEvent event, Emitter<ContractState> emitter)async{
-    emitter(ContractLoading());
+    // Smart loading: Initial (skeleton) hoặc Pagination (shimmer overlay)
+    if (listContract.isEmpty && event.pageIndex == 1) {
+      emitter(ContractInitialLoading());
+    } else {
+      emitter(ContractPaginationLoading());
+    }
+    
     ContractState state = _handleGetListContract(await _networkFactory!.getListContract(_accessToken.toString(),event.searchKey,event.pageIndex,20));
     emitter(state);
   }
 
   void _getListOrderFormContractEvent(GetListOrderFormContractEvent event, Emitter<ContractState> emitter)async{
-    emitter(ContractLoading());
+    emitter(ContractOrderListLoading());
     ContractState state = _handleGetListOrderFormContract(await _networkFactory!.getListOrderFormContract(_accessToken.toString(),event.soCt));
     emitter(state);
   }
 
   void _getDetailContractEvent(GetDetailContractEvent event, Emitter<ContractState> emitter)async{
-    emitter(ContractLoading());
+    // Smart loading: Initial (skeleton) hoặc Pagination (progress bar)
+    if (listItemProduct.isEmpty && event.pageIndex == 1) {
+      emitter(ContractInitialLoading());
+    } else {
+      emitter(ContractPaginationLoading());
+    }
+
     ContractState state = _handleGetDetailContract(await _networkFactory!.
-    getDetailContract(_accessToken.toString(),event.sttRec,event.date,event.pageIndex,10,event.searchKey),event.isSearchItem);
+    getDetailContract(_accessToken.toString(),event.sttRec,event.date,event.pageIndex,20,event.searchKey, event.isSearchItem == true ? 1 : 0));
     emitter(state);
   }
 
@@ -117,7 +135,7 @@ class ContractBloc extends Bloc<ContractEvent,ContractState>{
     }
   }
 
-  ContractState _handleGetDetailContract(Object data,bool isSearchItem){
+  ContractState _handleGetDetailContract(Object data){
     if(data is String) return ContractFailure('Úi, ${data.toString()}');
     try{
       listContract.clear();
@@ -137,12 +155,6 @@ class ContractBloc extends Bloc<ContractEvent,ContractState>{
         double soLuongChoPhep = (kdItem.totalAllowsOrder ?? 0) - (kdItem.totalOrder ?? 0);
         item.so_luong_kd = soLuongChoPhep > 0 ? soLuongChoPhep : 0;
       }
-
-      if(isSearchItem){
-        // Lọc các item có thể đặt hàng: slDh < so_luong_kd
-        listItemProduct = listItemProduct.where((item) => item.so_luong_kd > 0).toList();
-        print('heee: ${listProduct.length}');
-      }
       payment = response.data?.payment??Payment();
       totalPager = response.totalPage??0;
       return GetDetailContractSuccess();
@@ -160,6 +172,7 @@ class ContractBloc extends Bloc<ContractEvent,ContractState>{
       listOrderFormContract = response.data??[];
       return GetListOrderFormContractSuccess();
     }catch(e){
+      print(e.toString());
       return ContractFailure('Úi, ${e.toString()}');
     }
   }

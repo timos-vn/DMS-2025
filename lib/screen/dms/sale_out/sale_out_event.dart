@@ -190,3 +190,13 @@ class UpdateSaleOutEvent extends SaleOutEvent {
   @override
   String toString() => 'UpdateSaleOutEvent';
 }
+
+/// Auto load agent by maNPP
+class AutoLoadAgentByNPPEvent extends SaleOutEvent {
+  final String maNPP;
+
+  AutoLoadAgentByNPPEvent({required this.maNPP});
+
+  @override
+  String toString() => 'AutoLoadAgentByNPPEvent { maNPP: $maNPP }';
+}

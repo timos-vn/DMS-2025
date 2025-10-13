@@ -340,6 +340,10 @@ class InfoCPNBloc extends Bloc<InfoCPNEvent,InfoCPNState>{
       Const.scanQRCodeForInvoicePXB = response.masterAppSettings?.scanQRCodeForInvoicePXB == 1 ? true : false;
       Const.allowCreateTicketShipping = response.masterAppSettings?.allowCreateTicketShipping == 1 ? true : false;
       Const.percentQuantityImage = response.masterAppSettings?.percentQuantityImage??70;
+      Const.reportLocationNoChooseCustomer = response.masterAppSettings?.reportLocationNoChooseCustomer == 1 ? true : false;
+      Const.editPriceWidthValuesEmptyOrZero = response.masterAppSettings?.editPriceWidthValuesEmptyOrZero == 1 ? true : false;
+      Const.noCheckDayOff = response.masterAppSettings?.noCheckDayOff == 1 ? true : false;
+      Const.autoAddAgentFromSaleOut = response.masterAppSettings?.autoAddAgentFromSaleOut == 1 ? true : false;
 
       DataLocal.listTypeDelivery = response.listTypeDelivery??[];
       DataLocal.listAgency = response.listAgency??[];
@@ -468,6 +472,11 @@ class InfoCPNBloc extends Bloc<InfoCPNEvent,InfoCPNState>{
           }
           else if(element.menuId == '01.02.40'){
             Const.historyKeepCardList = true;
+          } else if(element.menuId == '01.02.07'){
+            Const.createOrderFormStore = true;
+          }
+          else if(element.menuId == '01.02.08'){
+            Const.downFileFromDetailOrder = true;
           }
 
           /// Contract

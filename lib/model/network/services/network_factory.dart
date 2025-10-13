@@ -18,6 +18,7 @@ import '../request/confirm_dnc_request.dart';
 import '../request/confirm_shipping_request.dart';
 import '../request/create_delivery_request.dart';
 import '../request/create_dnc_request.dart';
+import '../request/dynamic_api_request.dart';
 import '../request/create_item_holder_request.dart';
 import '../request/create_leave_letter_request.dart';
 import '../request/create_manufacturing_request.dart';
@@ -167,16 +168,49 @@ class NetWorkFactory{
     try {
       Response response = await request;
       var data = response.data;
+      
+      // Kiểm tra data có null không
+      if (data == null) {
+        print('=== NETWORK FACTORY: Response data is null ===');
+        return {'error': 'Response data is null'};
+      }
+      
       if(isDownloadFile == true){
         return data;
       }
-      else if (data["statusCode"] == 200 || data["status"] == 200 || data["status"] == "OK") {
+      
+      // Kiểm tra data có phải Map không
+      if (data is! Map<String, dynamic>) {
+        print('=== NETWORK FACTORY: Response data is not Map ===');
+        print('Data type: ${data.runtimeType}');
+        print('Data: $data');
+        return data; // Trả về data gốc nếu không phải Map
+      }
+      
+      // Kiểm tra statusCode an toàn
+      final statusCode = data["statusCode"];
+      final status = data["status"];
+      
+      print('=== NETWORK FACTORY: Checking response status ===');
+      print('statusCode: $statusCode');
+      print('status: $status');
+      
+      // Nếu có statusCode hoặc status = 200, trả về data
+      if (statusCode == 200 || status == 200 || status == "OK") {
+        print('=== NETWORK FACTORY: Success response ===');
         return data;
       }
-      else {
-        if (data["statusCode"] == 423) {
+      // Nếu không có statusCode/status nhưng có responseModel với isSucceded = true
+      else if (data["responseModel"] != null && data["responseModel"]["isSucceded"] == true) {
+        print('=== NETWORK FACTORY: Success response (responseModel) ===');
+        return data;
+      }
+      // Nếu có statusCode nhưng không phải 200
+      else if (statusCode != null) {
+        print('=== NETWORK FACTORY: Error response with statusCode ===');
+        if (statusCode == 423) {
           //showOverlay((context, t) => UpgradePopup(message: data["message"],));
-        } else if (data["statusCode"] == 401) {
+        } else if (statusCode == 401) {
           try {
             // Authen authBloc =
             // BlocProvider.of<AuthenticationBloc>(context);
@@ -185,9 +219,17 @@ class NetWorkFactory{
             debugPrint(e.toString());
           }
         }
-        return data["message"];
+        return data["message"] ?? 'Unknown error';
+      }
+      // Nếu không có statusCode/status, trả về data gốc (có thể là success)
+      else {
+        print('=== NETWORK FACTORY: No statusCode/status, returning data ===');
+        return data;
       }
     } catch (error, stacktrace) {
+      print('=== NETWORK FACTORY: Error in requestApi ===');
+      print('Error: $error');
+      print('Stack trace: $stacktrace');
       return _handleError(error);
     }
   }
@@ -1064,13 +1106,14 @@ class NetWorkFactory{
       "page_count": pageCount,
     })); //["Authorization"] = "Bearer " + token
   }
-  Future<Object> getDetailContract(String token,String sttRec,String dateTime ,int pageIndex,int pageCount,String searchKey) async {
+  Future<Object> getDetailContract(String token,String sttRec,String dateTime ,int pageIndex,int pageCount,String searchKey, int isSearch) async {
     return await requestApi(_dio!.get('/api/v1/order/chi-tiet-hop-dong', options: Options(headers: {"Authorization": "Bearer $token"}), queryParameters: {
       "sttRec": sttRec,
       "ngayCT": dateTime,
       "page_index": pageIndex,
       "page_count": pageCount,
       "searchKey": searchKey,
+      "isSearch": isSearch,
     })); //["Authorization"] = "Bearer " + token
   }
   Future<Object> getListOrderFormContract(String token, String soCt) async {
@@ -1154,6 +1197,68 @@ class NetWorkFactory{
     ));
   }
 
+  /// QRCode API Methods - Thêm từ SSE-Scanner
+  Future<Object> deleteItem({required String token, required String pallet, required String barcode, required String sttRec, required String sttRec0}) async {
+    return await requestApi(_dio!.post('/api/v1/order/delete-item',
+        options: Options(headers: {"Authorization": "Bearer $token"}),
+        queryParameters: {
+          "pallet": pallet,
+          "barcode": barcode,
+          "stt_rec": sttRec,
+          "stt_rec0": sttRec0,
+        }
+    ));
+  }
+
+  Future<Object> getRuleBarCode({required String token}) async {
+    return await requestApi(_dio!.get('/api/v1/qrcode/get-rule-barcode', 
+        options: Options(headers: {"Authorization": "Bearer $token"})
+    ));
+  }
+
+  Future<Object> createRefundBarcodeHistory({required String token, required Map<String, dynamic> data}) async {
+    return await requestApi(_dio!.post('/api/v1/qrcode/create-refund-barcode-history', 
+        options: Options(headers: {"Authorization": "Bearer $token"}),
+        data: data
+    ));
+  }
+
+  Future<Object> getValueBarcode({required String token, required String barcode}) async {
+    return await requestApi(_dio!.get('/api/v1/qrcode/get-value-barcode', 
+        options: Options(headers: {"Authorization": "Bearer $token"}),
+        queryParameters: {
+          "barcode": barcode,
+        }
+    ));
+  }
+
+  Future<Object> searchSuggest({required String token, required String query}) async {
+    return await requestApi(_dio!.get('/api/v1/qrcode/search-suggest', 
+        options: Options(headers: {"Authorization": "Bearer $token"}),
+        queryParameters: {
+          "query": query,
+        }
+    ));
+  }
+
+  Future<Object> checkShowClose({required String token, required String text}) async {
+    return await requestApi(_dio!.get('/api/v1/qrcode/check-show-close', 
+        options: Options(headers: {"Authorization": "Bearer $token"}),
+        queryParameters: {
+          "text": text,
+        }
+    ));
+  }
+
+  Future<Object> getItemBarcodeFromDMIN({required String token, required String itemCode}) async {
+    return await requestApi(_dio!.get('/api/v1/qrcode/get-item-barcode-from-dmin', 
+        options: Options(headers: {"Authorization": "Bearer $token"}),
+        queryParameters: {
+          "itemCode": itemCode,
+        }
+    ));
+  }
+
   Future<Object> createTaskFromCustomer(String token, String idCustomer) async {
     return await requestApi(_dio!.get('/api/v1/todos/create-task-from-customer', options: Options(headers: {"Authorization": "Bearer $token"}), queryParameters: {
       "idCustomer": idCustomer
@@ -1185,9 +1290,10 @@ class NetWorkFactory{
       "stt_rec": sttRec,
     }));
   }
-  Future<Object> getInformationItemFromBarCode({required String token,required String barcode}) async {
+  Future<Object> getInformationItemFromBarCode({required String token,required String barcode,required String pallet}) async {
     return await requestApi(_dio!.get('/api/v1/order/get-info-item-for-barcode', options: Options(headers: {"Authorization": "Bearer $token"}), queryParameters: {
-      "barcode": barcode
+      "barcode": barcode,
+      "palet": pallet,
     }));
   }
   Future<Object> getItemHolderDetail({required String token,required String sttRec}) async {
@@ -1368,5 +1474,11 @@ class NetWorkFactory{
   }
   Future<Object> updateHistoryInventory(HistoryRequest request,String token,) async {
     return await requestApi(_dio!.post('/api/v1/todos/cap-nhat-lich-su-kiem-ke', options: Options(headers: {"Authorization": "Bearer $token"}), data: request.toJson()));
+  }
+
+  Future<Object> callDynamicApi({required String token, required DynamicApiRequest request}) async {
+    return await requestApi(_dio!.post('/api/v1/dynamicApi/call-dynamic-api', 
+        options: Options(headers: {"Authorization": "Bearer $token"}), 
+        data: request.toJson()));
   }
 } 

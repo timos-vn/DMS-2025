@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:dms/themes/colors.dart';
+import 'package:dms/utils/utils.dart';
 import 'package:flutter/material.dart';
 
 class QuantityInfoBox extends StatefulWidget {
@@ -11,7 +12,7 @@ class QuantityInfoBox extends StatefulWidget {
 
   const QuantityInfoBox({
     super.key, 
-    required this.quantity, 
+    required this.quantity,
     required this.unit,
     required this.isShowInfo,
     this.contractQuantity,
@@ -67,7 +68,7 @@ class _QuantityInfoBoxState extends State<QuantityInfoBox> {
               Text(
                 widget.contractQuantity != null 
                   ? "SL: ${widget.contractQuantity} ${widget.unit}"
-                  : "SL: ${widget.quantity} ${widget.unit}",
+                  : "SL: ${Utils.formatQuantity(widget.quantity)} ${widget.unit}",
                 style: TextStyle(
                   fontSize: 12.5,
                   color: widget.contractQuantity != null ? Colors.green : accent,

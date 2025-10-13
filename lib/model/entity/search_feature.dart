@@ -40,7 +40,7 @@ class SearchFeature {
       id: json['id'],
       title: json['title'],
       description: json['description'],
-      icon: _getIconData(json['iconCode']),
+      icon: _getIconDataFromJson(json),
       category: json['category'],
       route: json['route'],
       isEnabled: json['isEnabled'] ?? true,
@@ -103,8 +103,23 @@ class SearchFeature {
     0xe3fb: Icons.keyboard_arrow_right,
   };
 
-  static IconData _getIconData(int codePoint) {
-    return _iconMap[codePoint] ?? Icons.help_outline;
+  static IconData _getIconDataFromJson(Map<String, dynamic> json) {
+    final codePoint = json['iconCode'] as int?;
+    final fontFamily = json['fontFamily'] as String?;
+    final fontPackage = json['fontPackage'] as String?;
+    
+    if (codePoint == null) {
+      return Icons.help_outline;
+    }
+    
+    // Try to get from predefined map first (all icons in map are const)
+    if (_iconMap.containsKey(codePoint)) {
+      return _iconMap[codePoint]!;
+    }
+    
+    // For icons not in predefined map, return a fallback constant icon
+    // This ensures tree-shaking compatibility
+    return Icons.help_outline;
   }
 }
 

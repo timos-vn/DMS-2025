@@ -234,7 +234,7 @@ packages:
     source: hosted
     version: "0.7.11"
   decimal:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: decimal
       sha256: "24a261d5d5c87e86c7651c417a5dbdf8bcd7080dd592533910e8d0505a279f21"
@@ -832,6 +832,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.0.0"
+  gs1_barcode_parser:
+    dependency: "direct main"
+    description:
+      name: gs1_barcode_parser
+      sha256: "8fce2a8bc39a0ca438456a3c940370d8a7d1c8219283d5c304519feb2027bfa3"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.1.2"
   html:
     dependency: transitive
     description:

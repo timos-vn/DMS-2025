@@ -207,27 +207,33 @@ class _OrderFromCheckInScreenState extends State<OrderFromCheckInScreen> {
                                             const SizedBox(width: 10,),
                                             Column(
                                               children: [
-                                                Text(
-                                                  // ignore: unrelated_type_equality_checks
-                                                  double.parse((Const.currencyCode == "VND"
-                                                      ?
-                                                  NumberFormat(Const.amountFormat).format(DataLocal.listOrderProductLocal[index].price??0)
-                                                      :
-                                                  NumberFormat(Const.amountNtFormat).format(DataLocal.listOrderProductLocal[index].price??0)))
-                                                      == 0 ? 'Giá đang cập nhật' : (Const.currencyCode == "VND"
-                                                      ?
-                                                  NumberFormat(Const.amountFormat).format(DataLocal.listOrderProductLocal[index].price??0)
-                                                      :
-                                                  NumberFormat(Const.amountNtFormat).format(DataLocal.listOrderProductLocal[index].price??0))
-                                                  ,
-                                                  textAlign: TextAlign.left,
-                                                  style: TextStyle(color: grey, fontSize: 10, decoration: double.parse((Const.currencyCode == "VND"
-                                                      ?
-                                                  NumberFormat(Const.amountFormat).format(DataLocal.listOrderProductLocal[index].price??0)
-                                                      :
-                                                  NumberFormat(Const.amountNtFormat).format(DataLocal.listOrderProductLocal[index].price??0))) == 0 ? TextDecoration.none : TextDecoration.lineThrough),
-                                                ),
-                                                const SizedBox(height: 3,),
+                                                // Text(
+                                                //   // ignore: unrelated_type_equality_checks
+                                                //   double.parse((Const.currencyCode == "VND"
+                                                //       ?
+                                                //   NumberFormat(Const.amountFormat).format(DataLocal.listOrderProductLocal[index].price??0)
+                                                //       :
+                                                //   NumberFormat(Const.amountNtFormat).format(DataLocal.listOrderProductLocal[index].price??0)))
+                                                //       == 0 ? 'Giá đang cập nhật' : (Const.currencyCode == "VND"
+                                                //       ?
+                                                //   NumberFormat(Const.amountFormat).format(DataLocal.listOrderProductLocal[index].price??0)
+                                                //       :
+                                                //   NumberFormat(Const.amountNtFormat).format(DataLocal.listOrderProductLocal[index].price??0))
+                                                //   ,
+                                                //   textAlign: TextAlign.left,
+                                                //   style: TextStyle(color: grey, fontSize: 10, decoration: double.parse((Const.currencyCode == "VND"
+                                                //       ?
+                                                //   NumberFormat(Const.amountFormat).format(DataLocal.listOrderProductLocal[index].price??0)
+                                                //       :
+                                                //   NumberFormat(Const.amountNtFormat).format(DataLocal.listOrderProductLocal[index].price??0))) == 0 ? TextDecoration.none : TextDecoration.lineThrough),
+                                                // ),
+                                                // Text(
+                                                //   '${Utils.formatMoneyStringToDouble(DataLocal.listOrderProductLocal[index].price??0)} ₫' ,
+                                                //   textAlign: TextAlign.left,
+                                                //   style: const TextStyle(color: Color(
+                                                //       0xff067902), fontSize: 13,fontWeight: FontWeight.w700),
+                                                // ),
+                                                // const SizedBox(height: 3,),
                                                 Visibility(
                                                   visible: DataLocal.listOrderProductLocal[index].price! > 0,
                                                   child: Text(

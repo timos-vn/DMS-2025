@@ -17,6 +17,7 @@ import 'package:persistent_bottom_nav_bar/persistent_bottom_nav_bar.dart';
 import 'package:simple_gesture_detector/simple_gesture_detector.dart';
 import 'package:dms/screen/dms/check_in/check_in_event.dart';
 import 'package:dms/screen/dms/check_in/component/detail_check_in.dart';
+import 'package:dms/services/location_service.dart';
 import 'package:dms/utils/const.dart';
 import 'package:dms/utils/extension/upper_case_to_title.dart';
 import 'package:dms/utils/utils.dart';
@@ -287,6 +288,9 @@ class _CheckInScreenState extends State<CheckInScreen> {
   }
 
   void pushNewDetailScreen({required ListCheckIn item,required bool view,required bool isCheckInSuccess}){
+    DataLocal.addressDifferent = DataLocal.addressCheckInCustomer;
+    DataLocal.latDifferent = _bloc.currentLocation?.latitude??0;
+    DataLocal.longDifferent = _bloc.currentLocation?.longitude??0;
     PersistentNavBarNavigator.pushNewScreen(context, screen: DetailCheckInScreen(
       idCheckIn: item.id ?? 0,
       dateCheckIn: _selectedDay!,
@@ -565,8 +569,9 @@ class _CheckInScreenState extends State<CheckInScreen> {
                                   itemCount: _bloc.listCheckInOffline.length,
                                   itemBuilder: (context, index) {
                                     return GestureDetector(
-                                      onTap: (){
-                                        _bloc.getUserLocation();
+                                      onTap: () async {
+                                        // Đợi lấy vị trí mới trước khi tiếp tục
+                                        await _bloc.getFreshLocation();
                                         itemSelect = ListCheckIn(
                                             id: (_bloc.listCheckInOffline[index].idCheckIn != "null" && _bloc.listCheckInOffline[index].idCheckIn != '') ? int.parse(_bloc.listCheckInOffline[index].idCheckIn.toString()) : 0,
                                             tieuDe: _bloc.listCheckInOffline[index].tieuDe,
@@ -772,8 +777,9 @@ class _CheckInScreenState extends State<CheckInScreen> {
             itemCount: _bloc.listCheckInOther.length,
             itemBuilder: (context, index) {
               return GestureDetector(
-                onTap: (){
-                  _bloc.getUserLocation();
+                onTap: () async {
+                  // Đợi lấy vị trí mới trước khi tiếp tục
+                  await _bloc.getFreshLocation();
                   itemSelect = ListCheckIn(
                       id: _bloc.listCheckInOther[index].id!,
                       tieuDe: _bloc.listCheckInOther[index].tieuDe,
@@ -1111,7 +1117,10 @@ class _CheckInScreenState extends State<CheckInScreen> {
           ),
           Expanded(
             child: InkWell(
-              onTap: ()=>_bloc.testLocation(),
+              onTap: () async {
+                // Đợi lấy vị trí mới trước khi tiếp tục
+                await _bloc.getFreshLocation();
+              },
               child: Center(
                 child: Text(
                   DateFormat.yMMMM('vi').format(_focusedDay).toTitleCase(),
@@ -1123,9 +1132,10 @@ class _CheckInScreenState extends State<CheckInScreen> {
           ),
           GestureDetector(
             onTap: (){
-              PersistentNavBarNavigator.pushNewScreen(context, screen: SearchTaskScreen(dateTime: _selectedDay.toString(),listCheckInOffline: _bloc.listCheckInOffline,)).then((value){
+              PersistentNavBarNavigator.pushNewScreen(context, screen: SearchTaskScreen(dateTime: _selectedDay.toString(),listCheckInOffline: _bloc.listCheckInOffline,)              ).then((value) async {
                 if(value != null && value[0] == 'Yeah'){
-                  _bloc.getUserLocation();
+                  // Đợi lấy vị trí mới trước khi tiếp tục
+                  await _bloc.getFreshLocation();
                   ListCheckIn itemSelected = value[1] as ListCheckIn;
                   showBottomSheet(itemSelected);
                 }
@@ -1141,6 +1151,240 @@ class _CheckInScreenState extends State<CheckInScreen> {
               ),
             ),
           )
+        ],
+      ),
+    );
+  }
+
+  // Method xử lý check-in với validation vị trí thông minh
+  void _handleCheckInWithLocationValidation(ListCheckIn itemSelect) async {
+    try {
+      print('📍 Starting check-in validation...');
+      
+      // Hiển thị loading indicator
+      _showLocationLoadingDialog();
+      
+      // Kiểm tra có tọa độ khách hàng không
+      if (itemSelect.latLong.toString().isEmpty || 
+          itemSelect.latLong.toString() == 'null') {
+        print('📍 No customer coordinates, proceeding without location check');
+        Navigator.pop(context); // Đóng loading dialog
+        _proceedWithCheckIn(itemSelect);
+        return;
+      }
+      
+      // Validate check-in với LocationService
+      CheckInValidationResult validation = LocationService.validateCheckIn(
+        customerLatLong: itemSelect.latLong.toString(),
+        currentPosition: _bloc.currentLocation,
+        maxAllowedDistance: Const.distanceLocationCheckIn,
+      );
+      
+      Navigator.pop(context); // Đóng loading dialog
+      
+      if (validation.isSuccess) {
+        print('📍 Check-in validation successful: distance=${validation.distance!.toStringAsFixed(2)}m');
+        _proceedWithCheckIn(itemSelect);
+        
+      } else if (validation.isDistanceExceeded) {
+        print('📍 Distance exceeded: ${validation.distance!.toStringAsFixed(2)}m > ${validation.maxAllowed}m');
+        _showDistanceExceededDialog(itemSelect, validation);
+        
+      } else {
+        print('📍 Check-in validation failed: ${validation.error}');
+        _showLocationErrorDialog(validation);
+      }
+      
+    } catch (e) {
+      print('❌ Check-in validation error: $e');
+      Navigator.pop(context); // Đóng loading dialog nếu có
+      Utils.showCustomToast(context, Icons.error_outline, 
+        'Lỗi kiểm tra vị trí. Vui lòng thử lại.');
+    }
+  }
+  
+  // Proceed với check-in
+  void _proceedWithCheckIn(ListCheckIn itemSelect) {
+    if(Const.checkInOnline == true){
+      if(DateTime.now().isSameDate(_selectedDay??_focusedDay) == true){
+        _bloc.add(GetTimeCheckOutSave(idCheckIn: itemSelect.id!, idCustomer: itemSelect.maKh.toString(),itemSelect: itemSelect));
+      }else{
+        pushNewDetailScreen(item: itemSelect, view: true, isCheckInSuccess: false);
+      }
+    }
+    else{
+      _bloc.add(GetTimeCheckOutSave(idCheckIn: itemSelect.id!, idCustomer: itemSelect.maKh!,itemSelect: itemSelect));
+    }
+  }
+  
+  // Hiển thị dialog khi khoảng cách vượt quá
+  void _showDistanceExceededDialog(ListCheckIn itemSelect, CheckInValidationResult validation) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.location_off, color: Colors.red),
+            SizedBox(width: 8),
+            Text('Khoảng cách vượt quá'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Bạn đang cách vị trí check-in ${validation.distance!.toStringAsFixed(0)}m'),
+            Text('(Cho phép tối đa: ${validation.maxAllowed}m)', 
+              style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+            SizedBox(height: 16),
+            Container(
+              padding: EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.orange[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange[200]!),
+              ),
+              child: Column(
+                children: [
+                  Text('📍 Xem bản đồ để xác nhận vị trí', 
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                  SizedBox(height: 4),
+                  Text('Nếu bạn chắc chắn đang ở đúng vị trí, hãy nhấn "Xác nhận"', 
+                    style: TextStyle(fontSize: 11)),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Hủy'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _showMapView(itemSelect, validation);
+            },
+            child: Text('Xem bản đồ'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Hiển thị MapView
+  void _showMapView(ListCheckIn itemSelect, CheckInValidationResult validation) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) => BlocProvider.value(
+        value: _bloc,
+        child: MapView(
+          latStart: itemSelect.latLong.toString().split(',')[0],
+          longStart: itemSelect.latLong.toString().split(',')[1],
+          latEnd: _bloc.currentLocation?.latitude??0,
+          longEnd: _bloc.currentLocation?.longitude??0,
+          metter: validation.distance!,
+          title: 'Khoảng cách vượt quá cho phép',
+        ),
+      ),
+    ).then((value) {
+      if(value != null && value[0] == "Accepted"){
+        _proceedWithCheckIn(itemSelect);
+      }
+    });
+  }
+  
+  // Hiển thị loading dialog khi đang kiểm tra vị trí
+  void _showLocationLoadingDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) => AlertDialog(
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Đang kiểm tra vị trí GPS...'),
+            SizedBox(height: 8),
+            Text(
+              'Vui lòng đợi trong giây lát',
+              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Đảm bảo bạn đang ở ngoài trời để GPS hoạt động tốt nhất',
+              style: TextStyle(fontSize: 11, color: Colors.blue[600]),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Hiển thị dialog lỗi vị trí
+  void _showLocationErrorDialog(CheckInValidationResult validation) {
+    String message = validation.error ?? 'Lỗi không xác định';
+    bool showRetry = validation.showRetry;
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_outlined, color: Colors.orange),
+            SizedBox(width: 8),
+            Text('Lỗi vị trí GPS'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(message),
+            if (validation.accuracy != null) ...[
+              SizedBox(height: 8),
+              Text('Độ chính xác GPS: ${validation.accuracy!.toStringAsFixed(0)}m', 
+                style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+            ],
+            SizedBox(height: 12),
+            Container(
+              padding: EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.blue[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue[200]!),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('💡 Mẹo cải thiện GPS:', 
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                  SizedBox(height: 4),
+                  Text('• Di chuyển ra ngoài trời', style: TextStyle(fontSize: 11)),
+                  Text('• Tránh khu vực có nhiều tòa nhà cao', style: TextStyle(fontSize: 11)),
+                  Text('• Đợi 10-15 giây để GPS ổn định', style: TextStyle(fontSize: 11)),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Đóng'),
+          ),
+          if (showRetry)
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(context);
+                await _bloc.getFreshLocation();
+              },
+              child: Text('Thử lại'),
+            ),
         ],
       ),
     );
@@ -1314,45 +1558,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
             break;
           case '2':
             if(isToday == true){
-              if(itemSelect.latLong.toString().isNotEmpty && itemSelect.latLong.toString() != 'null' && _bloc.currentLocation != null && _bloc.currentLocation != 'null'){
-                print('Checking location');
-                print(Utils.getDistance(double.parse(itemSelect.latLong.toString().split(',')[0]), double.parse(itemSelect.latLong.toString().split(',')[1]),_bloc.currentLocation) < Const.distanceLocationCheckIn);
-                if(Utils.getDistance(double.parse(itemSelect.latLong.toString().split(',')[0]), double.parse(itemSelect.latLong.toString().split(',')[1]),_bloc.currentLocation) < Const.distanceLocationCheckIn){
-                  if(Const.checkInOnline == true){
-                    if(DateTime.now().isSameDate(_selectedDay??_focusedDay) == true){
-                      _bloc.add(GetTimeCheckOutSave(idCheckIn: itemSelect.id!, idCustomer: itemSelect.maKh.toString(),itemSelect: itemSelect));
-                    }else{
-                      pushNewDetailScreen(item: itemSelect, view: true, isCheckInSuccess: false);
-                    }
-                  }
-                  else{
-                    _bloc.add(GetTimeCheckOutSave(idCheckIn: itemSelect.id!, idCustomer: itemSelect.maKh!,itemSelect: itemSelect));
-                  }
-                }
-                else{
-                  Utils.showCustomToast(context, Icons.warning_amber_outlined, 'Úi, Vị trí của bạn đang cách quá xa vị trí đã được lưu trước đó');
-                  showDialog(
-                      barrierDismissible: false,
-                      context: context,
-                      builder: (BuildContext context)=>BlocProvider.value(value: _bloc,
-                        child: MapView(
-                            latStart: itemSelect.latLong.toString().split(',')[0],
-                            longStart: itemSelect.latLong.toString().split(',')[1],
-                            latEnd: _bloc.currentLocation?.latitude??0,
-                            longEnd: _bloc.currentLocation?.longitude??0,
-                            metter: Utils.getDistance(double.parse(itemSelect.latLong.toString().split(',')[0]), double.parse(itemSelect.latLong.toString().split(',')[1]),_bloc.currentLocation),
-                        ),)
-                    ///8934988010039
-                  ).then((value){
-                    if(value != null && value[0] == "Accepted"){
-                      _bloc.add(GetTimeCheckOutSave(idCheckIn: itemSelect.id!, idCustomer: itemSelect.maKh.toString(),itemSelect: itemSelect));
-                    }
-                  });
-                }
-              }
-              else{
-                _bloc.add(GetTimeCheckOutSave(idCheckIn: itemSelect.id!, idCustomer: itemSelect.maKh.toString(),itemSelect: itemSelect));
-              }
+              _handleCheckInWithLocationValidation(itemSelect);
             }
             else{
               pushNewDetailScreen(item: itemSelect, view: true, isCheckInSuccess: false);

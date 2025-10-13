@@ -100,14 +100,18 @@ class ListQDDVT {
   String? dvt;
   dynamic heSo;
   bool? isDefault;
+  String? codeTax;
+  double? valueTax;
 
-  ListQDDVT({this.maVt, this.dvt, this.heSo, this.isDefault});
+  ListQDDVT({this.maVt, this.dvt, this.heSo, this.isDefault,this.codeTax, this.valueTax});
 
   ListQDDVT.fromJson(Map<String, dynamic> json) {
     maVt = json['ma_vt'];
     dvt = json['dvt'];
     heSo = json['he_so'];
     isDefault = json['default'];
+    codeTax = json['ma_thue'];
+    valueTax = json['thue_suat'];
   }
 
   Map<String, dynamic> toJson() {
@@ -116,6 +120,8 @@ class ListQDDVT {
     data['dvt'] = dvt;
     data['he_so'] = heSo;
     data['default'] = isDefault;
+    data['ma_thue'] = codeTax;
+    data['thue_suat'] = valueTax;
     return data;
   }
 }

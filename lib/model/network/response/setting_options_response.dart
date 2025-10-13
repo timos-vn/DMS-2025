@@ -168,6 +168,10 @@ class MasterAppSettings {
   int? scanQRCodeForInvoicePXB;
   int? allowCreateTicketShipping;
   int? percentQuantityImage;
+  int? reportLocationNoChooseCustomer;
+  int? editPriceWidthValuesEmptyOrZero;
+  int? noCheckDayOff;
+  int? autoAddAgentFromSaleOut;
 
   MasterAppSettings({
     this.inStockCheck,
@@ -226,6 +230,10 @@ class MasterAppSettings {
     this.scanQRCodeForInvoicePXB,
     this.allowCreateTicketShipping,
     this.percentQuantityImage,
+    this.reportLocationNoChooseCustomer,
+    this.editPriceWidthValuesEmptyOrZero,
+    this.noCheckDayOff,
+    this.autoAddAgentFromSaleOut,
   });
 
   MasterAppSettings.fromJson(Map<String, dynamic> json) {
@@ -288,6 +296,10 @@ class MasterAppSettings {
     scanQRCodeForInvoicePXB = json['scanQRCodeForInvoicePXB'];
     allowCreateTicketShipping = json['allowCreateTicketShipping'];
     percentQuantityImage = json['percentQuantityImage'];
+    reportLocationNoChooseCustomer = json['reportLocationNoChooseCustomer'];
+    editPriceWidthValuesEmptyOrZero = json['editPriceWidthValuesEmptyOrZero'];
+    noCheckDayOff = json['noCheckDayOff'];
+    autoAddAgentFromSaleOut = json['autoAddAgentFromSaleOut'];
   }
 
   Map<String, dynamic> toJson() {
@@ -351,6 +363,10 @@ class MasterAppSettings {
     data['scanQRCodeForInvoicePXB'] = scanQRCodeForInvoicePXB;
     data['allowCreateTicketShipping'] = allowCreateTicketShipping;
     data['percentQuantityImage'] = percentQuantityImage;
+    data['reportLocationNoChooseCustomer'] = reportLocationNoChooseCustomer;
+    data['editPriceWidthValuesEmptyOrZero'] = editPriceWidthValuesEmptyOrZero;
+    data['noCheckDayOff'] = noCheckDayOff;
+    data['autoAddAgentFromSaleOut'] = autoAddAgentFromSaleOut;
     return data;
   }
 }

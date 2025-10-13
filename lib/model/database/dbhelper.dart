@@ -15,7 +15,7 @@ import '../entity/item_check_in.dart';
 import '../entity/product.dart';
 
 class DatabaseHelper {
-  static const NEW_DB_VERSION = 20250830; // current 15
+ static const NEW_DB_VERSION = 20250831; // Thêm availableQuantity vào product table
   static final DatabaseHelper _instance = DatabaseHelper._();
   Database? _database;
 
@@ -125,7 +125,8 @@ class DatabaseHelper {
       woPrice REAL,
       woPriceAfter REAL,
       so_luong_kd REAL,
-      sttRec0 TEXT
+      sttRec0 TEXT,
+      availableQuantity REAL
       )
   ''');
     print("Database Production was created!");

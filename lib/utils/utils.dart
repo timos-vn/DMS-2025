@@ -22,7 +22,6 @@ import 'dart:math' show Random, asin, atan2, cos, pi, pow, sin, sqrt;
 import 'package:vector_math/vector_math.dart' as vector;
 
 class Utils{
-
   static String formatToTime(String inputDate, {String outputPattern = 'HH:mm'}) {
     try {
       final inputFormat = DateFormat('dd-MM-yyyy HH:mm');
@@ -343,7 +342,11 @@ class Utils{
   static Stream<Position> getPositionStream(
       {LocationSettings? locationSettings,}
       )=> GeolocatorPlatform.instance.getPositionStream(
-      locationSettings: locationSettings
+      locationSettings: locationSettings ?? const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 0, // Không filter, lấy mọi vị trí mới
+        timeLimit: Duration(seconds: 30),
+      )
   );
 
   static double getDistance(pLat, pLng, _currentPosition){
@@ -356,6 +359,53 @@ class Utils{
     var d = earthRadius * c;
     print("$d met =<<<<<<,");
     return d;
+  }
+
+  /// Kiểm tra độ chính xác của GPS
+  static bool isGpsAccurate(Position? position, {double maxAccuracy = 100}) {
+    if (position == null || position.accuracy == null) return false;
+    return position.accuracy <= maxAccuracy;
+  }
+
+  /// Lấy vị trí với retry mechanism - BẮT BUỘC lấy vị trí mới, không cache
+  static Future<Position?> getLocationWithRetry({
+    int maxRetries = 3,
+    Duration timeout = const Duration(seconds: 30),
+    LocationAccuracy accuracy = LocationAccuracy.high,
+  }) async {
+    for (int i = 0; i < maxRetries; i++) {
+      try {
+        print('GPS attempt ${i + 1}/$maxRetries - Getting fresh location');
+        
+        Position position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: accuracy,
+          timeLimit: timeout,
+          forceAndroidLocationManager: true, // Bắt buộc sử dụng GPS mới
+        );
+        
+        // Kiểm tra accuracy
+        if (isGpsAccurate(position)) {
+          print('GPS success: accuracy ${position.accuracy}m');
+          return position;
+        } else {
+          print('GPS accuracy low: ${position.accuracy}m, retrying...');
+          if (i == maxRetries - 1) {
+            // Lần cuối cùng, chấp nhận vị trí dù accuracy thấp
+            print('Final attempt: accepting GPS with accuracy ${position.accuracy}m');
+            return position;
+          }
+        }
+      } catch (e) {
+        print('GPS attempt ${i + 1} failed: $e');
+        if (i == maxRetries - 1) {
+          print('All GPS attempts failed - no cached location used');
+          return null;
+        }
+        // Đợi trước khi thử lại
+        await Future.delayed(Duration(seconds: 2 * (i + 1)));
+      }
+    }
+    return null;
   }
 
   static double calculateDistance(lat1, lon1, lat2, lon2){
@@ -626,9 +676,70 @@ class Utils{
   }
 
   static String formatMoneyStringToDouble(dynamic amount) {
-    return NumberFormat.simpleCurrency(locale: "vi_VN").format(amount)
-        .replaceAll(' ', '').replaceAll(',', '.')
-        .replaceAll('₫', '');
+    if (amount == null) return '0';
+    try {
+      double value = double.parse(amount.toString());
+      // Nếu là số nguyên, không hiển thị phần thập phân
+      if (value == value.roundToDouble()) {
+        final formatter = NumberFormat('#,##0', 'en_US');
+        return formatter.format(value);
+      }
+      // Nếu có phần thập phân
+      final formatter = NumberFormat('#,##0.##', 'en_US');
+      return formatter.format(value);
+    } catch (e) {
+      return '0';
+    }
+  }
+
+  static String formatQuantity(dynamic value) {
+    if (value == null) return '0';
+    try {
+      double amount = double.parse(value.toString());
+      // Nếu là số nguyên
+      if (amount == amount.roundToDouble()) {
+        final formatter = NumberFormat('#,##0', 'en_US');
+        return formatter.format(amount);
+      }
+      // Nếu có phần thập phân
+      final formatter = NumberFormat('#,##0.##', 'en_US');
+      return formatter.format(amount);
+    } catch (e) {
+      return value.toString();
+    }
+  }
+
+  static String formatDecimal(dynamic value, {bool withSeparator = false}) {
+    if (value == null) return '0';
+    try {
+      double amount = double.parse(value.toString());
+      
+      // Nếu cần separator (cho số lượng)
+      if (withSeparator) {
+        // Nếu là số nguyên
+        if (amount == amount.roundToDouble()) {
+          final formatter = NumberFormat('#,##0', 'en_US');
+          return formatter.format(amount);
+        }
+        // Nếu có phần thập phân
+        final formatter = NumberFormat('#,##0.##', 'en_US');
+        return formatter.format(amount);
+      }
+      
+      // Không cần separator (cho phần trăm)
+      // Nếu là số nguyên, không hiển thị .0
+      if (amount == amount.roundToDouble()) {
+        return amount.toInt().toString();
+      }
+      // Nếu có phần thập phân, hiển thị (tối đa 2 chữ số)
+      String result = amount.toStringAsFixed(2);
+      // Loại bỏ số 0 thừa ở cuối
+      result = result.replaceAll(RegExp(r'0*$'), '');
+      result = result.replaceAll(RegExp(r'\.$'), '');
+      return result;
+    } catch (e) {
+      return '0';
+    }
   }
 
   static bool isTablet() {

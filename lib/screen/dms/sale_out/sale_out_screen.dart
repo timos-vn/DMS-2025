@@ -94,6 +94,112 @@ class _SaleOutScreenState extends State<SaleOutScreen>with TickerProviderStateMi
     _bloc.codeCustomer = widget.codeCustomer.toString();
 
     _bloc.add(GetSaleOutPrefs());
+    
+    // Auto load agent by maNPP nếu có
+    _autoLoadAgentIfNeeded();
+  }
+  
+  /// Auto load thông tin đại lý nếu có mã NPP
+  void _autoLoadAgentIfNeeded() {
+    // Check điều kiện cho phép auto add agent
+    if (Const.autoAddAgentFromSaleOut != true) {
+      // Không cho phép auto add → return
+      return;
+    }
+    
+    // Check Const.maNPP có hợp lệ không
+    if (Const.maNPP.isNotEmpty && 
+        Const.maNPP != 'null' && 
+        Const.maNPP.trim().isNotEmpty) {
+      // Dispatch event để load agent
+      _bloc.add(AutoLoadAgentByNPPEvent(maNPP: Const.maNPP));
+    }
+  }
+  
+  /// Hiển thị dialog thông báo khi đã load đại lý thành công
+  void _showAgentLoadedDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          title: Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.green, size: 28),
+              const SizedBox(width: 10),
+              const Text('Thông báo', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Thông tin đại lý/NPP đã được tự động điền:',
+                style: TextStyle(fontSize: 14, color: Colors.black87),
+              ),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue.shade200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildInfoRow('Tên:', _bloc.agentName ?? ''),
+                    const SizedBox(height: 6),
+                    _buildInfoRow('SĐT:', _bloc.agentPhone ?? ''),
+                    const SizedBox(height: 6),
+                    _buildInfoRow('Địa chỉ:', _bloc.agentAddress ?? ''),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Đóng', style: TextStyle(fontSize: 15)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+  
+  /// Widget hiển thị thông tin trong dialog
+  Widget _buildInfoRow(String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(
+              fontSize: 13,
+              color: Colors.black54,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -102,16 +208,30 @@ class _SaleOutScreenState extends State<SaleOutScreen>with TickerProviderStateMi
       listener: (context,state){
         if(state is GetPrefsSuccess || state is DeleteProductFromDBSuccess){
           _bloc.add(GetListProductFromDB());
-        }else if(state is PickInfoCustomerSuccess){
-          nameCustomerController.text = _bloc.customerName!;
-          phoneCustomerController.text = _bloc.phoneCustomer!;
-          addressCustomerController.text = _bloc.addressCustomer!;
+        }
+        else if(state is PickInfoCustomerSuccess){
+          // Safe handling: sử dụng null coalescing operator
+          nameCustomerController.text = _bloc.customerName ?? '';
+          phoneCustomerController.text = _bloc.phoneCustomer ?? '';
+          addressCustomerController.text = _bloc.addressCustomer ?? '';
         }
         else if(state is PickInfoAgentSuccess){
-          nameAgentController.text = _bloc.agentName!;
-          phoneAgentController.text = _bloc.agentPhone!;
-          addressAgentController.text = _bloc.agentAddress!;
-        }else if(state is SaleOutSuccess){
+          // Safe handling: sử dụng null coalescing operator
+          nameAgentController.text = _bloc.agentName ?? '';
+          phoneAgentController.text = _bloc.agentPhone ?? '';
+          addressAgentController.text = _bloc.agentAddress ?? '';
+        }
+        else if(state is AutoLoadAgentSuccess){
+          // Auto fill thông tin đại lý từ maNPP
+          nameAgentController.text = _bloc.agentName ?? '';
+          phoneAgentController.text = _bloc.agentPhone ?? '';
+          addressAgentController.text = _bloc.agentAddress ?? '';
+          codeAgent = _bloc.agentCode ?? '';
+          
+          // Hiển thị dialog thông báo
+          _showAgentLoadedDialog();
+        }
+        else if(state is SaleOutSuccess){
           _bloc.add(DeleteAllProductFromDB());
           _bloc.listProductOrderAndUpdate.clear();
           nameCustomerController.text = '';
@@ -159,7 +279,7 @@ class _SaleOutScreenState extends State<SaleOutScreen>with TickerProviderStateMi
       child: BlocBuilder<SaleOutBloc,SaleOutState>(
         bloc: _bloc,
         builder: (BuildContext context,SaleOutState state){
-          return Stack(
+          return Stack( 
             children: [
               buildScreen(context, state),
               Visibility(
@@ -244,7 +364,7 @@ class _SaleOutScreenState extends State<SaleOutScreen>with TickerProviderStateMi
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10,vertical: 12),
+        padding: const EdgeInsets.only(left: 10,right: 10,top: 12,bottom: 18),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.end,
           crossAxisAlignment: CrossAxisAlignment.end,
@@ -1028,7 +1148,7 @@ class _SaleOutScreenState extends State<SaleOutScreen>with TickerProviderStateMi
                   visible: Const.chooseAgentSaleOut == true,
                   child: Padding(
                     padding: EdgeInsets.only(top: Const.dateEstDelivery == true ? 15 : 10),
-                    child: Text('Thông tin Đại lý:',style:  TextStyle(color: mainColor,fontSize: 13,fontStyle: FontStyle.italic),),
+                    child: Text('Thông tin Đại lý/NPP:',style:  TextStyle(color: mainColor,fontSize: 13,fontStyle: FontStyle.italic),),
                   )),
               Visibility(
                 visible: Const.chooseAgentSaleOut == true,
@@ -1162,7 +1282,7 @@ class _SaleOutScreenState extends State<SaleOutScreen>with TickerProviderStateMi
               color: Colors.amber.withOpacity(0.4),
               child: const Align(
                 alignment: Alignment.centerLeft,
-                child: Text('Thông tin người đại lý',style: TextStyle(color: Colors.black,fontSize: 13),),
+                child: Text('Thông tin người đại lý/NPP',style: TextStyle(color: Colors.black,fontSize: 13),),
               ),
             ),
             const SizedBox(height: 22,),
@@ -1178,14 +1298,14 @@ class _SaleOutScreenState extends State<SaleOutScreen>with TickerProviderStateMi
               },
               child: Stack(
                 children: [
-                  inputWidget(title:'Tên đại lý',hideText: "Đại lý A",controller: nameAgentController,focusNode: nameAgentFocus,textInputAction: TextInputAction.done, onTapSuffix: (){},note: true,isEnable: false),
+                  inputWidget(title:'Tên đại lý/NPP',hideText: "Đại lý/NPP A",controller: nameAgentController,focusNode: nameAgentFocus,textInputAction: TextInputAction.done, onTapSuffix: (){},note: true,isEnable: false),
                   const Positioned(
                       top: 20,right: 10,
                       child: Icon(Icons.search_outlined,color: Colors.grey,size: 20,))
                 ],
               ),
             ),
-            inputWidget(title:"SĐT đại lý",hideText: '0963 xxx xxx ',controller: phoneAgentController,focusNode: phoneAgentFocus,textInputAction: TextInputAction.done, onTapSuffix: (){},note: true),
+            inputWidget(title:"SĐT đại lý/NPP",hideText: '0963 xxx xxx ',controller: phoneAgentController,focusNode: phoneAgentFocus,textInputAction: TextInputAction.done, onTapSuffix: (){},note: true),
             GestureDetector(
               onTap:(){
                 showDialog(
@@ -1204,7 +1324,7 @@ class _SaleOutScreenState extends State<SaleOutScreen>with TickerProviderStateMi
               },
               child: Stack(
                 children: [
-                  inputWidget(title:'Địa chỉ đại lý',hideText: "Vui lòng nhập địa chỉ",controller: addressAgentController,focusNode: addressAgentFocus,textInputAction: TextInputAction.done, onTapSuffix: (){},note: true,isEnable: false),
+                  inputWidget(title:'Địa chỉ đại lý/NPP',hideText: "Vui lòng nhập địa chỉ",controller: addressAgentController,focusNode: addressAgentFocus,textInputAction: TextInputAction.done, onTapSuffix: (){},note: true,isEnable: false),
                   const Positioned(
                       top: 20,right: 10,
                       child: Icon(Icons.edit,color: Colors.grey,size: 20,))

@@ -610,10 +610,12 @@ class _HistoryOrderDetailScreenState extends State<HistoryOrderDetailScreen> {
           const SizedBox(width: 10,),
           InkWell(
             onTap: (){
-              if( _bloc.masterDetailOrder.sttRec.toString().replaceAll('null', '').isNotEmpty && (_bloc.masterDetailOrder.maGD.toString().replaceAll('null', '') == "5" || _bloc.masterDetailOrder.maGD.toString().replaceAll('null', '') == '6')){
-                _bloc.add(DownloadFileEvent(sttRec: _bloc.masterDetailOrder.sttRec.toString()));
-              }else{
-                Utils.showCustomToast(context, Icons.warning_amber, 'Úi, Không lấy được mã phiếu.');
+              if(Const.downFileFromDetailOrder == true){
+                if( _bloc.masterDetailOrder.sttRec.toString().replaceAll('null', '').isNotEmpty && (_bloc.masterDetailOrder.maGD.toString().replaceAll('null', '') == "5" || _bloc.masterDetailOrder.maGD.toString().replaceAll('null', '') == '6')){
+                  _bloc.add(DownloadFileEvent(sttRec: _bloc.masterDetailOrder.sttRec.toString()));
+                }else{
+                  Utils.showCustomToast(context, Icons.warning_amber, 'Úi, Không lấy được mã phiếu.');
+                }
               }
             },
             child: SizedBox(
@@ -622,7 +624,8 @@ class _HistoryOrderDetailScreenState extends State<HistoryOrderDetailScreen> {
               child: Icon(
                 Icons.file_download_outlined,
                 size: 25,
-                color: (_bloc.masterDetailOrder.status != 1 && _bloc.masterDetailOrder.status != 0 || widget.approveOrder == true) ? Colors.transparent : Colors.white,
+                color: Const.downFileFromDetailOrder == true ?
+                (_bloc.masterDetailOrder.status != 1 && _bloc.masterDetailOrder.status != 0 || widget.approveOrder == true) ? Colors.transparent : Colors.white :  Colors.transparent ,
               ),
             ),
           )
