@@ -49,6 +49,11 @@ class _DynamicCRUDScreenState extends State<DynamicScreen> {
   TextEditingController peopleJoinEditingController = TextEditingController();
   TextEditingController nameCustomerEditingController = TextEditingController();
   TextEditingController phoneCustomerEditingController = TextEditingController();
+  // BusinessTrip new fields
+  TextEditingController businessAddressEditingController = TextEditingController();
+  TextEditingController businessContactNameEditingController = TextEditingController();
+  TextEditingController businessContactPhoneEditingController = TextEditingController();
+  TextEditingController businessPurposeEditingController = TextEditingController();
   List<Map<String, dynamic>> fieldsConvert = [];
 
   Map<String, List<Map<String, dynamic>>> tableData = {};
@@ -84,6 +89,10 @@ class _DynamicCRUDScreenState extends State<DynamicScreen> {
   bool isCheckDU = false;
   bool isCheckMC = false;
 
+  // Validation tracking
+  bool isDateFromSelected = false;
+  bool isDateRequestSelected = false;
+
   Map<String, TextEditingController> controllers = {};
   GlobalKey<FormState> formKey = GlobalKey<FormState>();
 
@@ -102,6 +111,121 @@ class _DynamicCRUDScreenState extends State<DynamicScreen> {
     dateTo = dateFormat.parse(DateTime.now().toString());
     _bloc = ProposalBloc(context);
     _bloc.add(GetPrefsProposal());
+  }
+
+  /// Validation function to check all required fields
+  List<String> validateForm() {
+    List<String> missingFields = [];
+
+    if (widget.controller.contains('BusinessTrip')) {
+      // Date fields have default values, no need to validate
+      if (descEditingController.text.trim().isEmpty) missingFields.add('Nội dung');
+    } else if (widget.controller.contains('DayOff')) {
+      // Date fields have default values, no need to validate
+      if (codeLeaveLetter.isEmpty) missingFields.add('Lý do nghỉ phép');
+      if (descEditingController.text.trim().isEmpty) missingFields.add('Nội dung');
+    } else if (widget.controller.contains('OverTime')) {
+      // Date fields have default values, only validate time fields
+      if (selectedTimeStart == null) missingFields.add('Giờ bắt đầu');
+      if (selectedTimeEnd == null) missingFields.add('Giờ kết thúc');
+      if (descEditingController.text.trim().isEmpty) missingFields.add('Nội dung');
+    } else if (widget.controller.contains('AdvanceRequest')) {
+      if (titleEditingController.text.trim().isEmpty) missingFields.add('Tiêu đề');
+    } else if (widget.controller.contains('CheckinExplan')) {
+      // Date fields have default values, only validate time fields
+      if (selectedTimeStart == null) missingFields.add('Giờ bắt đầu');
+      if (selectedTimeEnd == null) missingFields.add('Giờ kết thúc');
+      if (descEditingController.text.trim().isEmpty) missingFields.add('Nội dung/Lý do');
+    } else if (widget.controller.contains('CarRequest')) {
+      if (idCar.isEmpty) missingFields.add('Loại xe');
+      // Date fields have default values, only validate time fields
+      if (selectedTimeStart == null) missingFields.add('Giờ bắt đầu');
+      if (selectedTimeEnd == null) missingFields.add('Giờ kết thúc');
+      if (addressStartEditingController.text.trim().isEmpty) missingFields.add('Điểm đi');
+      if (addressEndEditingController.text.trim().isEmpty) missingFields.add('Điểm đến');
+      if (descEditingController.text.trim().isEmpty) missingFields.add('Nội dung');
+    } else if (widget.controller.contains('MeetingRoom')) {
+      if (idRoom.isEmpty) missingFields.add('Phòng họp');
+      // Date fields have default values, only validate time fields
+      if (selectedTimeStart == null) missingFields.add('Giờ bắt đầu');
+      if (selectedTimeEnd == null) missingFields.add('Giờ kết thúc');
+      if (memberJoinEditingController.text.trim().isEmpty) missingFields.add('Số lượng tham gia');
+      if (peopleJoinEditingController.text.trim().isEmpty) missingFields.add('Thành phần tham gia');
+      if (descEditingController.text.trim().isEmpty) missingFields.add('Mục đích');
+    }
+
+    // Validate dynamic fields
+    for (var field in fields ?? []) {
+      String fieldName = field['name'];
+      String title = field['title'];
+      bool required = field['required'] ?? false;
+
+      if (required) {
+        if (controllers.containsKey(fieldName)) {
+          if (controllers[fieldName]!.text.trim().isEmpty) {
+            missingFields.add(title);
+          }
+        } else if (formDataDynamic.containsKey(fieldName)) {
+          if (formDataDynamic[fieldName].toString().trim().isEmpty) {
+            missingFields.add(title);
+          }
+        }
+      }
+    }
+
+    return missingFields;
+  }
+
+  /// Show validation error dialog
+  void showValidationErrorDialog(List<String> missingFields) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber, color: Colors.orange, size: 28),
+              SizedBox(width: 10),
+              Text('Thiếu thông tin', style: TextStyle(fontSize: 18)),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Vui lòng nhập đầy đủ các trường sau:',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+                const SizedBox(height: 10),
+                ...missingFields.map((field) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('• ', style: TextStyle(color: Colors.red, fontSize: 16)),
+                      Expanded(
+                        child: Text(
+                          field,
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      ),
+                    ],
+                  ),
+                )),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Đóng', style: TextStyle(fontSize: 16)),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -127,6 +251,10 @@ class _DynamicCRUDScreenState extends State<DynamicScreen> {
               dateFrom = _bloc.formFixData.ngayTu.toString().replaceAll('null', '').isNotEmpty ? dateFormat.parse(_bloc.formFixData.ngayTu.toString()) : dateFormat.parse(DateTime.now().toString());
               dateTo = _bloc.formFixData.ngayDen.toString().replaceAll('null', '').isNotEmpty ? dateFormat.parse(_bloc.formFixData.ngayDen.toString()) : dateFormat.parse(DateTime.now().toString());
               dateRequest = _bloc.formFixData.ngayDeNghi.toString().replaceAll('null', '').isNotEmpty ? dateFormat.parse(_bloc.formFixData.ngayDeNghi.toString()) : dateFormat.parse(DateTime.now().toString());
+              
+              // Set flags if data already exists (view/edit mode)
+              isDateFromSelected = _bloc.formFixData.ngayTu.toString().replaceAll('null', '').isNotEmpty;
+              isDateRequestSelected = _bloc.formFixData.ngayDeNghi.toString().replaceAll('null', '').isNotEmpty;
               _bloc.so_luong_anh = _bloc.formFixData.so_luong_anh??0;
               if(widget.controller.contains('AdvanceRequest')){
                 titleEditingController.text = _bloc.formFixData.dienGiai.toString().replaceAll('null', '');
@@ -164,6 +292,14 @@ class _DynamicCRUDScreenState extends State<DynamicScreen> {
               isCheckHQBK =  _bloc.formFixData.request??false;
               isCheckDU =  _bloc.formFixData.request??false;
               isCheckMC =  _bloc.formFixData.request??false;
+              
+              // Load BusinessTrip new fields
+              if(widget.controller.contains('BusinessTrip')){
+                businessAddressEditingController.text = _bloc.formFixData.diaChiDen?.toString().replaceAll('null', '') ?? '';
+                businessContactNameEditingController.text = _bloc.formFixData.tenNguoiGap?.toString().replaceAll('null', '') ?? '';
+                businessContactPhoneEditingController.text = _bloc.formFixData.sdtNguoiGap?.toString().replaceAll('null', '') ?? '';
+                businessPurposeEditingController.text = _bloc.formFixData.mucDich?.toString().replaceAll('null', '') ?? '';
+              }
             }
 
             ///dynamic
@@ -305,6 +441,15 @@ class _DynamicCRUDScreenState extends State<DynamicScreen> {
   }
 
   void onSave(Map<String, TextEditingController> controllers, Map<String, dynamic> formDataDynamic,int action) {
+    // Validate before saving (only for action = 1 which is Create/Update)
+    if (action == 1) {
+      List<String> missingFields = validateForm();
+      if (missingFields.isNotEmpty) {
+        showValidationErrorDialog(missingFields);
+        return;
+      }
+    }
+
     List<Map<String, dynamic>> gridsList =
     (_bloc.jsonListData['data']['formDefines']['grids'] as List)
         .map((e) => e as Map<String, dynamic>)
@@ -339,7 +484,8 @@ class _DynamicCRUDScreenState extends State<DynamicScreen> {
         "variable": "ca_tu",
         "type": "Int",
         "value": isMorningFrom,
-      });formValues.add({
+      });
+      formValues.add({
         "variable": "ca_den",
         "type": "Int",
         "value": isMorningTo,
@@ -348,6 +494,27 @@ class _DynamicCRUDScreenState extends State<DynamicScreen> {
         "variable": "dien_giai",
         "type": "Text",
         "value": descEditingController.text.toString(),
+      });
+      // New fields for BusinessTrip
+      formValues.add({
+        "variable": "dia_chi_den",
+        "type": "Text",
+        "value": businessAddressEditingController.text.toString(),
+      });
+      formValues.add({
+        "variable": "ten_nguoi_gap",
+        "type": "Text",
+        "value": businessContactNameEditingController.text.toString(),
+      });
+      formValues.add({
+        "variable": "sdt_nguoi_gap",
+        "type": "Text",
+        "value": businessContactPhoneEditingController.text.toString(),
+      });
+      formValues.add({
+        "variable": "muc_dich",
+        "type": "Text",
+        "value": businessPurposeEditingController.text.toString(),
       });
       formValues.add({
         "variable": "status",
@@ -390,7 +557,7 @@ class _DynamicCRUDScreenState extends State<DynamicScreen> {
         "value": isMorningTo,
       });formValues.add({
         "variable": "so_ngay",
-        "type": "Int",
+        "type": "Decimal",
         "value": ((((dateTo.difference(dateFrom).inDays) + 1) * 2) -
             (isMorningFrom == 0 ? 1 : 0) - (isMorningTo == 1 ? 1 : 0)) * 0.5,
       });
@@ -737,7 +904,8 @@ class _DynamicCRUDScreenState extends State<DynamicScreen> {
     if (_bloc.jsonListData.isEmpty) {
       return const Scaffold(body: Center());
     }
-    return Padding(
+    return SingleChildScrollView(
+      child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -745,22 +913,21 @@ class _DynamicCRUDScreenState extends State<DynamicScreen> {
           widget.controller.contains('BusinessTrip') ?
           buildBusiness(context)
               : widget.controller.contains('OverTime') ?
-          Expanded(child: buildOverTime(context)) :
+            buildOverTime(context) :
           widget.controller.contains('DayOff') ?
-          Expanded(child: buildDayOff(context)) :
+            buildDayOff(context) :
           widget.controller.contains('AdvanceRequest') ?
           buildAdvanceRequest(context) :
           widget.controller.contains('CheckinExplan') ?
-          Expanded(child: buildGTCC(context)) :
+            buildGTCC(context) :
           widget.controller.contains('CarRequest') ?
-          Expanded(child: buildDKX(context)) :
+            buildDKX(context) :
           widget.controller.contains('MeetingRoom') ?
-          Expanded(child: buildDKPH(context))
+            buildDKPH(context)
               : Container(),
           Visibility(
               visible: widget.controller.contains('BusinessTrip') ||  widget.controller.contains('AdvanceRequest')
-              ,child: Expanded(
-            child: Column(
+                ,child: Column(
               children: [
                 const SizedBox(height: 10,),
                 ...fields
@@ -768,18 +935,15 @@ class _DynamicCRUDScreenState extends State<DynamicScreen> {
                     buildInputField(field, formDataDynamic, controllers))
                     .toList(),
                 const SizedBox(height: 20),
-                Expanded(
-                  child: ListView(
-                    children: grids.map<Widget>((grid) {
+                ...grids.map<Widget>((grid) {
                       return buildTable(grid["controller"], grid["fields"],grid["title"]);
                     }).toList(),
-                  ),
-                ),
+                const SizedBox(height: 80), // Add space for floating button
               ],
-            ),
           )),
 
         ],
+        ),
       ),
     );
   }
@@ -788,30 +952,75 @@ class _DynamicCRUDScreenState extends State<DynamicScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(
-          height: 45,width: double.infinity,
-          child: Row(
+        // Section: Thời gian công tác
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.1),
+                spreadRadius: 1,
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: kSecondaryColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.calendar_today, color: kSecondaryColor, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text(
+                    "Thời gian công tác",
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
             children: [
               Expanded(
-                child: BuildRowWithDatePicker(label: "Từ ngày", date: dateFrom.toString(),onTap: (){
+                    child: BuildRowWithDatePicker(
+                      label: "Từ ngày",
+                      date: dateFrom.toString(),
+                      onTap: () {
                   FocusScope.of(context).requestFocus(FocusNode());
-                  Utils.dateTimePickerCustom(context).then((value){
-                    if(value != null){
+                        Utils.dateTimePickerCustom(context).then((value) {
+                          if (value != null) {
                       setState(() {
                         dateFrom = dateFormat.parse(value.toString());
+                              isDateFromSelected = true;
                         if (dateFrom.isAfter(dateTo)) {
                           dateFrom = DateTime.now();
-                          Utils.showCustomToast(context, Icons.warning_amber, 'Lỗi: Ngày bắt đầu phải nhỏ hơn hoặc bằng ngày kết thúc.');
+                                Utils.showCustomToast(context, Icons.warning_amber,
+                                    'Lỗi: Ngày bắt đầu phải nhỏ hơn hoặc bằng ngày kết thúc.');
                         }
                       });
                     }
                   });
-                },),
+                      },
               ),
+                  ),
+                  const SizedBox(width: 8),
               SizedBox(
-                height: 40,width: 120,
+                    width: 110,
                 child: StatusDropdownIsMorning(
-                  initialValue: isMorningFrom, // Mặc định là 1 khi thêm mới
+                      initialValue: isMorningFrom,
                   onChanged: (int newStatus) {
                     setState(() {
                       isMorningFrom = newStatus;
@@ -821,34 +1030,40 @@ class _DynamicCRUDScreenState extends State<DynamicScreen> {
               ),
             ],
           ),
-        ),
-        const SizedBox(
-          height: 10,
-        ),
-        SizedBox(
-          height: 45,width: double.infinity,
-          child: Row(
+              const SizedBox(height: 12),
+              Row(
             children: [
               Expanded(
-                child: BuildRowWithDatePicker(label: "Đến ngày", date: dateTo.toString(),onTap: (){
+                    child: BuildRowWithDatePicker(
+                      label: "Đến ngày",
+                      date: dateTo.toString(),
+                      onTap: () {
+                        if (!isDateFromSelected) {
+                          Utils.showCustomToast(
+                              context, Icons.warning_amber, 'Vui lòng chọn "Từ ngày" trước');
+                          return;
+                        }
                   FocusScope.of(context).requestFocus(FocusNode());
-                  Utils.dateTimePickerCustom(context).then((value){
-                    if(value != null){
+                        Utils.dateTimePickerCustom(context).then((value) {
+                          if (value != null) {
                       setState(() {
                         dateTo = dateFormat.parse(value.toString());
                         if (dateFrom.isAfter(dateTo)) {
                           dateTo = DateTime.now();
-                          Utils.showCustomToast(context, Icons.warning_amber, 'Lỗi: Ngày bắt đầu phải nhỏ hơn hoặc bằng ngày kết thúc.');
+                                Utils.showCustomToast(context, Icons.warning_amber,
+                                    'Lỗi: Ngày bắt đầu phải nhỏ hơn hoặc bằng ngày kết thúc.');
                         }
                       });
                     }
                   });
-                },),
+                      },
               ),
+                  ),
+                  const SizedBox(width: 8),
               SizedBox(
-                height: 40,width: 120,
+                    width: 110,
                 child: StatusDropdownIsMorning(
-                  initialValue: isMorningTo, // Mặc định là 1 khi thêm mới
+                      initialValue: isMorningTo,
                   onChanged: (int newStatus) {
                     setState(() {
                       isMorningTo = newStatus;
@@ -858,29 +1073,281 @@ class _DynamicCRUDScreenState extends State<DynamicScreen> {
               ),
             ],
           ),
+            ],
+          ),
         ),
-        const SizedBox(
-          height: 10,
+        const SizedBox(height: 16),
+
+        // Section: Thông tin địa điểm
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.1),
+                spreadRadius: 1,
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.location_on, color: Colors.orange, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text(
+                    "Thông tin địa điểm",
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                maxLines: 2,
+                controller: businessAddressEditingController,
+                style: const TextStyle(fontSize: 15),
+                decoration: InputDecoration(
+                  labelText: 'Địa chỉ đến',
+                  hintText: 'Nhập địa chỉ đến...',
+                  hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
+                  prefixIcon: const Icon(Icons.place, size: 20),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: kSecondaryColor, width: 2),
+                  ),
+                  filled: true,
+                  fillColor: Colors.grey.shade50,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                ),
+              ),
+            ],
+          ),
         ),
-        const SizedBox(
-          height: 10,
+        const SizedBox(height: 16),
+
+        // Section: Thông tin người gặp
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.1),
+                spreadRadius: 1,
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.person, color: Colors.blue, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text(
+                    "Thông tin người gặp",
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: businessContactNameEditingController,
+                style: const TextStyle(fontSize: 15),
+                decoration: InputDecoration(
+                  labelText: 'Tên & Chức vụ',
+                  hintText: 'Nhập tên & chức vụ người gặp...',
+                  hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
+                  prefixIcon: const Icon(Icons.badge, size: 20),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: kSecondaryColor, width: 2),
+                  ),
+                  filled: true,
+                  fillColor: Colors.grey.shade50,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: businessContactPhoneEditingController,
+                keyboardType: TextInputType.phone,
+                maxLength: 10,
+                style: const TextStyle(fontSize: 15),
+                decoration: InputDecoration(
+                  labelText: 'Số điện thoại',
+                  hintText: 'Nhập số điện thoại...',
+                  hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
+                  prefixIcon: const Icon(Icons.phone, size: 20),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: kSecondaryColor, width: 2),
+                  ),
+                  filled: true,
+                  fillColor: Colors.grey.shade50,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  counterText: '',
+                ),
+              ),
+            ],
+          ),
         ),
-        const Text("Nội dung"),
-        const SizedBox(
-          height: 5,
-        ),
+        const SizedBox(height: 16),
+
+        // Section: Mục đích & Nội dung
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.1),
+                spreadRadius: 1,
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.description, color: Colors.green, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text(
+                    "Mục đích & Nội dung",
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                maxLines: 3,
+                controller: businessPurposeEditingController,
+                style: const TextStyle(fontSize: 15),
+                decoration: InputDecoration(
+                  labelText: 'Mục đích cuộc gặp',
+                  hintText: 'Nhập mục đích cuộc gặp...',
+                  hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
+                  prefixIcon: const Padding(
+                    padding: EdgeInsets.only(bottom: 40),
+                    child: Icon(Icons.flag, size: 20),
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: kSecondaryColor, width: 2),
+                  ),
+                  filled: true,
+                  fillColor: Colors.grey.shade50,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                ),
+              ),
+              const SizedBox(height: 12),
         TextFormField(
           maxLines: 4,
           controller: descEditingController,
+                style: const TextStyle(fontSize: 15),
           decoration: InputDecoration(
-            hintText: 'Nhập nội dung công tác ...',
-            hintStyle: const TextStyle(
-              color: Colors.grey,
-              fontStyle: FontStyle.italic,
+                  labelText: 'Nội dung công tác',
+                  hintText: 'Nhập nội dung công tác...',
+                  hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
+                  prefixIcon: const Padding(
+                    padding: EdgeInsets.only(bottom: 60),
+                    child: Icon(Icons.edit_note, size: 20),
             ),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(5),
-            ),
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: kSecondaryColor, width: 2),
+                  ),
+                  filled: true,
+                  fillColor: Colors.grey.shade50,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -888,8 +1355,7 @@ class _DynamicCRUDScreenState extends State<DynamicScreen> {
   }
 
   Widget buildDayOff(BuildContext context) {
-    return SingleChildScrollView(
-      child: Column(
+    return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
@@ -903,6 +1369,7 @@ class _DynamicCRUDScreenState extends State<DynamicScreen> {
                       if(value != null){
                         setState(() {
                           dateFrom = dateFormat.parse(value.toString());
+                          isDateFromSelected = true;
                           if (dateFrom.isAfter(dateTo)) {
                             dateFrom = DateTime.now();
                             Utils.showCustomToast(context, Icons.warning_amber, 'Lỗi: Ngày bắt đầu phải nhỏ hơn hoặc bằng ngày kết thúc.');
@@ -935,6 +1402,10 @@ class _DynamicCRUDScreenState extends State<DynamicScreen> {
               children: [
                 Expanded(
                   child: BuildRowWithDatePicker(label: "Đến ngày", date: dateTo.toString(),onTap: (){
+                    if (!isDateFromSelected) {
+                      Utils.showCustomToast(context, Icons.warning_amber, 'Vui lòng chọn "Từ ngày" trước');
+                      return;
+                    }
                     FocusScope.of(context).requestFocus(FocusNode());
                     Utils.dateTimePickerCustom(context).then((value){
                       if(value != null){
@@ -1060,13 +1531,11 @@ class _DynamicCRUDScreenState extends State<DynamicScreen> {
             height: 10,
           ),
         ],
-      ),
     );
   }
 
   Widget buildOverTime(BuildContext context) {
-    return SingleChildScrollView(
-      child: Column(
+    return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
@@ -1080,6 +1549,7 @@ class _DynamicCRUDScreenState extends State<DynamicScreen> {
                       if(value != null){
                         setState(() {
                           dateFrom = dateFormat.parse(value.toString());
+                          isDateFromSelected = true;
                           if (dateFrom.isAfter(dateTo)) {
                             dateFrom = DateTime.now();
                             Utils.showCustomToast(context, Icons.warning_amber, 'Lỗi: Ngày bắt đầu phải nhỏ hơn hoặc bằng ngày kết thúc.');
@@ -1147,6 +1617,10 @@ class _DynamicCRUDScreenState extends State<DynamicScreen> {
               children: [
                 Expanded(
                   child: BuildRowWithDatePicker(label: "Ngày KT", date: dateTo.toString(),onTap: (){
+                    if (!isDateFromSelected) {
+                      Utils.showCustomToast(context, Icons.warning_amber, 'Vui lòng chọn "Ngày BĐ" trước');
+                      return;
+                    }
                     FocusScope.of(context).requestFocus(FocusNode());
                     Utils.dateTimePickerCustom(context).then((value){
                       if(value != null){
@@ -1260,7 +1734,6 @@ class _DynamicCRUDScreenState extends State<DynamicScreen> {
             height: 10,
           ),
         ],
-      ),
     );
   }
 
@@ -1295,8 +1768,7 @@ class _DynamicCRUDScreenState extends State<DynamicScreen> {
   }
 
   Widget buildGTCC(BuildContext context) {
-    return SingleChildScrollView(
-      child: Column(
+    return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           BuildRowWithDatePicker(isTrueWidth: true,label: "Ngày đề nghị", date: dateRequest.toString(),onTap: (){
@@ -1305,6 +1777,7 @@ class _DynamicCRUDScreenState extends State<DynamicScreen> {
               if(value != null){
                 setState(() {
                   dateRequest = dateFormat.parse(value.toString());
+                  isDateRequestSelected = true;
                 });
               }
             });
@@ -1323,6 +1796,7 @@ class _DynamicCRUDScreenState extends State<DynamicScreen> {
                       if(value != null){
                         setState(() {
                           dateFrom = dateFormat.parse(value.toString());
+                          isDateFromSelected = true;
                           if (dateFrom.isAfter(dateTo)) {
                             dateFrom = DateTime.now();
                             Utils.showCustomToast(context, Icons.warning_amber, 'Lỗi: Ngày bắt đầu phải nhỏ hơn hoặc bằng ngày kết thúc.');
@@ -1388,6 +1862,10 @@ class _DynamicCRUDScreenState extends State<DynamicScreen> {
               children: [
                 Flexible(
                   child: BuildRowWithDatePicker(isTrueWidth: true,label: "Ngày KT", date: dateTo.toString(),onTap: (){
+                    if (!isDateFromSelected) {
+                      Utils.showCustomToast(context, Icons.warning_amber, 'Vui lòng chọn "Ngày BĐ" trước');
+                      return;
+                    }
                     FocusScope.of(context).requestFocus(FocusNode());
                     Utils.dateTimePickerCustom(context).then((value){
                       if(value != null){
@@ -1525,7 +2003,6 @@ class _DynamicCRUDScreenState extends State<DynamicScreen> {
             ),
           ),
         ],
-      ),
     );
   }
 
@@ -1626,8 +2103,7 @@ class _DynamicCRUDScreenState extends State<DynamicScreen> {
   String idCar = '';
   String nameCar = '';
   Widget buildDKX(BuildContext context) {
-    return SingleChildScrollView(
-      child: Column(
+    return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
@@ -1685,6 +2161,7 @@ class _DynamicCRUDScreenState extends State<DynamicScreen> {
                       if(value != null){
                         setState(() {
                           dateFrom = dateFormat.parse(value.toString());
+                          isDateFromSelected = true;
                           if (dateFrom.isAfter(dateTo)) {
                             dateFrom = DateTime.now();
                             Utils.showCustomToast(context, Icons.warning_amber, 'Lỗi: Ngày bắt đầu phải nhỏ hơn hoặc bằng ngày kết thúc.');
@@ -1753,6 +2230,10 @@ class _DynamicCRUDScreenState extends State<DynamicScreen> {
               children: [
                 Expanded(
                   child: BuildRowWithDatePicker(label: "Ngày KT", date: dateTo.toString(),onTap: (){
+                    if (!isDateFromSelected) {
+                      Utils.showCustomToast(context, Icons.warning_amber, 'Vui lòng chọn "Ngày BĐ" trước');
+                      return;
+                    }
                     FocusScope.of(context).requestFocus(FocusNode());
                     Utils.dateTimePickerCustom(context).then((value){
                       if(value != null){
@@ -1951,15 +2432,13 @@ class _DynamicCRUDScreenState extends State<DynamicScreen> {
             ),
           ),
         ],
-      ),
     );
   }
 
   String idRoom = '';
   String nameRoom = '';
   Widget buildDKPH(BuildContext context) {
-    return SingleChildScrollView(
-      child: Column(
+    return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
@@ -1973,6 +2452,7 @@ class _DynamicCRUDScreenState extends State<DynamicScreen> {
                       if(value != null){
                         setState(() {
                           dateFrom = dateFormat.parse(value.toString());
+                          isDateFromSelected = true;
                           if (dateFrom.isAfter(dateTo)) {
                             dateFrom = DateTime.now();
                             Utils.showCustomToast(context, Icons.warning_amber, 'Lỗi: Ngày bắt đầu phải nhỏ hơn hoặc bằng ngày kết thúc.');
@@ -2040,6 +2520,10 @@ class _DynamicCRUDScreenState extends State<DynamicScreen> {
               children: [
                 Expanded(
                   child: BuildRowWithDatePicker(label: "Ngày KT", date: dateTo.toString(),onTap: (){
+                    if (!isDateFromSelected) {
+                      Utils.showCustomToast(context, Icons.warning_amber, 'Vui lòng chọn "Ngày BĐ" trước');
+                      return;
+                    }
                     FocusScope.of(context).requestFocus(FocusNode());
                     Utils.dateTimePickerCustom(context).then((value){
                       if(value != null){
@@ -2355,7 +2839,6 @@ class _DynamicCRUDScreenState extends State<DynamicScreen> {
             ),
           ),
         ],
-      ),
     );
   }
 

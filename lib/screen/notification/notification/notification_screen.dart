@@ -111,7 +111,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
               ),
             ),
           ),
-          Expanded(
+          const Expanded(
             child: Center(
               child: Text(
                 "Danh sách thông báo",
@@ -275,7 +275,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                             fontSize: 12,
                             color: notification.isRead == true
                                 ? Colors.grey
-                                : Color.fromARGB(255, 18, 101, 204),
+                                : const Color.fromARGB(255, 18, 101, 204),
                           ),
                         ),
                       ],

@@ -126,6 +126,7 @@ class MasterAppSettings {
   int? isHd;
   int? lockStockInItem;
   int? lockStockInCart;
+  int? lockStockInItemGift;
   int? findStoreForItemProduct;
   int? saleOutUpdatePrice;
   int? afterTax;
@@ -146,6 +147,7 @@ class MasterAppSettings {
   int? chooseStateWhenCreateNewOpenStore;
   int? editPrice;
   int? approveOrder;
+  int? approveNewStore;
   int? dateEstDelivery;
   int? typeProduction;
   int? giaGui;
@@ -172,6 +174,8 @@ class MasterAppSettings {
   int? editPriceWidthValuesEmptyOrZero;
   int? noCheckDayOff;
   int? autoAddAgentFromSaleOut;
+  int? discountSpecialAdd;
+  int? addProductionSameQuantity;
 
   MasterAppSettings({
     this.inStockCheck,
@@ -197,6 +201,7 @@ class MasterAppSettings {
     this.isHd,
     this.lockStockInItem,
     this.lockStockInCart,
+    this.lockStockInItemGift,
     this.checkGroup,
     this.chooseAgentSaleOut,
     this.chooseSaleOffSaleOut,
@@ -208,6 +213,7 @@ class MasterAppSettings {
     this.chooseStateWhenCreateNewOpenStore,
     this.editPrice,
     this.approveOrder,
+    this.approveNewStore,
     this.typeProduction,
     this.giaGui,
     this.dateEstDelivery,
@@ -234,6 +240,8 @@ class MasterAppSettings {
     this.editPriceWidthValuesEmptyOrZero,
     this.noCheckDayOff,
     this.autoAddAgentFromSaleOut,
+    this.discountSpecialAdd,
+    this.addProductionSameQuantity,
   });
 
   MasterAppSettings.fromJson(Map<String, dynamic> json) {
@@ -260,6 +268,7 @@ class MasterAppSettings {
     isHd = json['isHd'];
     lockStockInItem = json['lockStockInItem'];
     lockStockInCart = json['lockStockInCart'];
+    lockStockInItemGift = json['lockStockInItemGift'];
     checkGroup = json['checkGroup'];
     chooseAgentSaleOut = json['chooseAgentSaleOut'];
     chooseSaleOffSaleOut = json['chooseSaleOffSaleOut'];
@@ -273,6 +282,7 @@ class MasterAppSettings {
         json['chooseStateWhenCreateNewOpenStore'];
     editPrice = json['editPrice'];
     approveOrder = json['approveOrder'];
+    approveNewStore = json['approveNewStore'];
     typeProduction = json['typeProduction'];
     giaGui = json['giaGui'];
     dateEstDelivery = json['dateEstDelivery'];
@@ -300,6 +310,8 @@ class MasterAppSettings {
     editPriceWidthValuesEmptyOrZero = json['editPriceWidthValuesEmptyOrZero'];
     noCheckDayOff = json['noCheckDayOff'];
     autoAddAgentFromSaleOut = json['autoAddAgentFromSaleOut'];
+    discountSpecialAdd = json['discountSpecialAdd'];
+    addProductionSameQuantity = json['addProductionSameQuantity'];
   }
 
   Map<String, dynamic> toJson() {
@@ -327,6 +339,7 @@ class MasterAppSettings {
     data['isHd'] = isHd;
     data['lockStockInItem'] = lockStockInItem;
     data['lockStockInCart'] = lockStockInCart;
+    data['lockStockInItemGift'] = lockStockInItemGift;
     data['checkGroup'] = checkGroup;
     data['chooseAgentSaleOut'] = chooseAgentSaleOut;
     data['chooseSaleOffSaleOut'] = chooseSaleOffSaleOut;
@@ -340,6 +353,7 @@ class MasterAppSettings {
         chooseStateWhenCreateNewOpenStore;
     data['editPrice'] = editPrice;
     data['approveOrder'] = approveOrder;
+    data['approveNewStore'] = approveNewStore;
     data['typeProduction'] = typeProduction;
     data['giaGui'] = giaGui;
     data['dateEstDelivery'] = dateEstDelivery;
@@ -367,6 +381,8 @@ class MasterAppSettings {
     data['editPriceWidthValuesEmptyOrZero'] = editPriceWidthValuesEmptyOrZero;
     data['noCheckDayOff'] = noCheckDayOff;
     data['autoAddAgentFromSaleOut'] = autoAddAgentFromSaleOut;
+    data['discountSpecialAdd'] = discountSpecialAdd;
+    data['addProductionSameQuantity'] = addProductionSameQuantity;
     return data;
   }
 }

@@ -32,11 +32,13 @@ class HistoryOrderDetailScreen extends StatefulWidget {
   final String phoneCustomer;
   final String dateOrder;
   final String dateEstDelivery;
+  final bool? hideEditAndCancelButtons;
+  final String? statusName;
 
 
   const HistoryOrderDetailScreen({Key? key,this.sttRec,this.currencyCode,this.title, this.itemGroupCode,required this.codeCustomer,
     required this.nameCustomer ,required this.status,required this.addressCustomer,this.approveOrder,
-    required this.phoneCustomer, required this.dateOrder, required this.dateEstDelivery}) : super(key: key);
+    required this.phoneCustomer, required this.dateOrder, required this.dateEstDelivery, this.hideEditAndCancelButtons, this.statusName}) : super(key: key);
 
   @override
   _HistoryOrderDetailScreenState createState() => _HistoryOrderDetailScreenState();
@@ -223,7 +225,7 @@ class _HistoryOrderDetailScreenState extends State<HistoryOrderDetailScreen> {
                       ),
                       const SizedBox(height: 10,),
                       Visibility(
-                        visible: widget.status == true,
+                        visible: _canEditOrCancel() && widget.hideEditAndCancelButtons != true,
                         child: Row(
                           children: [
                             Expanded(
@@ -564,6 +566,17 @@ class _HistoryOrderDetailScreenState extends State<HistoryOrderDetailScreen> {
           );
         }
     );
+  }
+
+  bool _canEditOrCancel() {
+    if (widget.statusName == null || widget.statusName!.isEmpty) {
+      return false;
+    }
+    final statusNameLower = widget.statusName!.toLowerCase().trim();
+    return statusNameLower == 'lập ctừ' || 
+           statusNameLower == 'lập chứng từ' ||
+           statusNameLower.contains('lập ctừ') ||
+           statusNameLower.contains('lập chứng từ');
   }
 
   buildAppBar(){

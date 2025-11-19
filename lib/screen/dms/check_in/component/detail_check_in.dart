@@ -19,14 +19,12 @@ import 'package:dms/utils/const.dart';
 import 'package:dms/utils/extension/upper_case_to_title.dart';
 import 'package:dms/utils/utils.dart';
 
-
 import '../../../../model/database/data_local.dart';
 import '../../../../model/network/response/detail_checkin_response.dart';
 import '../../../../model/network/response/list_checkin_response.dart';
 import '../../../../themes/colors.dart';
 import '../../../../utils/images.dart';
 import '../album/album_screen.dart';
-import '../check_in_bloc.dart';
 import '../check_in_state.dart';
 import '../inventory/inventory_screen.dart';
 import '../order/order_from_check_in_screen.dart';
@@ -109,12 +107,21 @@ class _DetailCheckInScreenState extends State<DetailCheckInScreen> with TickerPr
               }
               else{
                 if(widget.listAppSettings.isEmpty){
+                  // Sử dụng thời gian check-in ban đầu nếu đã có (khi restore pending check-in)
+                  // Nếu không có, sử dụng thời gian hiện tại (check-in mới)
+                  String dateTimeToUse;
+                  if(DataLocal.dateTimeStartCheckIn.isNotEmpty){
+                    dateTimeToUse = DataLocal.dateTimeStartCheckIn;
+                  } else {
+                    dateTimeToUse = DateFormat("yyyy-MM-ddTHH:mm:ss").format(DateTime.now());
+                  }
+                  
                   _bloc.add(SaveTimeCheckOut(
                       latLong: widget.item.latLong.toString().trim(),
                       idCheckIn: widget.idCheckIn,
                       idCustomer: widget.item.maKh.toString().trim(),
                       nameStore: widget.item.tenCh.toString(),
-                      dateTime: DateFormat("yyyy-MM-ddTHH:mm:ss").format(DateTime.now()),
+                      dateTime: dateTimeToUse,
                       title: widget.item.tieuDe.toString().trim(),
                       ngayCheckIn: widget.dateCheckIn,
                       numberTimeCheckOut: widget.numberTimeCheckOut),);
@@ -331,50 +338,47 @@ class _DetailCheckInScreenState extends State<DetailCheckInScreen> with TickerPr
                     child: TabBarView(
                         controller: tabController,
                         children: List<Widget>.generate(listTabView.length, (int index) {
-                          for (int i = 0; i <= listTabView.length; i++) {
-                            if (index == 0) {
-                              return InventoryControlScreen(
-                                // isToday: widget.isToday,
-                                idCheckIn: widget.idCheckIn,
-                                idCustomer: widget.item.maKh.toString(),
-                                view: widget.view,
-                                isCheckInSuccess: widget.isCheckInSuccess,
-                              );
-                            }else if(index == 1){
-                              return AlbumImageScreen(
-                                key: _imageScreenState,
-                                isCheckInSuccess: widget.isCheckInSuccess,
-                                idCheckIn: widget.idCheckIn,
-                                idCustomer: widget.item.maKh.toString(),
-                                view: widget.view,
-                                // listAlbum: Const.checkInOnline == true ? _bloc.listAlbum : widget.listAlbumOffline,
-                                isSynSuccess: widget.isSynSuccess,
-                              );
-                            }
-                            else if(index == 2){
-                              return TicketScreen(
-                                isCheckInSuccess: widget.isCheckInSuccess,
-                                isSynSuccess: widget.isSynSuccess,
-                                idCustomer: widget.item.maKh.toString(),
-                                idCheckIn: widget.idCheckIn,
-                                listAlbumTicketOffLine: Const.checkInOnline == true ? _bloc.listTicket : widget.listAlbumTicketOffLine,
-                                view: widget.view,
-                              );
-                            }
-                            else{
-                              return OrderFromCheckInScreen(
-                                nameCustomer: widget.item.tenCh.toString().trim(),
-                                phoneCustomer: widget.item.dienThoai.toString(),
-                                addressCustomer: widget.item.diaChi.toString(),
-                                isCheckInSuccess: widget.isCheckInSuccess,
-                                idCheckIn: widget.idCheckIn,
-                                idCustomer: widget.item.maKh.toString(),
-                                view: widget.view,
-                                nameStore: widget.item.tieuDe.toString().trim(),
-                              );
-                            }
+                          if (index == 0) {
+                            return InventoryControlScreen(
+                              // isToday: widget.isToday,
+                              idCheckIn: widget.idCheckIn,
+                              idCustomer: widget.item.maKh.toString(),
+                              view: widget.view,
+                              isCheckInSuccess: widget.isCheckInSuccess,
+                            );
+                          }else if(index == 1){
+                            return AlbumImageScreen(
+                              key: _imageScreenState,
+                              isCheckInSuccess: widget.isCheckInSuccess,
+                              idCheckIn: widget.idCheckIn,
+                              idCustomer: widget.item.maKh.toString(),
+                              view: widget.view,
+                              // listAlbum: Const.checkInOnline == true ? _bloc.listAlbum : widget.listAlbumOffline,
+                              isSynSuccess: widget.isSynSuccess,
+                            );
                           }
-                          return const Text('');
+                          else if(index == 2){
+                            return TicketScreen(
+                              isCheckInSuccess: widget.isCheckInSuccess,
+                              isSynSuccess: widget.isSynSuccess,
+                              idCustomer: widget.item.maKh.toString(),
+                              idCheckIn: widget.idCheckIn,
+                              listAlbumTicketOffLine: Const.checkInOnline == true ? _bloc.listTicket : widget.listAlbumTicketOffLine,
+                              view: widget.view,
+                            );
+                          }
+                          else{
+                            return OrderFromCheckInScreen(
+                              nameCustomer: widget.item.tenCh.toString().trim(),
+                              phoneCustomer: widget.item.dienThoai.toString(),
+                              addressCustomer: widget.item.diaChi.toString(),
+                              isCheckInSuccess: widget.isCheckInSuccess,
+                              idCheckIn: widget.idCheckIn,
+                              idCustomer: widget.item.maKh.toString(),
+                              view: widget.view,
+                              nameStore: widget.item.tieuDe.toString().trim(),
+                            );
+                          }
                         })),
                   ),
                 ),

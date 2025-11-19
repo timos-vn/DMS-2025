@@ -39,3 +39,12 @@ class GetDetailCheckInOnlineEvent extends DetailCustomerEvent {
   @override
   String toString() => 'GetDetailCheckInOnlineEvent: $idCheckIn';
 }
+
+class CheckPendingCheckInEvent extends DetailCustomerEvent {
+  final String customerCode;
+
+  CheckPendingCheckInEvent({required this.customerCode});
+  
+  @override
+  String toString() => 'CheckPendingCheckInEvent {customerCode: $customerCode}';
+}

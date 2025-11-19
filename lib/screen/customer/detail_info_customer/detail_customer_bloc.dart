@@ -2,13 +2,14 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_storage/get_storage.dart';
 import '../../../model/database/data_local.dart';
+import '../../../model/database/dbhelper.dart';
+import '../../../model/entity/item_check_in.dart';
 import '../../../model/network/response/create_task_from_customer_response.dart';
 import '../../../model/network/response/detail_checkin_response.dart';
 import '../../../model/network/response/detail_customer_response.dart';
 import '../../../model/network/response/list_checkin_response.dart';
 import '../../../model/network/services/network_factory.dart';
 import '../../../utils/const.dart';
-import '../../../utils/utils.dart';
 import 'detail_customer_event.dart';
 import 'detail_customer_state.dart';
 
@@ -24,7 +25,8 @@ class DetailCustomerBloc extends Bloc<DetailCustomerEvent,DetailCustomerState>{
 
   DetailCustomerResponseData detailCustomer =  DetailCustomerResponseData();
   List<OtherData>? listOtherData = <OtherData>[];
-
+  ItemCheckInOffline? pendingCheckIn;
+  DatabaseHelper db = DatabaseHelper();
 
   DetailCustomerBloc(this.context) : super(DetailCustomerInitial()){
     _networkFactory = NetWorkFactory(context);
@@ -32,6 +34,7 @@ class DetailCustomerBloc extends Bloc<DetailCustomerEvent,DetailCustomerState>{
     on<GetDetailCustomerEvent>(_getDetailCustomerEvent);
     on<GetDetailCheckInOnlineEvent>(_getDetailCheckInOnlineEvent);
     on<CreateTaskFromCustomerEvent>(_createTaskFromCustomerEvent);
+    on<CheckPendingCheckInEvent>(_checkPendingCheckIn);
   }
 
   final box = GetStorage();
@@ -127,6 +130,34 @@ class DetailCustomerBloc extends Bloc<DetailCustomerEvent,DetailCustomerState>{
       }
     }catch(e){
       return DetailCustomerFailure('Úi, ${e.toString()}');
+    }
+  }
+
+  void _checkPendingCheckIn(CheckPendingCheckInEvent event, Emitter<DetailCustomerState> emitter) async {
+    try {
+      // Lấy tất cả check-in từ database
+      List<ItemCheckInOffline> allCheckIns = await db.getListCheckIn();
+      
+      // Tìm check-in dở dang với khách hàng này
+      // Check-in dở dang: timeCheckOut rỗng hoặc null VÀ isCheckInSuccessful != 1
+      ItemCheckInOffline? pending = allCheckIns.firstWhere(
+        (checkIn) => 
+          checkIn.maKh?.trim() == event.customerCode.trim() &&
+          (checkIn.timeCheckOut == null || checkIn.timeCheckOut == '' || checkIn.timeCheckOut?.isEmpty == true) &&
+          (checkIn.isCheckInSuccessful == null || checkIn.isCheckInSuccessful == 0),
+        orElse: () => ItemCheckInOffline(),
+      );
+      
+      if (pending.id != null && pending.id!.isNotEmpty) {
+        pendingCheckIn = pending;
+        emitter(CheckPendingCheckInSuccess(hasPendingCheckIn: true, pendingCheckInData: pending));
+      } else {
+        pendingCheckIn = null;
+        emitter(CheckPendingCheckInSuccess(hasPendingCheckIn: false));
+      }
+    } catch (e) {
+      pendingCheckIn = null;
+      emitter(CheckPendingCheckInSuccess(hasPendingCheckIn: false));
     }
   }
 }

@@ -15,7 +15,7 @@ import '../entity/item_check_in.dart';
 import '../entity/product.dart';
 
 class DatabaseHelper {
- static const NEW_DB_VERSION = 20250831; // Thêm availableQuantity vào product table
+ static const NEW_DB_VERSION = 20251030; // Thêm availableQuantity vào product table
   static final DatabaseHelper _instance = DatabaseHelper._();
   Database? _database;
 
@@ -26,7 +26,6 @@ class DatabaseHelper {
   }
 
   Future<Database> get db async {
-    // ignore: unnecessary_null_comparison
     if (_database != null) {
       print('db is exits');
       return _database!;
@@ -126,7 +125,8 @@ class DatabaseHelper {
       woPriceAfter REAL,
       so_luong_kd REAL,
       sttRec0 TEXT,
-      availableQuantity REAL
+      availableQuantity REAL,
+      originalPrice REAL
       )
   ''');
     print("Database Production was created!");
@@ -188,14 +188,16 @@ class DatabaseHelper {
       woPrice REAL,
       woPriceAfter REAL,
       so_luong_kd REAL,
-      sttRec0 TEXT)
+      sttRec0 TEXT,
+      availableQuantity REAL,
+      originalPrice REAL)
   ''');
     print("Database saleOut was created!");
 
     db.execute('''
     CREATE TABLE imageCheckIn(
       id TEXT,
-      idCheckIn TEXT,
+      idCheckIn TEXT, 
       maAlbum TEXT,
       tenAlbum TEXT,
       fileName TEXT,
@@ -305,6 +307,27 @@ class DatabaseHelper {
       "Migration: $oldVersion, $newVersion",
     );
     print('"Migration: $oldVersion, $newVersion"');
+    
+    // Migration for version 20250831 - Add availableQuantity column
+    if (oldVersion < NEW_DB_VERSION) {
+      try {
+        // Add availableQuantity column to product table if it doesn't exist
+        db.execute('ALTER TABLE product ADD COLUMN availableQuantity REAL');
+        print("Added availableQuantity column to product table");
+      } catch (e) {
+        print("Column availableQuantity might already exist in product table: $e");
+      }
+      
+      try {
+        // Add availableQuantity column to saleOut table if it doesn't exist
+        db.execute('ALTER TABLE saleOut ADD COLUMN availableQuantity REAL');
+        print("Added availableQuantity column to saleOut table");
+      } catch (e) {
+        print("Column availableQuantity might already exist in saleOut table: $e");
+      }
+    }
+    
+    // Legacy migration logic (keeping for backward compatibility)
     if (oldVersion == 1 && newVersion == 2) {
       db.execute('ALTER TABLE product ADD COLUMN attributes TEXT');
       db.delete("product");
@@ -973,6 +996,10 @@ class DatabaseHelper {
     Product? oldProduct = await fetchProduct(product.code.toString().trim(),product.codeStock.toString().trim());
     if(Const.addProductFollowStore == true){
       if (oldProduct == null && oldProduct?.codeStock.toString().trim() != product.codeStock.toString().trim()) {
+        // Set originalPrice = price ban đầu nếu chưa có
+        if (product.originalPrice == null) {
+          product.originalPrice = product.price;
+        }
         await client.insert('product', product.toMapForDb(),
             conflictAlgorithm: ConflictAlgorithm.replace);
       } else {
@@ -982,6 +1009,10 @@ class DatabaseHelper {
     }
     else{
       if (oldProduct == null) {
+        // Set originalPrice = price ban đầu nếu chưa có
+        if (product.originalPrice == null) {
+          product.originalPrice = product.price;
+        }
         await client.insert('product', product.toMapForDb(),
             conflictAlgorithm: ConflictAlgorithm.replace);
       } else {
@@ -1183,10 +1214,15 @@ class DatabaseHelper {
     var client = await db;
     Product? oldProduct = await fetchProductSaleOut(product.code.toString());
     if (oldProduct == null) {
+      // Set originalPrice = price ban đầu nếu chưa có
+      if (product.originalPrice == null) {
+        product.originalPrice = product.price;
+      }
       await client.insert('saleOut', product.toMapForDb(),
           conflictAlgorithm: ConflictAlgorithm.replace);
     } else {
       oldProduct.count = product.count!;//oldProduct.count! + product.count!;
+      // Giữ nguyên originalPrice của sản phẩm cũ (không ghi đè)
       await updateProductSaleOut(oldProduct);
     }
   }

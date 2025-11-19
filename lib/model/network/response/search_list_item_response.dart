@@ -135,6 +135,16 @@ class SearchItemResponseData {
     this.availableQuantity, // Runtime-only, không từ API
   });
 
+  // Helper method để parse double an toàn từ JSON
+  static double? _parseDouble(dynamic value) {
+    if (value == null) return 0;
+    if (value is num) return value.toDouble();
+    if (value is String) {
+      return double.tryParse(value) ?? 0;
+    }
+    return 0;
+  }
+
   SearchItemResponseData.fromJson(Map<String, dynamic> json) {
     maThue = json['ma_thue'];
     tenThue = json['ten_thue'];
@@ -147,15 +157,15 @@ class SearchItemResponseData {
     dvt = json['dvt'];
 
     descript = json['descript'];
-    price = json['price'];
-    woPrice = json['wo_price'];
-    woPriceAfter = json['wo_priceAfter'];
-    discountPercent = json['discountPercent'];
+    // Parse giá với xử lý cả number và string
+    price = _parseDouble(json['price']);
+    woPrice = _parseDouble(json['wo_price']);
+    woPriceAfter = _parseDouble(json['wo_priceAfter']);
+    discountPercent = _parseDouble(json['discountPercent']);
     imageUrl = json['imageUrl'];
-    priceAfter = json['priceAfter'];
-    stockAmount = json['stockAmount'];
-    taxPercent = json['taxPercent'];
-    taxPercent = json['taxPercent'];
+    priceAfter = _parseDouble(json['priceAfter']);
+    stockAmount = _parseDouble(json['stockAmount']);
+    taxPercent = _parseDouble(json['taxPercent']);
     count = json['count'];
     budgetForItem = json['ten_ns'];
     residualValueProduct = json['gt_cl_product'];

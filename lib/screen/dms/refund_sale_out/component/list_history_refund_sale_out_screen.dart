@@ -9,6 +9,7 @@ import 'package:material_design_icons_flutter/material_design_icons_flutter.dart
 import 'package:persistent_bottom_nav_bar/persistent_bottom_nav_bar.dart';
 
 import '../../../../model/network/response/detail_customer_response.dart';
+import '../../../../model/network/response/manager_customer_response.dart';
 import '../../../../themes/colors.dart';
 import '../../../../utils/const.dart';
 import '../../../../utils/utils.dart';
@@ -17,6 +18,8 @@ import '../../sale_out/component/detail_history_sale_out_screen.dart';
 import '../refund_sale_out_bloc.dart';
 import '../refund_sale_out_event.dart';
 import '../refund_sale_out_state.dart';
+import 'list_sale_out_completed_screen.dart';
+import '../../../../widget/customer_picker_dialog.dart';
 
 class ListHistoryRefundSaleOutScreen extends StatefulWidget {
   final DetailCustomerResponseData? detailCustomer;
@@ -70,13 +73,31 @@ class _ListHistoryRefundSaleOutScreenState extends State<ListHistoryRefundSaleOu
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: subColor,
-        onPressed: ()async{
-          // pushNewScreen(context, screen: SaleOutCompletedScreen(),withNavBar: false);
-        },
-        child: Icon(MdiIcons.skipNextCircleOutline,color: Colors.white,),
-      ),
+      // floatingActionButton: FloatingActionButton(
+      //   backgroundColor: subColor,
+      //   onPressed: ()async{
+      //     final selectedCustomer = await showDialog(
+      //       context: context,
+      //       barrierDismissible: true,
+      //       builder: (context) => const CustomerPickerDialog(),
+      //     );
+      //     if(selectedCustomer != null){
+      //       final ManagerCustomerResponseData info = selectedCustomer as ManagerCustomerResponseData;
+      //       final DetailCustomerResponseData detail = DetailCustomerResponseData(
+      //         customerCode: info.customerCode,
+      //         customerName: info.customerName,
+      //         phone: info.phone,
+      //         address: info.address,
+      //       );
+      //       PersistentNavBarNavigator.pushNewScreen(
+      //         context,
+      //         screen: SaleOutCompletedScreen(detailAgency: detail),
+      //         withNavBar: false,
+      //       );
+      //     }
+      //   },
+      //   child: Icon(MdiIcons.skipNextCircleOutline,color: Colors.white,),
+      // ),
       body: BlocListener<RefundSaleOutBloc,RefundSaleOutState>(
         bloc: _bloc,
         listener: (context,state){

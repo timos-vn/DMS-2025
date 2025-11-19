@@ -10,10 +10,14 @@ import 'package:persistent_bottom_nav_bar/persistent_bottom_nav_bar.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../model/database/data_local.dart';
+import '../../../model/entity/item_check_in.dart';
+import '../../../model/network/response/list_checkin_response.dart';
+import '../../../services/location_service.dart';
 import '../../../themes/colors.dart';
 import '../../../utils/const.dart';
 import '../../../utils/utils.dart';
 import '../../dms/check_in/component/detail_check_in.dart';
+import 'package:geolocator/geolocator.dart';
 import '../../dms/refund_sale_out/component/list_sale_out_completed_screen.dart';
 import '../../sell/order/order_sceen.dart';
 import '../../sell/refund_order/component/list_order_completed_screen.dart';
@@ -32,6 +36,8 @@ class DetailInfoCustomerScreen extends StatefulWidget {
 class _DetailInfoCustomerScreenState extends State<DetailInfoCustomerScreen> {
 
   late DetailCustomerBloc _bloc;
+  bool _hasPendingCheckIn = false;
+  ItemCheckInOffline? _pendingCheckIn;  
 
   List<Color> listColor = [Colors.blueAccent,Colors.lightGreen,Colors.pink,Colors.yellow];
 
@@ -119,6 +125,16 @@ class _DetailInfoCustomerScreenState extends State<DetailInfoCustomerScreen> {
             if(state is DetailCustomerFailure){
               Utils.showCustomToast(context, Icons.warning_amber_outlined, 'Úi, Có lỗi xảy ra.');
             }
+            else if(state is GetDetailCustomerSuccess){
+              // Check pending check-in sau khi load thông tin khách hàng
+              _bloc.add(CheckPendingCheckInEvent(customerCode: widget.idCustomer.toString()));
+            }
+            else if(state is CheckPendingCheckInSuccess){
+              setState(() {
+                _hasPendingCheckIn = state.hasPendingCheckIn;
+                _pendingCheckIn = state.pendingCheckInData as ItemCheckInOffline?;
+              });
+            }
             else if(state is GetInfoTaskCustomerSuccess){
               _bloc.add(GetDetailCheckInOnlineEvent(idCheckIn: state.idTask, idCustomer: state.idCustomer.toString()));
             }else if(state is GetDetailCheckInOnlineSuccess){
@@ -139,7 +155,7 @@ class _DetailInfoCustomerScreenState extends State<DetailInfoCustomerScreen> {
                 listAlbumTicketOffLine: _bloc.listTicket,
                 ngayCheckin: (state.itemSelect.ngayCheckin != "null" && state.itemSelect.ngayCheckin != '' && state.itemSelect.ngayCheckin != null) ? DateTime.tryParse(state.itemSelect.ngayCheckin.toString()).toString() : '',
                 tgHoanThanh: (state.itemSelect.tgHoanThanh != null && state.itemSelect.tgHoanThanh != 'null' && state.itemSelect.tgHoanThanh != '') ? state.itemSelect.tgHoanThanh! : '',
-                numberTimeCheckOut:  int.parse(state.itemSelect.timeCheckOut.toString()),
+                numberTimeCheckOut:  int.parse(state.itemSelect.timeCheckOut.toString().replaceAll('null', '').isNotEmpty ? state.itemSelect.timeCheckOut.toString() : "0"),
                 isSynSuccess: false,
                 item:  state.itemSelect,
                 isGpsFormCustomer: true,
@@ -206,9 +222,12 @@ class _DetailInfoCustomerScreenState extends State<DetailInfoCustomerScreen> {
                             children: [
                               const Icon(Icons.email,size: 13,color: grey,),
                               const SizedBox(width: 8,),
-                              Text(
-                                _bloc.detailCustomer.email??'....',
-                                style: const TextStyle(fontSize: 13,color: grey,),
+                              Flexible(
+                                child: Text(
+                                  _bloc.detailCustomer.email??'....',
+                                  style: const TextStyle(fontSize: 13,color: grey,),
+                                  maxLines: 1,overflow: TextOverflow.ellipsis,
+                                ),
                               ),
                             ],
                           ),
@@ -277,7 +296,7 @@ class _DetailInfoCustomerScreenState extends State<DetailInfoCustomerScreen> {
                     padding: const EdgeInsets.only(left: 16,right: 16),
                     child: GestureDetector(
                       onTap: (){
-                        _bloc.add(CreateTaskFromCustomerEvent(idCustomer: _bloc.detailCustomer.customerCode.toString()));
+                        _handleCheckInTap();
                       },
                       child: Card(
                         elevation: 1,
@@ -291,20 +310,48 @@ class _DetailInfoCustomerScreenState extends State<DetailInfoCustomerScreen> {
                             children: [
                               Container(
                                   padding:const EdgeInsets.all(8),
-                                  decoration: const BoxDecoration(
-                                    borderRadius: BorderRadius.all(Radius.circular(8)),
-                                    color: subColor,
+                                  decoration: BoxDecoration(
+                                    borderRadius: const BorderRadius.all(Radius.circular(8)),
+                                    color: _hasPendingCheckIn ? Colors.orange : subColor,
                                   ),
                                   child: Center(
-                                      child:  Icon(MdiIcons.watchImport,color: Colors.white,size: 15,)
+                                      child: Icon(
+                                        _hasPendingCheckIn ? MdiIcons.clockOutline : MdiIcons.watchImport,
+                                        color: Colors.white,
+                                        size: 15,
+                                      )
                                   )
                               ),
                               const SizedBox(width: 10,),
-                              const Flexible(
-                                child: Text(
-                                  'Check-in / Giám sát',
-                                  textAlign: TextAlign.left,
-                                  style: TextStyle(fontWeight: FontWeight.normal),
+                              Flexible(
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        'Check-in / Giám sát',
+                                        textAlign: TextAlign.left,
+                                        style: const TextStyle(fontWeight: FontWeight.normal),
+                                      ),
+                                    ),
+                                    if (_hasPendingCheckIn) ...[
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: Colors.orange,
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        child: const Text(
+                                          'Đang check-in',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
                                 ),
                               ),//_bloc.listOtherData[index]?.value.toString()??'0.0'
                             ],
@@ -506,6 +553,232 @@ class _DetailInfoCustomerScreenState extends State<DetailInfoCustomerScreen> {
         ],
       ),
     );
+  }
+
+  void _handleCheckInTap() {
+    if (_hasPendingCheckIn && _pendingCheckIn != null) {
+      // Kiểm tra vị trí trước khi khôi phục check-in dở dang
+      _handleRestoreCheckInWithLocationValidation();
+    } else {
+      // Tạo check-in mới
+      _bloc.add(CreateTaskFromCustomerEvent(idCustomer: _bloc.detailCustomer.customerCode.toString()));
+    }
+  }
+
+  // Method xử lý restore check-in với validation vị trí (giống luồng "Gặp gỡ")
+  void _handleRestoreCheckInWithLocationValidation() async {
+    if (_pendingCheckIn == null) return;
+
+    try {
+      print('📍 Starting restore check-in validation...');
+      
+      // Hiển thị loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) => const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+
+      // Lấy vị trí GPS hiện tại
+      LocationResult locationResult = await LocationService.getLocationWithRetry(
+        forceFresh: true,
+        maxRetries: 3,
+      );
+
+      Navigator.pop(context); // Đóng loading dialog
+
+      if (!locationResult.isSuccess) {
+        Utils.showCustomToast(
+          context,
+          Icons.error_outline,
+          locationResult.error ?? 'Không thể lấy vị trí GPS. Vui lòng thử lại.',
+        );
+        return;
+      }
+
+      Position? currentPosition = locationResult.position;
+
+      // Kiểm tra có tọa độ khách hàng không
+      String customerLatLong = _pendingCheckIn!.latlong ?? _pendingCheckIn!.gps ?? '';
+      if (customerLatLong.isEmpty || customerLatLong == 'null') {
+        print('📍 No customer coordinates, proceeding without location check');
+        _restorePendingCheckIn();
+        return;
+      }
+
+      // Validate check-in với LocationService (giống luồng "Gặp gỡ")
+      CheckInValidationResult validation = LocationService.validateCheckIn(
+        customerLatLong: customerLatLong,
+        currentPosition: currentPosition,
+        maxAllowedDistance: Const.distanceLocationCheckIn,
+      );
+
+      if (validation.isSuccess) {
+        print('📍 Restore check-in validation successful: distance=${validation.distance!.toStringAsFixed(2)}m');
+        _restorePendingCheckIn();
+        
+      } else if (validation.isDistanceExceeded) {
+        print('📍 Distance exceeded: ${validation.distance!.toStringAsFixed(2)}m > ${validation.maxAllowed}m');
+        _showDistanceExceededDialogForRestore(validation);
+        
+      } else {
+        print('📍 Restore check-in validation failed: ${validation.error}');
+        _showLocationErrorDialogForRestore(validation);
+      }
+      
+    } catch (e) {
+      print('❌ Restore check-in validation error: $e');
+      Navigator.pop(context); // Đóng loading dialog nếu có
+      Utils.showCustomToast(context, Icons.error_outline, 
+        'Lỗi kiểm tra vị trí. Vui lòng thử lại.');
+    }
+  }
+
+  // Hiển thị dialog khi khoảng cách vượt quá khi restore
+  void _showDistanceExceededDialogForRestore(CheckInValidationResult validation) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.location_off, color: Colors.red),
+            SizedBox(width: 8),
+            Text('Khoảng cách vượt quá'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Bạn đang cách vị trí check-in ${validation.distance!.toStringAsFixed(0)}m'),
+            Text('(Cho phép tối đa: ${validation.maxAllowed}m)', 
+              style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.orange[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange[200]!),
+              ),
+              child: const Column(
+                children: [
+                  Text('⚠️ Bạn đang quá xa vị trí check-in', 
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                  SizedBox(height: 4),
+                  Text('Vui lòng di chuyển đến gần vị trí khách hàng để tiếp tục check-in', 
+                    style: TextStyle(fontSize: 11)),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Hủy'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Hiển thị dialog khi lỗi vị trí khi restore
+  void _showLocationErrorDialogForRestore(CheckInValidationResult validation) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_outlined, color: Colors.orange),
+            SizedBox(width: 8),
+            Text('Lỗi kiểm tra vị trí'),
+          ],
+        ),
+        content: Text(validation.error ?? 'Không thể kiểm tra vị trí. Vui lòng thử lại.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Đóng'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _handleRestoreCheckInWithLocationValidation(); // Thử lại
+            },
+            child: const Text('Thử lại'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _restorePendingCheckIn() {
+    if (_pendingCheckIn == null) return;
+
+    // Set DataLocal để khôi phục check-in dở dang
+    DataLocal.idCurrentCheckIn = _pendingCheckIn!.id ?? '';
+    DataLocal.dateTimeStartCheckIn = _pendingCheckIn!.timeCheckIn ?? '';
+    
+    // Khôi phục địa chỉ và vị trí GPS từ pending check-in nếu có
+    if (_pendingCheckIn!.latlong != null && _pendingCheckIn!.latlong!.isNotEmpty) {
+      DataLocal.latLongLocation = _pendingCheckIn!.latlong ?? '';
+    }
+    if (_pendingCheckIn!.diaChi != null && _pendingCheckIn!.diaChi!.isNotEmpty) {
+      DataLocal.addressCheckInCustomer = _pendingCheckIn!.diaChi ?? '';
+    }
+
+    // Tạo ListCheckIn từ ItemCheckInOffline
+    ListCheckIn restoredCheckIn = ListCheckIn(
+      id: int.tryParse(_pendingCheckIn!.idCheckIn ?? '0') ?? 0,
+      tieuDe: _pendingCheckIn!.tieuDe ?? '',
+      ngayCheckin: _pendingCheckIn!.ngayCheckin ?? DateTime.now().toString(),
+      maKh: _pendingCheckIn!.maKh ?? '',
+      tenCh: _pendingCheckIn!.tenCh ?? '',
+      diaChi: _pendingCheckIn!.diaChi ?? '',
+      dienThoai: _pendingCheckIn!.dienThoai ?? '',
+      gps: _pendingCheckIn!.gps ?? '',
+      trangThai: _pendingCheckIn!.trangThai ?? '',
+      tgHoanThanh: _pendingCheckIn!.tgHoanThanh ?? '',
+      timeCheckOut: _pendingCheckIn!.timeCheckOut ?? '',
+      latLong: _pendingCheckIn!.latlong ?? '',
+    );
+
+    // Điều hướng tới DetailCheckInScreen với check-in dở dang
+    DataLocal.addImageToAlbumRequest = false;
+    DataLocal.addImageToAlbum = false;
+    DataLocal.listInventoryIsChange = true;
+    DataLocal.listOrderProductIsChange = true;
+
+    PersistentNavBarNavigator.pushNewScreen(
+      context,
+      screen: DetailCheckInScreen(
+        idCheckIn: int.tryParse(_pendingCheckIn!.idCheckIn ?? '0') ?? 0,
+        dateCheckIn: _pendingCheckIn!.ngayCheckin != null && _pendingCheckIn!.ngayCheckin!.isNotEmpty
+            ? (DateTime.tryParse(_pendingCheckIn!.ngayCheckin!) ?? DateTime.now())
+            : DateTime.now(),
+        listAppSettings: const [],
+        view: false,
+        isCheckInSuccess: false,
+        listAlbumOffline: _bloc.listAlbum,
+        listAlbumTicketOffLine: _bloc.listTicket,
+        ngayCheckin: _pendingCheckIn!.ngayCheckin ?? DateTime.now().toString(),
+        tgHoanThanh: _pendingCheckIn!.tgHoanThanh ?? '',
+        numberTimeCheckOut: _pendingCheckIn!.numberTimeCheckOut ?? 0,
+        isSynSuccess: false,
+        item: restoredCheckIn,
+        isGpsFormCustomer: true,
+      ),
+      withNavBar: false,
+    ).then((value) {
+      // Refresh pending check-in status sau khi quay lại
+      if (value != null) {
+        _bloc.add(CheckPendingCheckInEvent(customerCode: widget.idCustomer.toString()));
+      }
+    });
   }
 
   Widget listItem(BuildContext context){

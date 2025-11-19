@@ -496,7 +496,7 @@ class _ValueReportFilterState extends State<ValueReportFilter> {
                   onChanged: (text){
                     widget.listRPLayout[index].listItemPush = text;
                   },
-                  labelText: widget.listRPLayout[index].selectValue != null ? null
+                  labelText: widget.listRPLayout[index].selectValue != null ? widget.listRPLayout[index].selectValue?.name.toString()
                       : (
                       widget.listRPLayout[index].defaultValue ?? widget.listRPLayout[index].name),
 
@@ -519,17 +519,19 @@ class _ValueReportFilterState extends State<ValueReportFilter> {
                                   widget.listRPLayout[index].listItemPush.toString() : '',show: true,)).then((value) {//listItem: widget.listRPLayout[index].selectValue.code
                               if (!Utils.isEmpty(value)) {
                                 setState(() {
-                                  List<String> geek = <String>[];
+                                  List<String> geek = <String>[];List<String> geekName = <String>[];
                                   widget.listRPLayout[index].listItem = value;
                                   widget.listRPLayout[index].listItem?.forEach((element) {
                                     ///sau co sửa code hay name thì tuỳ
                                     geek.add(element.code.toString());
+                                    geekName.add(element.name.toString());
                                   });
                                   String geek2 = geek.join(",");
+                                  String geek2Name = geekName.join(",");
                                   widget.listRPLayout[index].textEditingController = TextEditingController();
                                   widget.listRPLayout[index].textEditingController.text = geek2;
                                   widget.listRPLayout[index].listItemPush = geek2;
-                                  widget.listRPLayout[index].selectValue =  ReportFieldLookupResponseData(code: geek2, name: '',);
+                                  widget.listRPLayout[index].selectValue =  ReportFieldLookupResponseData(code: geek2, name: geek2Name,);
                                   // widget.listRPLayout[index].listItem = value;
                                   widget.listRPLayout[index].c = true;
                                   print('valueSelect = ${widget.listRPLayout[index].selectValue?.name}');

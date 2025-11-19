@@ -23,6 +23,7 @@ import '../login/login_screen.dart';
 import '../personnel/personnel_screen.dart';
 import '../sell/component/list_approve_order.dart';
 import 'approval/approval/approval_screen.dart';
+import 'approval/new_store/new_store_approval_list_screen.dart';
 import 'component/history_action_employee_screen.dart';
 import 'component/layout_voucher_screen.dart';
 import 'menu_event.dart';
@@ -168,6 +169,15 @@ class _MenuScreenState extends State<MenuScreen> with TickerProviderStateMixin {
                   if (Const.approveOrder == true) {
                     PersistentNavBarNavigator.pushNewScreen(context,
                         screen: const ListApproveOrderScreen(),
+                        withNavBar: false);
+                  } else {
+                    Utils.showUpgradeAccount(context);
+                  }
+                },),
+                buildButton(title: 'Duyệt điểm bán mở mới', icons:  MdiIcons.storeCheckOutline, lock:  Const.approveNewStore == true ? false : true, onTap: () {
+                  if (Const.approveNewStore == true) {
+                    PersistentNavBarNavigator.pushNewScreen(context,
+                        screen: const NewStoreApprovalListScreen(),
                         withNavBar: false);
                   } else {
                     Utils.showUpgradeAccount(context);

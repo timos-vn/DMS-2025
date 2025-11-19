@@ -4,8 +4,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:dio/dio.dart';
-import 'package:http/http.dart' as http;
+// import 'package:dio/dio.dart';
+// import 'package:http/http.dart' as http;
 import 'package:dms/model/network/request/apply_discount_request.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -17,7 +17,7 @@ import 'package:permission_handler/permission_handler.dart';
 import '../../../model/database/data_local.dart';
 import '../../../model/database/dbhelper.dart';
 import '../../../model/entity/entity.dart';
-import '../../../model/entity/entity_request.dart';
+// import '../../../model/entity/entity_request.dart';
 import '../../../model/entity/product.dart';
 import '../../../model/network/request/create_order_request.dart';
 import '../../../model/network/request/discount_request.dart';
@@ -31,7 +31,8 @@ import '../../../model/network/response/list_stock_response.dart';
 import '../../../model/network/response/list_vvhd_response.dart';
 import '../../../model/network/response/search_list_item_response.dart';
 import '../../../model/network/response/history_order_detail_reponse.dart';
-import '../../../model/network/services/host.dart';
+import '../../../model/network/response/gift_product_list_response.dart';
+// import '../../../model/network/services/host.dart';
 import '../../../model/network/services/network_factory.dart';
 import '../../../utils/const.dart';
 import '../../../utils/utils.dart';
@@ -125,6 +126,35 @@ class CartBloc extends Bloc<CartEvent,CartState>{
   List<ListCkTongDon> listCkTongDon = [];
   List<ListCkMatHang> listCkMatHang = [];
   List<ListCk> listDiscount = [];
+  
+  // CKN - Chiết khấu nhóm: Cho phép chọn sản phẩm tặng từ nhóm (MULTIPLE selection)
+  List<ListCkMatHang> listCkn = [];
+  bool hasCknDiscount = false;
+  String? selectedCknProductCode; // Mã sản phẩm CKN đã chọn
+  String? selectedCknSttRecCk; // Mã CK CKN đã chọn
+  List<GiftProductItem> listGiftProducts = []; // Danh sách hàng tặng từ API
+  String? selectedDiscountGroup; // Legacy - keep for backward compatibility
+  Set<String> selectedCknGroups = {}; // Set of group_dk đã chọn (MULTIPLE)
+  
+  // CKG - Chiết khấu giá: Giảm giá trực tiếp cho sản phẩm (từ list_ck)
+  List<ListCk> listCkg = [];
+  bool hasCkgDiscount = false;
+  Set<String> selectedCkgIds = {}; // Set of sttRecCk đã chọn (multiple selection)
+  
+  // HH - Hàng hóa tặng: Tặng hàng cố định kèm theo (từ list_ck)
+  List<ListCk> listHH = [];
+  bool hasHHDiscount = false;
+  Set<String> selectedHHIds = {}; // Set of sttRecCk đã chọn (multiple selection)
+  
+  // CKTDTT - Chiết khấu tổng đơn tặng tiền (từ listCkTongDon với kieuCK = 'CKTDTT')
+  List<ListCkTongDon> listCktdtt = [];
+  bool hasCktdttDiscount = false;
+  Set<String> selectedCktdttIds = {}; // Set of sttRecCk đã chọn (multiple selection)
+  
+  // CKTDTH - Chiết khấu tổng đơn tặng hàng (từ listCkMatHang với kieuCK = 'CKTDTH')
+  List<ListCkMatHang> listCktdth = [];
+  bool hasCktdthDiscount = false;
+  Set<String> selectedCktdthGroups = {}; // Set of group_dk đã chọn (multiple selection)
 
   double totalMoney = 0;
   double totalMoneyOld = 0;
@@ -180,7 +210,6 @@ class CartBloc extends Bloc<CartEvent,CartState>{
     on<CreateOderEvent>(_createOderEvent);
     on<GetListItemApplyDiscountEvent>(_getListItemApplyDiscountEvent);
     ///
-    on<TotalDiscountAndMoneyForAppEvent>(_totalDiscountAndMoneyForAppEvent);
     on<GetListItemUpdateOrderEvent>(_getListItemUpdateOrderEvent);
     on<CheckDisCountWhenUpdateEvent>(_checkDisCountWhenUpdateEvent);
     on<GetListProductFromDB>(_getListProductFromDB);
@@ -233,6 +262,7 @@ class CartBloc extends Bloc<CartEvent,CartState>{
     on<SearchItemInOrderEvent>(_searchItemInOrderEvent);
     on<CalculatorTaxForItemEvent>(_calculatorTaxForItemEvent);
     on<UpdateListOrder>(_updateListOrder);
+    on<GetGiftProductListEvent>(_getGiftProductListEvent);
   }
   final box = GetStorage();
   
@@ -611,15 +641,34 @@ class CartBloc extends Bloc<CartEvent,CartState>{
       if(DataLocal.listProductGift.isEmpty){
         DataLocal.listProductGift.add(event.item);
       }else{
-        if(DataLocal.listProductGift.any((element) => element.code.toString().trim() == event.item.code.toString().trim()) == true){
-          DataLocal.listProductGift.remove(event.item);
+        // Check if product already exists
+        bool productExists = DataLocal.listProductGift.any((element) => 
+          element.code.toString().trim() == event.item.code.toString().trim() &&
+          element.typeCK == event.item.typeCK &&
+          element.sttRecCK == event.item.sttRecCK
+        );
+        
+        if(productExists){
+          // Remove existing product with same code + CK info
+          DataLocal.listProductGift.removeWhere((element) => 
+            element.code.toString().trim() == event.item.code.toString().trim() &&
+            element.typeCK == event.item.typeCK &&
+            element.sttRecCK == event.item.sttRecCK
+          );
+          // Add updated product
           DataLocal.listProductGift.add(event.item);
         }else{
+          // Add new product
           DataLocal.listProductGift.add(event.item);
         }
       }
     }else{
-      DataLocal.listProductGift.remove(event.item);
+      // Remove product when deleting
+      DataLocal.listProductGift.removeWhere((element) => 
+        element.code.toString().trim() == event.item.code.toString().trim() &&
+        element.typeCK == event.item.typeCK &&
+        element.sttRecCK == event.item.sttRecCK
+      );
     }
     totalMoneyProductGift = 0;
     if(Const.enableViewPriceAndTotalPriceProductGift == true && DataLocal.listProductGift.isNotEmpty){
@@ -945,10 +994,12 @@ class CartBloc extends Bloc<CartEvent,CartState>{
       }
 
       List<ListObjectJson> listEntityClass = [];
-      if(element.jsonOtherInfo.toString().trim().replaceAll('null', '').isNotEmpty){
-        final valueMap = json.decode(element.jsonOtherInfo.toString()) as List;
+      final String jsonOtherInfoText = (element.jsonOtherInfo ?? '').toString();
+      if(jsonOtherInfoText.trim().replaceAll('null', '').isNotEmpty){
+        final valueMap = json.decode(jsonOtherInfoText) as List;
         listEntityClass = (valueMap.map((itemValues) => ListObjectJson.fromJson(itemValues))).toList();
       }
+      // Note: SL_KD is now sent via DetailOrderV3.slKd, not listAdvanceOrderInfo
 
 
       if(element.isMark == 1 && element.typeCK != 'HH'){
@@ -989,6 +1040,7 @@ class CartBloc extends Bloc<CartEvent,CartState>{
             idNVKD: element.idNVKD,
             ncsx: element.nuocsx,quycach: element.quycach,
             listAdvanceOrderInfo: listEntityClass,
+            slKd: (event.sttRectHD ?? '').toString().trim().isNotEmpty ? (element.so_luong_kd as num?)?.toDouble() : null,
         );
         listDetailOrderV3.add(item);
       }
@@ -1028,6 +1080,7 @@ class CartBloc extends Bloc<CartEvent,CartState>{
                 :
             element.heSo.toString() : "1",
             listAdvanceOrderInfo: listEntityClass,
+            slKd: (event.sttRectHD ?? '').toString().trim().isNotEmpty ? (element.so_luong_kd as num?)?.toDouble() : null,
             idNVKD: element.idNVKD,
             ncsx: element.nuocsx,quycach: element.quycach,
 
@@ -1383,8 +1436,8 @@ class CartBloc extends Bloc<CartEvent,CartState>{
     emitter(CartLoading());
     if(event.viewUpdateOrder == false){
       deleteProduct(event.codeProduct.toString(),event.codeStock.toString().trim());
-      // listProductOrderAndUpdate  = await db.fetchAllProduct();
-      emitter(TotalMoneyForAppSuccess(true));
+      add(GetListProductFromDB(addOrderFromCheckIn: false, getValuesTax: false, key: 'Second'));
+      emitter(CartInitial());
     }
     else {
       listProductOrderAndUpdate.removeAt(event.index);
@@ -1445,7 +1498,6 @@ class CartBloc extends Bloc<CartEvent,CartState>{
           int index = listOrder.indexOf(element);
           if(item != null){
             double a = item.ckntByHand!;
-            double b = item.priceAfter!;
            if(allowTaxPercent == true && event.addTax == true){
              a = (((element.priceAfterTax! * element.count!) * item.discountPercentByHand)/100);
            }
@@ -1641,64 +1693,6 @@ class CartBloc extends Bloc<CartEvent,CartState>{
     }
   }
  double ton13 = 0;
-  void _totalDiscountAndMoneyForAppEvent(TotalDiscountAndMoneyForAppEvent event, Emitter<CartState> emitter)async{
-    emitter(CartLoading());
-    if(event.listProduct.isNotEmpty){
-      List<SearchItemResponseData> draft = [];
-      for (var element in event.listProduct) {
-        SearchItemResponseData item = SearchItemResponseData(
-            code: element.code,
-            name: element.name,
-            name2:element.name2,
-            dvt: element.dvt,
-            descript: element.description,
-            price: element.price,
-            discountPercent: element.discountPercent,
-            priceAfter: element.priceAfter,
-            stockAmount: element.stockAmount,
-            taxPercent: element.taxPercent,
-            imageUrl: element.imageUrl,
-            count: element.count,
-            countMax: element.countMax,
-            so_luong_kd: element.so_luong_kd,
-            maVt2: element.maVt2,
-            sttRec0: element.sttRec0,
-            isMark:0,
-            discountMoney: element.discountMoney,
-            discountProduct: element.discountProduct,
-            budgetForItem: element.budgetForItem,
-            budgetForProduct: element.budgetForProduct,
-            residualValueProduct: element.residualValueProduct,
-            residualValue: element.residualValue,
-            unit: element.unit,
-            unitProduct: element.unitProduct,
-            maCk: element.dsCKLineItem,
-            maCkOld: element.dsCKLineItem.toString(),
-            kColorFormatAlphaB: Color(element.kColorFormatAlphaB!.toInt()),
-            giaSuaDoi: element.giaSuaDoi,
-            giaGui: element.giaGui,
-            isCheBien: element.isCheBien == 1 ? true : false,
-            isSanXuat: element.isSanXuat == 1 ? true : false,
-            availableQuantity: element.availableQuantity
-        );
-        draft.add(item);
-      }
-      DiscountRequest requestBody = DiscountRequest(
-          maKh: codeCustomer,
-          maKho: storeCode,
-          lineItem: draft
-      );
-      CartState state = _handleCalculator(await _networkFactory!.calculatorPayment(requestBody,_accessToken!),event.viewUpdateOrder,false,event.reCalculator);
-      emitter(state);
-    }
-    else{
-      totalMNProduct = 0;
-      totalMNDiscount = 0;
-      totalMNPayment = 0;
-      emitter(CartInitial());
-    }
-  }
-
   void _getListItemUpdateOrderEvent(GetListItemUpdateOrderEvent event, Emitter<CartState> emitter)async{
     emitter(CartLoading());
     CartState state = _handleGetDetailOrder(await _networkFactory!.getItemDetailOrder(_accessToken!,event.sttRec));
@@ -1884,9 +1878,9 @@ class CartBloc extends Bloc<CartEvent,CartState>{
     totalTax2 = 0;
     for (var item in listOrder) {
       // Kiểm tra null safety cho giaSuaDoi và thueSuat
-      double giaSuaDoi = item.giaSuaDoi ?? 0;
-      double thueSuat = item.thueSuat ?? 0;
-      double count = item.count ?? 0;
+      final double giaSuaDoi = (item.giaSuaDoi as num?)?.toDouble() ?? 0.0;
+      final double thueSuat = (item.thueSuat as num?)?.toDouble() ?? 0.0;
+      final double count = (item.count as num?)?.toDouble() ?? 0.0;
       
       if (giaSuaDoi > 0 && thueSuat > 0 && count > 0) {
         totalTax2 = totalTax2 + (((giaSuaDoi * count) * thueSuat)/100);
@@ -1906,7 +1900,41 @@ class CartBloc extends Bloc<CartEvent,CartState>{
   CartState _handlerApplyDiscountV2(Object data, String keyLoad){
     if (data is String) return CartFailure('Úi, ${data.toString()}');
     try{
+      totalMoney = 0;
+      totalDiscount = 0;
+      totalPayment = 0;
+      totalMNProduct = 0;
+      totalMNDiscount = 0;
+      totalMNPayment = 0;
       listDiscount.clear(); listItemOrder.clear();
+      
+      // ✅ PRESERVE listPromotion và DataLocal.listCKVT khi keyLoad == 'Second'
+      // (Để không mất các chiết khấu đã chọn trước đó như CKN, CKTDTH, CKTDTT)
+      String preservedListPromotion = '';
+      String preservedListCKVT = '';
+      if(keyLoad == 'Second'){
+        preservedListPromotion = listPromotion;
+        preservedListCKVT = DataLocal.listCKVT;
+        print('💰 Preserving listPromotion: $preservedListPromotion');
+        print('💰 Preserving listCKVT: $preservedListCKVT');
+      }
+      
+      if(keyLoad == 'First'){
+        listPromotion = '';
+        DataLocal.listCKVT = '';
+        DataLocal.listProductGift.clear();
+        totalProductGift = 0;
+        selectedCkgIds.clear();
+        selectedHHIds.clear();
+        selectedCknGroups.clear();
+      }
+      
+      // Clear CKN data when recalculating
+      if(keyLoad == 'First'){
+        listCkn.clear();
+        hasCknDiscount = false;
+      }
+
       if(keyLoad == 'Second'){
         if(listOrder.isNotEmpty){
           for (int j =0; j< listProductOrderAndUpdate.length ;j++) {
@@ -1924,8 +1952,28 @@ class CartBloc extends Bloc<CartEvent,CartState>{
       }
       /// Salonzo có chiết khấu nhập tay : freeDiscount và chiết khấu hàng tự chọn : discountspecial
       /// Vậy khi xoá ds hàng tặng khi và chỉ khi freeDiscount được sử dụng
-      if(Const.freeDiscount == false){
+      // ✅ CHỈ clear hàng tặng khi keyLoad == 'First' (lần đầu load)
+      // Khi keyLoad == 'Second' (reload sau khi chọn thêm chiết khấu), PRESERVE các hàng tặng đã chọn (CKN, CKTDTH)
+      if(Const.freeDiscount == false && keyLoad == 'First'){
         DataLocal.listProductGift.clear();
+      }
+      
+      // ✅ PRESERVE CKN và CKTDTH gifts khi keyLoad == 'Second'
+      List<SearchItemResponseData> preservedCknGifts = [];
+      List<SearchItemResponseData> preservedCktdthGifts = [];
+      List<SearchItemResponseData> preservedManualGifts = [];
+      if(keyLoad == 'Second'){
+        // Backup các hàng tặng CKN, CKTDTH và manual gifts
+        for (var gift in DataLocal.listProductGift) {
+          if (gift.typeCK == 'CKN') {
+            preservedCknGifts.add(gift);
+          } else if (gift.typeCK == 'CKTDTH') {
+            preservedCktdthGifts.add(gift);
+          } else if (gift.gifProductByHand == true) {
+            preservedManualGifts.add(gift);
+          }
+        }
+        print('💰 Preserving gifts: CKN=${preservedCknGifts.length}, CKTDTH=${preservedCktdthGifts.length}, Manual=${preservedManualGifts.length}');
       }
       ApplyDiscountResponse response = ApplyDiscountResponse.fromJson(data as Map<String,dynamic>);
       if(listCkMatHang.isEmpty){
@@ -1939,6 +1987,55 @@ class CartBloc extends Bloc<CartEvent,CartState>{
       }
       List<ListCkMatHang> listCheckCKMH = [];
       listCheckCKMH = response.listCkMatHang!;
+      
+      // Filter discount products by type
+      // ✅ Cập nhật danh sách chiết khấu cho CẢ 'First' và 'Second' để sheet hiển thị dữ liệu mới nhất
+      // CKN - Chiết khấu nhóm (từ list_ck_mat_hang vì cần group_dk)
+      if(response.listCkMatHang != null){
+        listCkn = response.listCkMatHang!.where((item) => item.kieuCK == 'CKN').toList();
+        hasCknDiscount = listCkn.isNotEmpty;
+        
+        // CKTDTH - Chiết khấu tổng đơn tặng hàng (từ list_ck_mat_hang với kieuCK = 'CKTDTH')
+        listCktdth = response.listCkMatHang!.where((item) => item.kieuCK == 'CKTDTH').toList();
+        hasCktdthDiscount = listCktdth.isNotEmpty;
+        
+        if(keyLoad == 'First') {
+          selectedCktdthGroups.clear();
+        }
+      }
+      
+      // CKTDTT - Chiết khấu tổng đơn tặng tiền (từ listCkTongDon với kieuCK = 'CKTDTT')
+      if(response.listCkTongDon != null){
+        listCktdtt = response.listCkTongDon!.where((item) => item.kieuCK == 'CKTDTT').toList();
+        hasCktdttDiscount = listCktdtt.isNotEmpty;
+        
+        if(keyLoad == 'First') {
+          selectedCktdttIds.clear();
+        }
+      }
+      
+      // CKG & HH - Từ list_ck (vì backend trả về ở đó)
+      if(response.listCk != null){
+        // CKG - Chiết khấu giá
+        listCkg = response.listCk!.where((item) => item.kieuCk == 'CKG').toList();
+        hasCkgDiscount = listCkg.isNotEmpty;
+        
+        if(keyLoad == 'First') {
+          selectedCkgIds.clear();
+        }
+        
+        // HH - Hàng hóa tặng
+        listHH = response.listCk!.where((item) => item.kieuCk == 'HH').toList();
+        hasHHDiscount = listHH.isNotEmpty;
+        
+        if(keyLoad == 'First') {
+          selectedHHIds.clear();
+        }
+      }
+      
+      print('💰 Discount Debug (keyLoad=$keyLoad): CKN: ${listCkn.length}, CKG: ${listCkg.length}, HH: ${listHH.length}, CKTDTT: ${listCktdtt.length}, CKTDTH: ${listCktdth.length}');
+      print('💰 Default Selected: CKG: ${selectedCkgIds.length}, HH: ${selectedHHIds.length}, CKTDTT: ${selectedCktdttIds.length}, CKTDTH: ${selectedCktdthGroups.length}');
+      print('💰 Discount Source: CKN/CKTDTH from listCkMatHang, CKG/HH from listCk, CKTDTT from listCkTongDon');
 
       if(listProductOrderAndUpdate.isNotEmpty){
         for (var element in listProductOrderAndUpdate) {
@@ -2038,16 +2135,23 @@ class CartBloc extends Bloc<CartEvent,CartState>{
             allowed = false;
           }
           if(keyLoad == 'First'){
+            // ✅ CHỈ apply CKTDTT khi được tích chọn (không tự động apply nữa)
+            // Logic apply CKTDTT sẽ được xử lý trong cart_screen khi user tích chọn trong DiscountVoucherSelectionSheet
+            // Giữ lại logic cũ cho các loại CKTD khác (nếu có) để backward compatibility
             if(listCkTongDon.isNotEmpty){
-              // ignore: iterable_contains_unrelated_type
-              if(!listPromotion.contains(listCkTongDon[0].sttRecCk.toString().trim())){
-                listPromotion = listCkTongDon[0].sttRecCk.toString().trim();
-                codeDiscountTD = listCkTongDon[0].maCk.toString().trim();
-                sttRecCKOld = listCkTongDon[0].sttRecCk.toString().trim();
-                totalDiscountForOder = listCkTongDon[0].tCkTtNt??0;
-              }
-              if(!DataLocal.listCKVT.contains(listCkTongDon[0].sttRecCk.toString().trim())){
-                DataLocal.listCKVT = listCkTongDon[0].sttRecCk.toString().trim();
+              // Chỉ apply nếu không phải CKTDTT (CKTDTT sẽ được apply thủ công khi user tích chọn)
+              final cktdItem = listCkTongDon[0];
+              if(cktdItem.kieuCK != 'CKTDTT'){
+                // ignore: iterable_contains_unrelated_type
+                if(!listPromotion.contains(cktdItem.sttRecCk.toString().trim())){
+                  listPromotion = cktdItem.sttRecCk.toString().trim();
+                  codeDiscountTD = cktdItem.maCk.toString().trim();
+                  sttRecCKOld = cktdItem.sttRecCk.toString().trim();
+                  totalDiscountForOder = cktdItem.tCkTtNt??0;
+                }
+                if(!DataLocal.listCKVT.contains(cktdItem.sttRecCk.toString().trim())){
+                  DataLocal.listCKVT = cktdItem.sttRecCk.toString().trim();
+                }
               }
             }
           }
@@ -2056,7 +2160,7 @@ class CartBloc extends Bloc<CartEvent,CartState>{
               if(elements.maVt.toString().trim() == element.code.toString().trim() && elements.kieuCK.toString().trim() != 'TDTH'){
                 itemOrder.listDiscountProduct?.add(elements);
               }
-              else if(elements.kieuCK.toString().trim() == 'TDTH' && elements.sttRecCk.toString().trim() == sttRecCKOld.toString().trim()){
+              else if(keyLoad != 'First' && elements.kieuCK.toString().trim() == 'TDTH' && elements.sttRecCk.toString().trim() == sttRecCKOld.toString().trim()){
                 SearchItemResponseData itemTDTH = SearchItemResponseData(
                   code: elements.maHangTang,
                   name: elements.tenHangTang,
@@ -2093,6 +2197,21 @@ class CartBloc extends Bloc<CartEvent,CartState>{
                 DataLocal.listProductGift.add(itemTDTH);
               }
             }
+          }
+          if(keyLoad == 'First'){
+            itemOrder.maCk = '';
+            itemOrder.maCkOld = '';
+            itemOrder.sttRecCK = '';
+            itemOrder.typeCK = '';
+            itemOrder.maVtGoc = '';
+            itemOrder.sctGoc = '';
+            itemOrder.discountPercent = 0;
+            itemOrder.ck = 0;
+            itemOrder.cknt = 0;
+            itemOrder.priceAfter = itemOrder.giaSuaDoi;
+            listOrder.add(itemOrder);
+            listItemOrder.add(itemOrder);
+            continue;
           }
           if(keyLoad == 'First' && itemOrder.listDiscount!.isNotEmpty){
             allowed = false;
@@ -2147,8 +2266,8 @@ class CartBloc extends Bloc<CartEvent,CartState>{
               itemOrder.sctGoc = (itemOrder.listDiscount != null && itemOrder.listDiscount!.isNotEmpty) ? itemOrder.listDiscount![0].sttRecCk.toString() : '';
               itemOrder.maVtGoc = (itemOrder.listDiscount != null && itemOrder.listDiscount!.isNotEmpty) ? itemOrder.listDiscount![0].maVt.toString() : "";
               if(itemOrder.listDiscount![0].tlCk! > 0){
-                // itemOrder.priceAfter = (itemOrder.price! - (itemOrder.price! * itemOrder.listDiscount![0].tlCk!)/100) * itemOrder.count!;
-                itemOrder.priceAfter = itemOrder.listDiscount![0].giaGoc! - ((itemOrder.listDiscount![0].giaSauCk! * itemOrder.listDiscount![0].tlCk!)/100) ;
+                // ✅ FIX: priceAfter là ĐƠN GIÁ, KHÔNG NHÂN count!
+                itemOrder.priceAfter = itemOrder.giaSuaDoi - (itemOrder.giaSuaDoi * itemOrder.listDiscount![0].tlCk! / 100);
               }
               /// add ck lần đầu để ghi nhận ck lần tiếp User chọn
               maHangTangOld = '';
@@ -2169,7 +2288,8 @@ class CartBloc extends Bloc<CartEvent,CartState>{
               itemOrder.maVtGoc = (itemOrder.listDiscount != null && itemOrder.listDiscount!.isNotEmpty) ? itemOrder.listDiscount![0].maVt.toString() : "";
               // itemOrder.giaSuaDoi = itemOrder.listDiscount![0].giaSauCk!;
               if(itemOrder.listDiscount![0].tlCk! > 0){
-                itemOrder.priceAfter = ((/*itemOrder.giaGui > 0 ? itemOrder.giaGui :*/ itemOrder.giaSuaDoi) - (itemOrder.price! * itemOrder.listDiscount![0].tlCk!)/100) * itemOrder.count!;
+                // ✅ FIX: priceAfter là ĐƠN GIÁ, KHÔNG NHÂN count!
+                itemOrder.priceAfter = itemOrder.giaSuaDoi - (itemOrder.giaSuaDoi * itemOrder.listDiscount![0].tlCk! / 100);
               }
               double _ck = 0;
               if(itemOrder.listDiscount![0].tlCk == 0 && itemOrder.listDiscount![0].giaSauCk! > 0 && itemOrder.listDiscount![0].ck! > 0){
@@ -2206,8 +2326,8 @@ class CartBloc extends Bloc<CartEvent,CartState>{
                 itemOrder.typeCK = 'VND';
                 itemOrder.priceOk = x.giaSauCk;
                 if(x.tlCk! > 0){
-                  // itemOrder.priceAfter = (itemOrder.price! - (itemOrder.price! * x.tlCk!)/100) * itemOrder.count!;
-                  itemOrder.priceAfter = x.giaGoc! - ((x.giaSauCk! * x.tlCk!)/100) ;
+                  // ✅ FIX: priceAfter là ĐƠN GIÁ, KHÔNG NHÂN count!
+                  itemOrder.priceAfter = itemOrder.giaSuaDoi - (itemOrder.giaSuaDoi * x.tlCk! / 100);
                 }
                 /// add ck lần đầu để ghi nhận ck lần tiếp User chọn
                 maHangTangOld = '';
@@ -2227,7 +2347,8 @@ class CartBloc extends Bloc<CartEvent,CartState>{
                 itemOrder.priceOk = x.giaSauCk;
                 // itemOrder.giaSuaDoi = x.giaSauCk!;
                 if(x.tlCk! > 0){
-                  itemOrder.priceAfter = ((/*itemOrder.giaGui > 0 ? itemOrder.giaGui :*/ itemOrder.giaSuaDoi) - (itemOrder.price! * x.tlCk!)/100) * itemOrder.count!;
+                  // ✅ FIX: priceAfter là ĐƠN GIÁ, KHÔNG NHÂN count!
+                  itemOrder.priceAfter = itemOrder.giaSuaDoi - (itemOrder.giaSuaDoi * x.tlCk! / 100);
                 }
                 double _ck = 0;
                 if( x.tlCk == 0 && x.giaSauCk! > 0 && x.ck! > 0){
@@ -2266,7 +2387,7 @@ class CartBloc extends Bloc<CartEvent,CartState>{
             listItemOrder.add(itemOrder);
           }
         }
-        if(true){
+        if(keyLoad != 'First'){
           listOrder.clear();
           for (var elementDiscount in listItemOrder) {
             listOrder.add(elementDiscount);
@@ -2298,12 +2419,143 @@ class CartBloc extends Bloc<CartEvent,CartState>{
         }
       }
       allowed = false;
-      totalMoney =  response.totalMoneyDiscount!.tTien??0;
-      totalDiscount =  response.totalMoneyDiscount!.tCk??0;
-      totalDiscountOldByHand =  response.totalMoneyDiscount!.tCk??0;
-      totalDiscountOld =  response.totalMoneyDiscount!.tCk??0;
-      totalPayment =  response.totalMoneyDiscount!.tThanhToan??0;
-      totalPaymentOld =  response.totalMoneyDiscount!.tThanhToan??0;
+      if(keyLoad == 'First'){
+        double baseTotal = 0;
+        for (var elementDiscount in listOrder) {
+          if(elementDiscount.gifProduct == true) continue;
+          final double unitPrice = (elementDiscount.giaSuaDoi as num?)?.toDouble()
+              ?? (elementDiscount.price as num?)?.toDouble()
+              ?? (elementDiscount.priceAfter as num?)?.toDouble()
+              ?? 0;
+          final double quantity = (elementDiscount.count as num?)?.toDouble() ?? 0;
+          baseTotal += unitPrice * quantity;
+        }
+        totalMoney = baseTotal;
+        totalDiscount = 0;
+        totalDiscountOldByHand = 0;
+        totalDiscountOld = 0;
+        totalPayment = baseTotal;
+        totalPaymentOld = baseTotal;
+        totalMNProduct = baseTotal;
+        totalMNDiscount = 0;
+        totalMNPayment = baseTotal;
+      }else{
+        final totalMoneyDiscount = response.totalMoneyDiscount;
+        totalMoney =  totalMoneyDiscount?.tTien??0;
+        totalDiscount =  totalMoneyDiscount?.tCk??0;
+        totalDiscountOldByHand =  totalMoneyDiscount?.tCk??0;
+        totalDiscountOld =  totalMoneyDiscount?.tCk??0;
+        totalPayment =  totalMoneyDiscount?.tThanhToan??0;
+        totalPaymentOld =  totalMoneyDiscount?.tThanhToan??0;
+        totalMNProduct = totalMoneyDiscount?.tTien ?? 0;
+        totalMNDiscount = totalMoneyDiscount?.tCk ?? 0;
+        totalMNPayment = totalMoneyDiscount?.tThanhToan ?? 0;
+        
+        // ✅ Cập nhật totalDiscountForOder từ listCkTongDon nếu có CKTDTT được chọn
+        if (response.listCkTongDon != null && response.listCkTongDon!.isNotEmpty) {
+          // Tìm CKTDTT đã được chọn
+          for (var cktdttItem in response.listCkTongDon!) {
+            if (cktdttItem.kieuCK == 'CKTDTT' && selectedCktdttIds.contains((cktdttItem.sttRecCk ?? '').trim())) {
+              totalDiscountForOder = cktdttItem.tCkTtNt ?? 0;
+              codeDiscountTD = cktdttItem.maCk?.toString().trim() ?? '';
+              print('💰 CKTDTT: Updated from API response - totalDiscountForOder=$totalDiscountForOder, codeDiscountTD=$codeDiscountTD');
+              
+              // ✅ QUAN TRỌNG: API có thể chưa tính CKTDTT vào tThanhToan, nên cần trừ thủ công
+              // Nếu totalDiscountForOder > 0, trừ vào totalPayment
+              if (totalDiscountForOder > 0) {
+                totalPayment = totalPayment - totalDiscountForOder;
+                totalPaymentOld = totalPayment;
+                totalMNPayment = totalPayment;
+                print('💰 CKTDTT: Trừ chiết khấu tổng đơn vào totalPayment: ${totalMoneyDiscount?.tThanhToan} - $totalDiscountForOder = $totalPayment');
+              }
+              break; // Chỉ lấy CKTDTT đầu tiên được chọn
+            }
+          }
+        } else {
+          // ✅ Nếu không có CKTDTT trong response nhưng đang có selectedCktdttIds, reset totalDiscountForOder
+          if (selectedCktdttIds.isEmpty) {
+            totalDiscountForOder = 0;
+            codeDiscountTD = '';
+            print('💰 CKTDTT: No CKTDTT selected, reset totalDiscountForOder=0');
+          }
+        }
+      }
+      // ✅ RESTORE CKN và CKTDTH gifts sau khi xử lý response (keyLoad == 'Second')
+      if(keyLoad == 'Second'){
+        // Remove only HH gifts (từ response), preserve CKN, CKTDTH và manual gifts
+        DataLocal.listProductGift.removeWhere((gift) => gift.typeCK == 'HH');
+        
+        // Restore preserved CKN gifts
+        for (var gift in preservedCknGifts) {
+          // Check if not already exists
+          bool exists = DataLocal.listProductGift.any((g) => 
+            g.code == gift.code && 
+            g.typeCK == gift.typeCK && 
+            g.sttRecCK == gift.sttRecCK
+          );
+          if (!exists) {
+            DataLocal.listProductGift.add(gift);
+            totalProductGift += gift.count ?? 0;
+            print('💰 Restored CKN gift: ${gift.code} (qty: ${gift.count})');
+          }
+        }
+        
+        // Restore preserved CKTDTH gifts
+        for (var gift in preservedCktdthGifts) {
+          // Check if not already exists
+          bool exists = DataLocal.listProductGift.any((g) => 
+            g.code == gift.code && 
+            g.typeCK == gift.typeCK && 
+            g.sttRecCK == gift.sttRecCK
+          );
+          if (!exists) {
+            DataLocal.listProductGift.add(gift);
+            totalProductGift += gift.count ?? 0;
+            print('💰 Restored CKTDTH gift: ${gift.code} (qty: ${gift.count})');
+          }
+        }
+        
+        // Restore preserved manual gifts
+        for (var gift in preservedManualGifts) {
+          // Check if not already exists
+          bool exists = DataLocal.listProductGift.any((g) => 
+            g.code == gift.code && 
+            g.gifProductByHand == true
+          );
+          if (!exists) {
+            DataLocal.listProductGift.add(gift);
+            totalProductGift += gift.count ?? 0;
+            print('💰 Restored manual gift: ${gift.code} (qty: ${gift.count})');
+          }
+        }
+        
+        print('💰 After restore: totalProductGift=$totalProductGift, listProductGift.length=${DataLocal.listProductGift.length}');
+        
+        // ✅ RESTORE listPromotion và DataLocal.listCKVT để không mất các chiết khấu đã chọn trước đó
+        // Merge với các giá trị từ response (nếu có)
+        if (preservedListPromotion.isNotEmpty) {
+          // Merge: giữ lại các sttRecCk từ preserved, thêm các sttRecCk mới từ response (nếu chưa có)
+          List<String> preservedPromoList = preservedListPromotion.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+          List<String> currentPromoList = listPromotion.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+          
+          // Combine: preserved + current (loại bỏ duplicate)
+          Set<String> combinedPromoSet = {...preservedPromoList, ...currentPromoList};
+          listPromotion = combinedPromoSet.join(',');
+          print('💰 Restored listPromotion: $listPromotion (preserved: $preservedListPromotion)');
+        }
+        
+        if (preservedListCKVT.isNotEmpty) {
+          // Merge: giữ lại các discountKey từ preserved, thêm các discountKey mới từ response (nếu chưa có)
+          List<String> preservedCkvtList = preservedListCKVT.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+          List<String> currentCkvtList = DataLocal.listCKVT.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+          
+          // Combine: preserved + current (loại bỏ duplicate)
+          Set<String> combinedCkvtSet = {...preservedCkvtList, ...currentCkvtList};
+          DataLocal.listCKVT = combinedCkvtSet.join(',');
+          print('💰 Restored listCKVT: ${DataLocal.listCKVT} (preserved: $preservedListCKVT)');
+        }
+      }
+      
       print('check tax ${keyLoad} => ${ Const.useTax} ${DataLocal.indexValuesTax} ${allowed2 = true}');
       if(keyLoad == 'Second' && Const.useTax == true && DataLocal.indexValuesTax >= 0 && allowed2 == true){
         allowed2 = false;
@@ -2421,7 +2673,7 @@ class CartBloc extends Bloc<CartEvent,CartState>{
       totalMNDiscount = response.data?.order?.ck;
       totalMNPayment = response.data?.order?.tTt;
       if(viewUpdateOrder == false && addNewItem == false){
-        return TotalMoneyForAppSuccess(reCalculator);
+        return CartInitial();
       }else {
         return TotalMoneyUpdateOrderSuccess();
       }
@@ -2571,28 +2823,29 @@ class CartBloc extends Bloc<CartEvent,CartState>{
         await file.writeAsBytes(response as List<int>);
         return file;
       }
+      return null;
     } catch (e) {
       print('Lỗi tải xuống: $e');
+      return null;
     }
   }
   Future<bool?> downloadAndOpenFile(String sttRec) async {
     try {
       File? file = await downloadPDF(sttRec);
       if (file != null) {
-        final String? result = await openFile(file.path.toString());
-        if (result != null) {
-          // Warning
-        }
+        await openFile(file.path.toString());
         return true;
       }else{
         return false;
       }
     } catch (e) {
       print(e);
+      return false;
     }}
 
   static Future<String?> openFile(String url) async {
-    final OpenResult result = await OpenFile.open(url);
+    final OpenResult openResult = await OpenFile.open(url);
+    return openResult.message;
   }
 
 
@@ -2677,6 +2930,26 @@ class CartBloc extends Bloc<CartEvent,CartState>{
       DataLocal.listVv = response.listVv!;
       DataLocal.listHd = response.listHd!;
       return GetListVvHdSuccess();
+    } catch (e) {
+      return CartFailure('Úi, ${e.toString()}');
+    }
+  }
+
+  void _getGiftProductListEvent(GetGiftProductListEvent event, Emitter<CartState> emitter) async {
+    emitter(CartLoading());
+    CartState state = _handleGetGiftProductList(
+      await _networkFactory!.getGiftProductList(event.maNhom, _accessToken!)
+    );
+    emitter(state);
+  }
+
+  CartState _handleGetGiftProductList(Object data) {
+    if (data is String) return CartFailure('Úi, ${data.toString()}');
+    try {
+      listGiftProducts.clear();
+      GiftProductListResponse response = GiftProductListResponse.fromJson(data as Map<String, dynamic>);
+      listGiftProducts = response.data?.danhSachHangTang ?? [];
+      return GetGiftProductListSuccess();
     } catch (e) {
       return CartFailure('Úi, ${e.toString()}');
     }

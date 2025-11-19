@@ -1,0 +1,5 @@
+// This is a stub marker file to indicate discount flow wiring was restored.
+// Real logic is implemented directly in cart_screen.dart.
+
+
+

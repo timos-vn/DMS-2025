@@ -331,6 +331,9 @@ class DetailOrderV3 {
   dynamic ncsx;
   dynamic quycach;
 
+  // Số lượng B (theo hợp đồng) để map vào trường SL_KD
+  double? slKd;
+
   List<ListObjectJson>? listAdvanceOrderInfo;
 
   DetailOrderV3(
@@ -348,6 +351,7 @@ class DetailOrderV3 {
         this.idNVKD,
         this.ncsx,
         this.quycach,
+        this.slKd,
       });
 
   DetailOrderV3.fromJson(Map<String, dynamic> json) {
@@ -383,6 +387,7 @@ class DetailOrderV3 {
     giaGuiNT = json['giaGuiNT'];
     note = json['note'];
     heSo = json['heSo'];
+    slKd = json['SL_KD'];
     if (json['listAdvanceOrderInfo'] != null) {
       listAdvanceOrderInfo = <ListObjectJson>[];
       json['ds_ck'].forEach((v) {
@@ -427,6 +432,9 @@ class DetailOrderV3 {
     data['giaGuiNT'] = giaGuiNT;
     data['note'] = note;
     data['heSo'] = heSo;
+    if (slKd != null) {
+      data['SL_KD'] = slKd;
+    }
     if (listAdvanceOrderInfo != null) {
       data['listAdvanceOrderInfo'] = listAdvanceOrderInfo!.map((v) => v.toJson()).toList();
     }

@@ -393,7 +393,7 @@ class _AnimatedOrderItemState extends State<_AnimatedOrderItem> with SingleTicke
               Row(
                 children: [
                                     Icon(Icons.receipt, size: 16, color: mainColor),
-                  const SizedBox(width: 6),
+                                     const SizedBox(width: 6),
                                     const Text(
                                       'Mã đơn hàng',
                                       style: TextStyle(
@@ -606,6 +606,7 @@ class _AnimatedOrderItemState extends State<_AnimatedOrderItem> with SingleTicke
         addressCustomer: '',
         phoneCustomer: '',
         dateEstDelivery: '',
+        hideEditAndCancelButtons: true,
       ),
       withNavBar: false,
     );

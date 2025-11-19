@@ -283,106 +283,225 @@ class _HistoryOrderScreenState extends State<HistoryOrderScreen>  with TickerPro
   }
 
   buildAppBar(){
+    final statusBarHeight = MediaQuery.of(context).padding.top;
     return Container(
-      height: 153,
-      width: double.infinity,
+      padding: EdgeInsets.only(top: statusBarHeight),
       decoration: BoxDecoration(
-          boxShadow: <BoxShadow>[
-            BoxShadow(
-                color: Colors.grey.shade200,
-                offset: const Offset(2, 4),
-                blurRadius: 5,
-                spreadRadius: 2)
-          ],
-          gradient: const LinearGradient(
-              begin: Alignment.centerLeft,
-              end: Alignment.centerRight,
-              colors: [subColor,Color.fromARGB(255, 150, 185, 229)])),
-      padding: const EdgeInsets.fromLTRB(5, 35, 12,0),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: Colors.grey.shade200,
+            offset: const Offset(2, 4),
+            blurRadius: 5,
+            spreadRadius: 2,
+          ),
+        ],
+        gradient: const LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [subColor, Color.fromARGB(255, 150, 185, 229)],
+        ),
+      ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              InkWell(
-                onTap: ()=> Navigator.pop(context),
-                child: const SizedBox(
-                  width: 40,
-                  height: 50,
-                  child: Icon(
-                    Icons.arrow_back_rounded,
-                    size: 25,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.only(top: 16),
-                  child: const Align(
-                    alignment: Alignment.topCenter,
-                    child: Text(
-                      "Lịch sử đơn hàng",
-                      style: TextStyle(fontWeight: FontWeight.bold,fontSize: 17,color: Colors.white,),
-                      maxLines: 1,overflow: TextOverflow.fade,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(5, 12, 12, 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                InkWell(
+                  onTap: () => Navigator.pop(context),
+                  child: const SizedBox(
+                    width: 40,
+                    height: 40,
+                    child: Icon(
+                      Icons.arrow_back_rounded,
+                      size: 24,
+                      color: Colors.white,
                     ),
                   ),
                 ),
-              ),
-              InkWell(
-                onTap: ()=>  showDialog(
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: const Align(
+                      alignment: Alignment.center,
+                      child: Text(
+                        "Lịch sử đơn hàng",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 17,
+                          color: Colors.white,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                ),
+                InkWell(
+                  onTap: () => showDialog(
                     context: context,
                     builder: (context) => OptionsFilterDate(
                       dateFrom: Const.dateFrom.toString(),
                       dateTo: Const.dateTo.toString(),
-                    )).then((value){
-                  if(value != 'CANCEL' && value != null){
-                    Const.dateFrom =  Utils.parseStringToDate(value[3], Const.DATE_SV_FORMAT);
-                    Const.dateTo =  Utils.parseStringToDate(value[4], Const.DATE_SV_FORMAT);
-                    _bloc.add(GetListHistoryOrder(status: _bloc.statusOrderList,dateFrom: Const.dateFrom, dateTo: Const.dateTo,userId:  widget.userId, typeLetterId: 'ORDERLIST'));
-                  }
-                }),
-                child: const SizedBox(
-                  width: 40,
-                  height: 50,
-                  child: Icon(
-                    Icons.event,
-                    size: 25,
-                    color: Colors.white,
+                    ),
+                  ).then((value) {
+                    if (value != 'CANCEL' && value != null) {
+                      Const.dateFrom = Utils.parseStringToDate(value[3], Const.DATE_SV_FORMAT);
+                      Const.dateTo = Utils.parseStringToDate(value[4], Const.DATE_SV_FORMAT);
+                      _bloc.add(GetListHistoryOrder(
+                        status: _bloc.statusOrderList,
+                        dateFrom: Const.dateFrom,
+                        dateTo: Const.dateTo,
+                        userId: widget.userId,
+                        typeLetterId: 'ORDERLIST',
+                      ));
+                    }
+                  }),
+                  child: const SizedBox(
+                    width: 40,
+                    height: 40,
+                    child: Icon(
+                      Icons.filter_list_rounded,
+                      size: 24,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
-              )
-            ],
+              ],
+            ),
           ),
           Visibility(
             visible: show == true,
             child: Container(
-              padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
-              child: Container(
-                  padding: const EdgeInsets.all(4),
-                  height: 43,
-                  width: double.infinity,
-                  decoration: BoxDecoration(border: Border.all(width: 0.8, color: white), borderRadius: const BorderRadius.all(Radius.circular(16))),
-                  child: TabBar(
-                    controller: tabController,
-                    unselectedLabelColor: white,
-                    labelColor: orange,
-                    labelStyle: const TextStyle(fontWeight: FontWeight.normal),
-                    isScrollable: DataLocal.listStatusToOrder.length <= 3 ? false : true,
-                    // indicatorPadding: EdgeInsets.only(top: 6,bottom: 6,right: 8,left: 8),
-
-                    indicator:const BoxDecoration(color: white, borderRadius:  BorderRadius.all(Radius.circular(12))),
-                    tabs: List<Widget>.generate(DataLocal.listStatusToOrder.length, (int index) {
-                      return  Tab(
-                        text: DataLocal.listStatusToOrder[index].statusname.toString(),
-                      );
-                    }),
-                  )),
+              margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.3),
+                  width: 1,
+                ),
+              ),
+              padding: const EdgeInsets.all(4),
+              child: TabBar(
+                controller: tabController,
+                indicator: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      offset: const Offset(0, 2),
+                      blurRadius: 4,
+                    ),
+                  ],
+                ),
+                indicatorSize: TabBarIndicatorSize.tab,
+                indicatorPadding: const EdgeInsets.all(2),
+                dividerColor: Colors.transparent,
+                labelColor: subColor,
+                unselectedLabelColor: Colors.white,
+                labelPadding: EdgeInsets.zero,
+                isScrollable: DataLocal.listStatusToOrder.length > 3,
+                tabs: List<Widget>.generate(
+                  DataLocal.listStatusToOrder.length,
+                  (int index) {
+                    return _buildVerticalTab(
+                      DataLocal.listStatusToOrder[index],
+                      index,
+                    );
+                  },
+                ),
+              ),
             ),
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildVerticalTab(dynamic statusItem, int index) {
+    final status = statusItem.status?.toString().trim() ?? '';
+    final statusName = statusItem.statusname?.toString() ?? '';
+    final tabInfo = _getTabInfo(status);
+    
+    return Tab(
+      height: 48,
+      child: AnimatedBuilder(
+        animation: tabController,
+        builder: (context, child) {
+          final isSelected = tabController.index == index;
+          
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Icon(
+                  tabInfo['icon'] as IconData,
+                  size: isSelected ? 18 : 16,
+                  color: isSelected 
+                      ? subColor 
+                      : Colors.white.withOpacity(0.85),
+                ),
+                const SizedBox(height: 3),
+                Flexible(
+                  child: Text(
+                    statusName,
+                    style: TextStyle(
+                      fontSize: 9.5,
+                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                      color: isSelected 
+                          ? subColor 
+                          : Colors.white.withOpacity(0.85),
+                      letterSpacing: 0.05,
+                      height: 1.0,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Map<String, dynamic> _getTabInfo(String status) {
+    switch (status) {
+      case '0':
+        return {
+          'icon': Icons.schedule_rounded,
+          'color': const Color(0xFF2196F3),
+        };
+      case '1':
+        return {
+          'icon': Icons.autorenew_rounded,
+          'color': const Color(0xFFFF9800),
+        };
+      case '2':
+        return {
+          'icon': Icons.check_circle_outline_rounded,
+          'color': const Color(0xFF4CAF50),
+        };
+      case '3':
+        return {
+          'icon': Icons.cancel_outlined,
+          'color': const Color(0xFF9E9E9E),
+        };
+      default:
+        return {
+          'icon': Icons.receipt_long_rounded,
+          'color': Colors.grey,
+        };
+    }
   }
 }

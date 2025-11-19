@@ -76,3 +76,15 @@ class GetDetailCheckInOnlineSuccess extends DetailCustomerState {
     return 'GetDetailCheckInOnlineSuccess{}';
   }
 }
+
+class CheckPendingCheckInSuccess extends DetailCustomerState {
+  final bool hasPendingCheckIn;
+  final dynamic pendingCheckInData;
+
+  CheckPendingCheckInSuccess({required this.hasPendingCheckIn, this.pendingCheckInData});
+
+  @override
+  String toString() {
+    return 'CheckPendingCheckInSuccess {hasPendingCheckIn: $hasPendingCheckIn}';
+  }
+}

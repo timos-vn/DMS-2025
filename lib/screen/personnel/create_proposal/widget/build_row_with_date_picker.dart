@@ -29,14 +29,14 @@ class BuildRowWithDatePicker extends StatelessWidget {
                 children: [
                   Text(
                     date.toString().split(' ').first,
-                    style: TextStyle(color: Colors.blueGrey),
+                    style: const TextStyle(color: Colors.black),
                   ),
                   const SizedBox(
                     width: 5,
                   ),
-                  Icon(
+                  const Icon(
                     Icons.date_range,
-                    color: Colors.blueGrey,
+                    color: Colors.black,
                     size: 22,
                   ),
                 ],

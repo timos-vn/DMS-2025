@@ -243,10 +243,13 @@ class SearchCustomerScreenState extends State<SearchCustomerScreen> {
                                   children: [
                                     const Icon(Icons.phone,size: 12,color: grey,),
                                     const SizedBox(width: 4,),
-                                    Text(
+                                    Flexible(
+                                      child: Text(
                                       '${_dataListSearch[index].phone}',
                                       style: const TextStyle(fontSize: 12,color: grey,),
-                                      maxLines: 2,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -317,12 +320,13 @@ class SearchCustomerScreenState extends State<SearchCustomerScreen> {
                 children: <Widget>[
                   Expanded(
                     child: SizedBox(
-                      height: 30,
-                      child: Center(
+                      height: 36,
                         child: TextField(
                           autofocus: true,
+                        maxLines: 1,
+                        minLines: 1,
                           textAlign: TextAlign.left,
-                          textAlignVertical: TextAlignVertical.top,
+                        textAlignVertical: TextAlignVertical.center,
                           style: const TextStyle(fontSize: 14, color: Colors.white),
                           focusNode: focusNode,
                           onSubmitted: (text) {
@@ -330,7 +334,7 @@ class SearchCustomerScreenState extends State<SearchCustomerScreen> {
                           },
                           controller: _searchController,
                           keyboardType: TextInputType.text,
-                          textInputAction: TextInputAction.done,
+                        textInputAction: TextInputAction.search,
                           onChanged: (text){
                             if(text.isNotEmpty){
                               onSearchDebounce.debounce(
@@ -339,14 +343,13 @@ class SearchCustomerScreenState extends State<SearchCustomerScreen> {
                             _bloc.add(CheckShowCloseEvent(text));
                           },
                           decoration: const InputDecoration(
+                          isDense: true,
                             border: InputBorder.none,
                             filled: true,
                             fillColor: transparent,
                             hintText: 'Tìm kiếm khách hàng',
-                            hintStyle: TextStyle(color: Colors.white),
-                              contentPadding: EdgeInsets.only(
-                                  bottom: 10, top: 15)
-                          ),
+                          hintStyle: TextStyle(color: Colors.white70),
+                          contentPadding: EdgeInsets.symmetric(vertical: 8),
                         ),
                       ),
                     ),

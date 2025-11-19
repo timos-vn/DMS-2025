@@ -69,6 +69,7 @@ class ShorebirdUtils {
 
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (context) {
         return UtilsWidget.dialogUpdateShorebird(
           contentNotification: description,

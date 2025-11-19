@@ -55,25 +55,45 @@ class _DetailNotificationScreenState extends State<DetailNotificationScreen> {
     _bloc.add(GetPrefsDetailNotificationEvent());
     _infoCPNBloc = InfoCPNBloc(context);
     _infoCPNBloc.add(GetPrefsInfoCPN());
-    messaging.getToken().then((value) {
-      if (widget.linkDetail != '') {
-        _bloc.add(FetchHTMLDataEvent(
-            linkDetail: widget.linkDetail!,
-            code: widget.code!,
-            sttRec: widget.sttRec,
-            loaiDuyet: widget.idApproval,
-            fcmToken: value!));
+    _getTokenAndFetchData();
+  }
+
+  Future<void> _getTokenAndFetchData() async {
+    String? token;
+    try {
+      // On iOS, wait for APNS token first
+      if (Theme.of(context).platform == TargetPlatform.iOS) {
+        final apnsToken = await messaging.getAPNSToken();
+        if (apnsToken != null) {
+          token = await messaging.getToken();
+        }
+      } else {
+        // On Android, directly get the token
+        token = await messaging.getToken();
       }
-      if (widget.code != '') {
-        _bloc.add(FetchHTMLDataEvent(
-            linkDetail: widget.htmlData,
-            code: widget.code!,
-            sttRec: widget.sttRec,
-            loaiDuyet: widget.idApproval,
-            fcmToken: value!));
-        _bloc.add(ReadNotificationEvent(idNotification: widget.code!));
-      }
-    });
+    } catch (e) {
+      print('Error getting FCM token: $e');
+      // Continue without token if not available
+    }
+
+    // Fetch data with or without token
+    if (widget.linkDetail != '') {
+      _bloc.add(FetchHTMLDataEvent(
+          linkDetail: widget.linkDetail!,
+          code: widget.code!,
+          sttRec: widget.sttRec,
+          loaiDuyet: widget.idApproval,
+          fcmToken: token ?? ''));
+    }
+    if (widget.code != '') {
+      _bloc.add(FetchHTMLDataEvent(
+          linkDetail: widget.htmlData,
+          code: widget.code!,
+          sttRec: widget.sttRec,
+          loaiDuyet: widget.idApproval,
+          fcmToken: token ?? ''));
+      _bloc.add(ReadNotificationEvent(idNotification: widget.code!));
+    }
   }
 
   @override

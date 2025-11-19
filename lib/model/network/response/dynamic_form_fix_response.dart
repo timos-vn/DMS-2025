@@ -88,6 +88,11 @@ class FormDataFix {
   bool? requestMC;
   String? nameCustomer;
   String? phoneCustomer;
+  // BusinessTrip new fields
+  String? diaChiDen;
+  String? tenNguoiGap;
+  String? sdtNguoiGap;
+  String? mucDich;
 
   FormDataFix(
       {this.sttRec,this.stt_rec_nv,this.ma_nv,this.ngayDn,this.idRoom,this.nameRoom,this.soLuong,this.request,this.thanhPhan,
@@ -118,7 +123,8 @@ class FormDataFix {
         this.ngayPhep,
         this.caTu,
         this.caDen,this.diemDi,this.diemDen,this.idCar,this.nameCar,this.phoneCustomer,this.nameCustomer,
-        this.ghiChu,this.soGio,this.tongGio,this.gioDen,this.gioTu});
+        this.ghiChu,this.soGio,this.tongGio,this.gioDen,this.gioTu,
+        this.diaChiDen,this.tenNguoiGap,this.sdtNguoiGap,this.mucDich});
 
   FormDataFix.fromJson(Map<String, dynamic> json) {
     sttRec = json['stt_rec'];
@@ -170,6 +176,12 @@ class FormDataFix {
      requestDU = json['nuoc_yn'];
     requestMC = json['maychieu_yn'];
     requestOther = json['other'];
+    
+    // BusinessTrip new fields
+    diaChiDen = json['dia_chi_den'];
+    tenNguoiGap = json['ten_nguoi_gap'];
+    sdtNguoiGap = json['sdt_nguoi_gap'];
+    mucDich = json['muc_dich'];
   }
 
   Map<String, dynamic> toJson() {
@@ -224,6 +236,13 @@ class FormDataFix {
     data['loai_xe'] =  idCar;
     data['ten_xe'] =  nameCar;
     data['ly_do'] =  lyDo;
+    
+    // BusinessTrip new fields
+    data['dia_chi_den'] = diaChiDen;
+    data['ten_nguoi_gap'] = tenNguoiGap;
+    data['sdt_nguoi_gap'] = sdtNguoiGap;
+    data['muc_dich'] = mucDich;
+    
     return data;
   }
 }

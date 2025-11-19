@@ -37,7 +37,7 @@ class Const {
   ///Migration db
   static const bool migrationDB = true;
   ///version app
-  static String versionApp = '1.0.77';
+  static String versionApp = '1.0.78';
 
   static const int MAX_COUNT_ITEM = 20;
   static const kDefaultPadding = 20.0;
@@ -159,6 +159,7 @@ class Const {
   static bool isHd = false;
   static bool lockStockInItem = false;
   static bool lockStockInCart = false;
+  static bool lockStockInItemGift = false;
   static bool saleOutUpdatePrice = false; /// Cho phép cập nhật giá cho tính năng sale Out
   static bool afterTax = false; /// Cho phép tính thuế sau chiết khấu : true - false : cho phép tính thuế trước chiết khấu
   static bool useTax = false; /// Cho phép tính thuế
@@ -178,6 +179,7 @@ class Const {
   static bool addProductFollowStore = false;
   static bool enableViewPriceAndTotalPriceProductGift = false;
   static bool allowViewPriceAndTotalPriceProductGift = false;
+  static bool approveNewStore = false; /// Duyệt điểm bán mở mới
   static bool chooseStateWhenCreateNewOpenStore = false; ///Thêm thông tin trạng thái khi mở mới điểm bán
   static bool dateEstDelivery = false; ///Ngày dự kiến giao hàng
   static bool editPrice = false; /// Cho phép sửa giá (không giới hạn)
@@ -205,6 +207,8 @@ class Const {
   static bool reportLocationNoChooseCustomer = false; /// Yêu cầu phải chọn khách hàng - Báo cáo vị trí
   static bool noCheckDayOff = false; /// Yêu cầu phải chọn khách hàng - Báo cáo vị trí
   static bool autoAddAgentFromSaleOut = false; /// Cho phép tự động add NPP/ĐL theo nhân viên sale ở trong SALE OUT
+  static bool discountSpecialAdd = false; /// hiển thị nút add sp tặng ở giỏ hàng
+  static bool addProductionSameQuantity = false; /// thêm sp có cùng số lượng
 
 
   ///Data format

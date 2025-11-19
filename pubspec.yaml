@@ -2,7 +2,7 @@ name: dms
 description: "A new Flutter project."
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 
-version: 1.0.77+142
+version: 1.0.78+143
 
 environment:
   sdk: '>=3.5.4 <4.0.0'

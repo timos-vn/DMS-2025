@@ -75,6 +75,10 @@ class SearchProductScreenState extends State<SearchProductScreen> {
 
   late SearchItemResponseData itemSelect;
   late int indexSelect;
+  
+  // Multi-select state for Const.addProductionSameQuantity
+  Set<String> selectedProductCodes = {}; // Track selected product codes
+  Map<String, SearchItemResponseData> selectedProducts = {}; // Store full product data
 
   @override
   void initState() {
@@ -375,14 +379,16 @@ class SearchProductScreenState extends State<SearchProductScreen> {
                           }else if(widget.addProductFromCheckIn == true){
                             _bloc.add(AddProductCountFromCheckIn(product: itemSelect));
                           }else if(widget.addProductFromSaleOut == true){
+                            // Lấy giá từ popup nếu có sửa (value[4]), nếu không thì lấy giá gốc
+                            double finalPrice = double.parse(value[4].toString());
                             Product production = Product(
                                 code: itemSelect.code,
                                 name: (value[7].toString().isNotEmpty && value[7].toString().replaceAll('null', '').isNotEmpty) ? value[7].toString() : itemSelect.name,
                                 name2:itemSelect.name2,
                                 dvt: value[1].toString().replaceAll('null', '').isNotEmpty ? value[1].toString() :  itemSelect.dvt,
                                 description:itemSelect.descript,
-                                price: Const.isWoPrice == false ? itemSelect.price :itemSelect.woPrice,
-                                priceAfter: Const.isWoPrice == false ?  itemSelect.priceAfter : itemSelect.woPriceAfter ,
+                                price: finalPrice, // Sử dụng giá đã sửa từ popup
+                                priceAfter: finalPrice, // Cập nhật giá sau cũng bằng giá đã sửa
                                 discountPercent:itemSelect.discountPercent,
                                 stockAmount:itemSelect.stockAmount,
                                 taxPercent:itemSelect.taxPercent,
@@ -426,6 +432,7 @@ class SearchProductScreenState extends State<SearchProductScreen> {
                                 priceOk: itemSelect.priceOk,
                                 woPrice: itemSelect.woPrice,
                                 woPriceAfter: itemSelect.woPriceAfter,
+                                originalPrice: Const.isWoPrice == false ? itemSelect.price :itemSelect.woPrice, // Lưu giá gốc ban đầu
                             );
                             _bloc.add(AddProductSaleOutEvent(productItem: production));
                           }
@@ -481,6 +488,7 @@ class SearchProductScreenState extends State<SearchProductScreen> {
                               priceOk: itemSelect.priceOk,
                               woPrice: itemSelect.woPrice,
                               woPriceAfter: itemSelect.woPriceAfter,
+                              originalPrice: Const.isWoPrice == false ? itemSelect.price :itemSelect.woPrice, // Lưu giá gốc ban đầu
                             );
                             print(value[12].toString(),);
                             _bloc.add(AddCartEvent(productItem: production));
@@ -542,14 +550,16 @@ class SearchProductScreenState extends State<SearchProductScreen> {
                               _bloc.add(AddProductCountFromCheckIn(product: itemSelect));
                             }
                             else if(widget.addProductFromSaleOut == true){
+                              // Lấy giá từ popup nếu có sửa (value[4]), nếu không thì lấy giá gốc
+                              double finalPrice = double.parse(value[4].toString());
                               Product production = Product(
                                   code: itemSelect.code,
                                 name: (value[7].toString().isNotEmpty && value[7].toString().replaceAll('null', '').isNotEmpty) ? value[7].toString() : itemSelect.name,
                                   name2:itemSelect.name2,
                                   dvt:value[1].toString().replaceAll('null', '').isNotEmpty ? value[1].toString() :  itemSelect.dvt,
                                   description:itemSelect.descript,
-                                  price: Const.isWoPrice == false ? itemSelect.price :itemSelect.woPrice,
-                                  priceAfter: Const.isWoPrice == false ?  itemSelect.priceAfter : itemSelect.woPriceAfter ,
+                                  price: finalPrice, // Sử dụng giá đã sửa từ popup
+                                  priceAfter: finalPrice, // Cập nhật giá sau cũng bằng giá đã sửa
                                   discountPercent:itemSelect.discountPercent,
                                   stockAmount:itemSelect.stockAmount,
                                   taxPercent:itemSelect.taxPercent,
@@ -594,6 +604,7 @@ class SearchProductScreenState extends State<SearchProductScreen> {
                                   priceOk: itemSelect.priceOk,
                                   woPrice: itemSelect.woPrice,
                                   woPriceAfter: itemSelect.woPriceAfter,
+                                  originalPrice: Const.isWoPrice == false ? itemSelect.price :itemSelect.woPrice, // Lưu giá gốc ban đầu
                               );
                               _bloc.add(AddProductSaleOutEvent(productItem: production));
                             }
@@ -649,6 +660,7 @@ class SearchProductScreenState extends State<SearchProductScreen> {
                                 priceOk: itemSelect.priceOk,
                                 woPrice: itemSelect.woPrice,
                                 woPriceAfter: itemSelect.woPriceAfter,
+                                originalPrice: Const.isWoPrice == false ? itemSelect.price :itemSelect.woPrice, // Lưu giá gốc ban đầu
                               );
                               _bloc.add(AddCartEvent(productItem: production));
                             }
@@ -739,25 +751,62 @@ class SearchProductScreenState extends State<SearchProductScreen> {
                           child: const PendingAction(),
                     )
                         :
-                    GestureDetector(
-                      onTap: (){
-                        itemSelect = _dataListSearch[index];
-                        indexSelect = index;
-                        _bloc.add(GetListStockEvent(
-                            itemCode: _dataListSearch[index].code.toString(),
-                            getListGroup: true,lockInputToCart: widget.lockInputToCart,
-                            checkStockEmployee: widget.checkStockEmployee??false
-                        ));
-                      },
-                      child: Card(
-                        semanticContainer: true,
-                        margin: const EdgeInsets.only(left: 10,right: 10,top: 5,bottom: 5),
-                        child: Padding(
-                          padding: const EdgeInsets.only(left: 8,right: 6,top: 10,bottom: 10),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.max,
-                            children: [
-                              Stack(
+                    Card(
+                      semanticContainer: true,
+                      margin: const EdgeInsets.only(left: 10,right: 10,top: 5,bottom: 5),
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 8,right: 6,top: 10,bottom: 10),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.max,
+                          children: [
+                            // Checkbox for multi-select with larger tap area
+                            Visibility(
+                              visible: Const.addProductionSameQuantity == true,
+                              child: InkWell(
+                                onTap: () {
+                                  // Toggle selection
+                                  setState(() {
+                                    final productCode = _dataListSearch[index].code ?? '';
+                                    if (selectedProductCodes.contains(productCode)) {
+                                      selectedProductCodes.remove(productCode);
+                                      selectedProducts.remove(productCode);
+                                    } else {
+                                      selectedProductCodes.add(productCode);
+                                      selectedProducts[productCode] = _dataListSearch[index];
+                                    }
+                                  });
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  margin: const EdgeInsets.only(right: 4),
+                                  child: Icon(
+                                    selectedProductCodes.contains(_dataListSearch[index].code)
+                                        ? Icons.check_box
+                                        : Icons.check_box_outline_blank,
+                                    color: selectedProductCodes.contains(_dataListSearch[index].code)
+                                        ? Colors.green
+                                        : Colors.grey.shade400,
+                                    size: 24,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            // Product content - clickable area
+                            Expanded(
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque, // Make entire area tappable including whitespace
+                                onTap: (){
+                                  itemSelect = _dataListSearch[index];
+                                  indexSelect = index;
+                                  _bloc.add(GetListStockEvent(
+                                      itemCode: _dataListSearch[index].code.toString(),
+                                      getListGroup: true,lockInputToCart: widget.lockInputToCart,
+                                      checkStockEmployee: widget.checkStockEmployee??false
+                                  ));
+                                },
+                                child: Row(
+                                  children: [
+                                    Stack(
                                 clipBehavior: Clip.none, children: [
                                 Container(
                                   width: 50,
@@ -919,53 +968,58 @@ class SearchProductScreenState extends State<SearchProductScreen> {
                                       Row(
                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         children: [
-                                          Row(
-                                            children: [
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                                                decoration: BoxDecoration(
-                                                  color: const Color(0xfff5f5f5),
-                                                  borderRadius: BorderRadius.circular(8),
-                                                  border: Border.all(
-                                                    color: const Color(0xffe0e0e0),
-                                                    width: 1,
+                                          Flexible(
+                                            child: Row(
+                                              children: [
+                                                Flexible(
+                                                  child: Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                                    decoration: BoxDecoration(
+                                                      color: const Color(0xfff5f5f5),
+                                                      borderRadius: BorderRadius.circular(8),
+                                                      border: Border.all(
+                                                        color: const Color(0xffe0e0e0),
+                                                        width: 1,
+                                                      ),
+                                                    ),
+                                                    child: Row(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        const Icon(
+                                                          Icons.inventory_2,
+                                                          size: 12,
+                                                          color: Color(0xff666666),
+                                                        ),
+                                                        const SizedBox(width: 4),
+                                                        const Text(
+                                                          'Mã SP:',
+                                                          textAlign: TextAlign.left,
+                                                          style: TextStyle(
+                                                            fontWeight: FontWeight.w500,
+                                                            fontSize: 10,
+                                                            color: Color(0xff666666),
+                                                          ),
+                                                          maxLines: 1,
+                                                          overflow: TextOverflow.ellipsis,
+                                                        ),
+                                                        const SizedBox(width: 3),
+                                                        Flexible(
+                                                          child: Text(
+                                                            '${_dataListSearch[index].code}',
+                                                            textAlign: TextAlign.left,
+                                                            style: const TextStyle(
+                                                              fontWeight: FontWeight.w600,
+                                                              fontSize: 10,
+                                                              color: Color(0xff333333),
+                                                            ),
+                                                            maxLines: 1,
+                                                            overflow: TextOverflow.ellipsis,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
                                                   ),
                                                 ),
-                                                child: Row(
-                                                  mainAxisSize: MainAxisSize.min,
-                                                  children: [
-                                                    const Icon(
-                                                      Icons.inventory_2,
-                                                      size: 12,
-                                                      color: Color(0xff666666),
-                                                    ),
-                                                    const SizedBox(width: 4),
-                                                    const Text(
-                                                      'Mã SP:',
-                                                      textAlign: TextAlign.left,
-                                                      style: TextStyle(
-                                                        fontWeight: FontWeight.w500,
-                                                        fontSize: 10,
-                                                        color: Color(0xff666666),
-                                                      ),
-                                                      maxLines: 1,
-                                                      overflow: TextOverflow.ellipsis,
-                                                    ),
-                                                    const SizedBox(width: 3),
-                                                    Text(
-                                                      '${_dataListSearch[index].code}',
-                                                      textAlign: TextAlign.left,
-                                                      style: const TextStyle(
-                                                        fontWeight: FontWeight.w600,
-                                                        fontSize: 10,
-                                                        color: Color(0xff333333),
-                                                      ),
-                                                      maxLines: 1,
-                                                      overflow: TextOverflow.ellipsis,
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
                                               const SizedBox(width: 8,),
                                               Visibility(
                                                 visible: _dataListSearch[index].discountPercent! > 0,
@@ -1025,18 +1079,20 @@ class SearchProductScreenState extends State<SearchProductScreen> {
                                               ),
                                             ],
                                           ),
+                                          ),
                                           Row(
+                                            mainAxisSize: MainAxisSize.min,
                                             children: [
                                               Text(
-                                                'Tồn kho:',
+                                                'Tồn:',
                                                 style: TextStyle(color: Colors.black.withOpacity(0.7), fontSize: 11),
                                                 textAlign: TextAlign.left,
                                               ),
                                               const SizedBox(
-                                                width: 5,
+                                                width: 4,
                                               ),
                                               Text("${_dataListSearch[index].stockAmount?.toInt()??0}",
-                                                style:const TextStyle(color: blue, fontSize: 12),
+                                                style:const TextStyle(color: blue, fontSize: 12, fontWeight: FontWeight.w600),
                                                 textAlign: TextAlign.left,
                                               ),
                                             ],
@@ -1047,8 +1103,11 @@ class SearchProductScreenState extends State<SearchProductScreen> {
                                   ),
                                 ),
                               ),
-                            ],
-                          ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     );
@@ -1128,7 +1187,7 @@ class SearchProductScreenState extends State<SearchProductScreen> {
                       child: TextField(
                         autofocus: true,
                         textAlign: TextAlign.left,
-                        textAlignVertical: TextAlignVertical.top,
+                        textAlignVertical: TextAlignVertical.center,
                         style: const TextStyle(fontSize: 14, color: Colors.white),
                         focusNode: focusNode,
                         onSubmitted: (text) {
@@ -1136,6 +1195,8 @@ class SearchProductScreenState extends State<SearchProductScreen> {
                         },
                         controller: _searchController,
                         keyboardType: TextInputType.text,
+                        maxLines: 1,
+                        minLines: 1,
                         textInputAction: TextInputAction.done,
 
                         onChanged: (text) {
@@ -1154,8 +1215,7 @@ class SearchProductScreenState extends State<SearchProductScreen> {
                             fillColor: transparent,
                             hintText: "Tìm kiếm sản phẩm",
                             hintStyle: TextStyle(color: Colors.white),
-                            contentPadding: EdgeInsets.only(
-                                bottom: 10, top: 16.5)
+                            contentPadding: EdgeInsets.only(bottom: 15)
                         ),
                       ),
                     ),
@@ -1164,7 +1224,7 @@ class SearchProductScreenState extends State<SearchProductScreen> {
                     visible: _bloc.isShowCancelButton,
                     child: InkWell(
                         child: Padding(
-                          padding: EdgeInsets.only(left: 0,top:0,right: 8,bottom: 0),
+                          padding: const EdgeInsets.only(left: 0,top:0,right: 8,bottom: 0),
                           child: Icon(
                             MdiIcons.close,
                             color: Colors.white,
@@ -1179,6 +1239,53 @@ class SearchProductScreenState extends State<SearchProductScreen> {
                 ],
               ),
             )
+          ),
+          // Cart icon for multi-select
+          Visibility(
+            visible: Const.addProductionSameQuantity == true,
+            child: Stack(
+              children: [
+                InkWell(
+                  onTap: () => _showMultiSelectQuantityPopup(),
+                  child: Container(
+                    width: 40,
+                    height: 50,
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: const Icon( 
+                      Icons.shopping_cart,
+                      size: 25,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+                // Badge showing count
+                if (selectedProductCodes.isNotEmpty)
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 18,
+                        minHeight: 18,
+                      ),
+                      child: Text(
+                        '${selectedProductCodes.length}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ],
       ),
@@ -1195,10 +1302,390 @@ class SearchProductScreenState extends State<SearchProductScreen> {
     }
   }
 
+  // Show popup to input quantity for selected products
+  void _showMultiSelectQuantityPopup() async {
+    if (selectedProductCodes.isEmpty) {
+      Utils.showCustomToast(context, Icons.warning, 'Vui lòng chọn ít nhất 1 sản phẩm');
+      return;
+    }
+
+    final result = await showDialog<double>(
+      context: context,
+      builder: (context) => _MultiSelectQuantityDialog(
+        selectedProducts: selectedProducts.values.toList(),
+      ),
+    );
+
+    if (result == null || result <= 0) return;
+
+    // Add all selected products to cart with the same quantity
+    _addMultipleProductsToCart(result);
+  }
+
+  // Add multiple products to cart
+  void _addMultipleProductsToCart(double quantity) async {
+    int successCount = 0;
+    
+    for (var product in selectedProducts.values) {
+      // Debug log giá sản phẩm
+      print('DEBUG: Product ${product.code} - price: ${product.price}, woPrice: ${product.woPrice}, giaSuaDoi: ${product.giaSuaDoi}, priceAfter: ${product.priceAfter}, woPriceAfter: ${product.woPriceAfter}');
+      
+      // Set quantity for each product
+      product.count = quantity;
+      
+      // Add to cart logic based on screen type - KHÔNG GỌI GetListStockEvent để tránh show popup
+      if (widget.inventoryControl == true) {
+        // Inventory control logic
+        _bloc.add(UpdateProductCountInventory(product: product));
+      } else if (widget.addProductFromCheckIn == true) {
+        // Check-in logic - use SearchItemResponseData directly
+        _bloc.add(AddProductCountFromCheckIn(product: product));
+      } else if (widget.addProductFromSaleOut == true) {
+        // Sale out logic
+        // Lấy giá từ các nguồn khả dụng: giaSuaDoi > 0 thì dùng, không thì dùng price/woPrice
+        double basePrice = Const.isWoPrice == false ? (product.price ?? 0) : (product.woPrice ?? 0);
+        double giaBan = product.giaSuaDoi > 0 ? product.giaSuaDoi : basePrice;
+        double giaSauCK = Const.isWoPrice == false ? (product.priceAfter ?? 0) : (product.woPriceAfter ?? 0);
+        double giaGuiBan = product.giaGui > 0 ? product.giaGui : giaSauCK;
+        
+        // Kiểm tra nếu giá = 0 thì dùng priceAfter/woPriceAfter
+        if (giaBan <= 0) {
+          giaBan = giaSauCK;
+        }
+        
+        Product production = Product(
+          code: product.code,
+          sttRec0: product.sttRec0,
+          name: product.name,
+          name2: product.name2,
+          dvt: product.dvt,
+          description: product.descript,
+          price: basePrice,
+          priceAfter: giaSauCK,
+          discountPercent: product.discountPercent,
+          stockAmount: product.stockAmount,
+          taxPercent: product.taxPercent,
+          imageUrl: product.imageUrl ?? '',
+          count: quantity,
+          giaSuaDoi: giaBan, // Fix: Thêm giaSuaDoi - ưu tiên giaSuaDoi nếu có
+          giaGui: giaGuiBan, // Thêm giaGui
+          originalPrice: basePrice, // Lưu giá gốc ban đầu
+        );
+        _bloc.add(AddProductSaleOutEvent(productItem: production));
+      } else {
+        // Regular cart logic
+        // Lấy giá từ các nguồn khả dụng: giaSuaDoi > 0 thì dùng, không thì dùng price/woPrice
+        double basePrice = Const.isWoPrice == false ? (product.price ?? 0) : (product.woPrice ?? 0);
+        double giaBan = product.giaSuaDoi > 0 ? product.giaSuaDoi : basePrice;
+        double giaSauCK = Const.isWoPrice == false ? (product.priceAfter ?? 0) : (product.woPriceAfter ?? 0);
+        double giaGuiBan = product.giaGui > 0 ? product.giaGui : giaSauCK;
+        
+        // Kiểm tra nếu giá = 0 thì dùng priceAfter/woPriceAfter
+        if (giaBan <= 0) {
+          giaBan = giaSauCK;
+        }
+        
+        Product production = Product(
+          code: product.code,
+          sttRec0: product.sttRec0,
+          name: product.name,
+          name2: product.name2,
+          dvt: product.dvt,
+          description: product.descript,
+          price: basePrice,
+          priceAfter: giaSauCK,
+          discountPercent: product.discountPercent,
+          stockAmount: product.stockAmount,
+          taxPercent: product.taxPercent,
+          imageUrl: product.imageUrl ?? '',
+          count: quantity,
+          isMark: 1,
+          discountMoney: product.discountMoney ?? '0',
+          discountProduct: product.discountProduct ?? '0',
+          budgetForItem: product.budgetForItem ?? '',
+          budgetForProduct: product.budgetForProduct ?? '',
+          residualValueProduct: product.residualValueProduct ?? 0,
+          residualValue: product.residualValue ?? 0,
+          unit: product.unit ?? '',
+          unitProduct: product.unitProduct ?? '',
+          dsCKLineItem: product.maCk.toString(),
+          giaSuaDoi: giaBan, // Fix: Thêm giaSuaDoi - ưu tiên giaSuaDoi nếu có
+          giaGui: giaGuiBan, // Thêm giaGui
+          originalPrice: basePrice, // Giá gốc ban đầu
+          maThue: product.maThue, // Mã thuế
+          tenThue: product.tenThue, // Tên thuế
+          thueSuat: product.thueSuat, // Thuế suất (%)
+        );
+        _bloc.add(AddCartEvent(productItem: production));
+      }
+      
+      successCount++;
+      
+      // Small delay between adds to avoid overwhelming the BLoC
+      await Future.delayed(const Duration(milliseconds: 50));
+    }
+
+    // Clear selections after adding
+    setState(() {
+      selectedProductCodes.clear();
+      selectedProducts.clear();
+    });
+
+    Utils.showCustomToast(
+      context,
+      Icons.check_circle_outline,
+      'Đã thêm $successCount sản phẩm vào giỏ hàng'
+    );
+  }
+
   @override
   void dispose() {
     // TODO: implement dispose
     _bloc.reset();
     super.dispose();
+  }
+}
+
+// Dialog để nhập số lượng chung cho nhiều sản phẩm
+class _MultiSelectQuantityDialog extends StatefulWidget {
+  final List<SearchItemResponseData> selectedProducts;
+
+  const _MultiSelectQuantityDialog({required this.selectedProducts});
+
+  @override
+  State<_MultiSelectQuantityDialog> createState() => _MultiSelectQuantityDialogState();
+}
+
+class _MultiSelectQuantityDialogState extends State<_MultiSelectQuantityDialog> {
+  final TextEditingController _quantityController = TextEditingController(text: '1');
+  double quantity = 1;
+
+  @override
+  void dispose() {
+    _quantityController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.blue.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.shopping_cart, color: Colors.blue, size: 24),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              'Nhập số lượng',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Selected products summary
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.inventory_2, size: 16, color: Colors.grey),
+                    const SizedBox(width: 6),
+                    Text(
+                      '${widget.selectedProducts.length} sản phẩm đã chọn',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                const Divider(height: 1),
+                const SizedBox(height: 8),
+                // List of selected products (max 3, then show "...")
+                ...widget.selectedProducts.take(3).map((product) => Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 4,
+                        height: 4,
+                        decoration: const BoxDecoration(
+                          color: Colors.green,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          product.name ?? '',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade700,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                )).toList(),
+                if (widget.selectedProducts.length > 3)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      '...và ${widget.selectedProducts.length - 3} sản phẩm khác',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey.shade600,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          // Quantity input
+          const Text(
+            'Số lượng cho tất cả sản phẩm:',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey.shade300),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                // Minus button
+                InkWell(
+                  onTap: () {
+                    if (quantity > 1) {
+                      setState(() {
+                        quantity--;
+                        _quantityController.text = quantity.toInt().toString();
+                      });
+                    }
+                  },
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: quantity > 1 ? Colors.red.shade50 : Colors.grey.shade200,
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(8),
+                        bottomLeft: Radius.circular(8),
+                      ),
+                    ),
+                    child: Icon(
+                      Icons.remove,
+                      color: quantity > 1 ? Colors.red : Colors.grey,
+                    ),
+                  ),
+                ),
+                // TextField
+                Expanded(
+                  child: TextField(
+                    controller: _quantityController,
+                    textAlign: TextAlign.center,
+                    keyboardType: TextInputType.number,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                    decoration: const InputDecoration(
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    onChanged: (value) {
+                      final newQuantity = double.tryParse(value) ?? 1;
+                      if (newQuantity > 0) {
+                        setState(() {
+                          quantity = newQuantity;
+                        });
+                      }
+                    },
+                  ),
+                ),
+                // Plus button
+                InkWell(
+                  onTap: () {
+                    setState(() {
+                      quantity++;
+                      _quantityController.text = quantity.toInt().toString();
+                    });
+                  },
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade50,
+                      borderRadius: const BorderRadius.only(
+                        topRight: Radius.circular(8),
+                        bottomRight: Radius.circular(8),
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.add,
+                      color: Colors.green,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            if (quantity > 0) {
+              Navigator.pop(context, quantity);
+            } else {
+              Utils.showCustomToast(context, Icons.warning, 'Số lượng phải lớn hơn 0');
+            }
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.green,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          child: const Text(
+            'Xác nhận',
+            style: TextStyle(color: Colors.white, fontSize: 14),
+          ),
+        ),
+      ],
+    );
   }
 }

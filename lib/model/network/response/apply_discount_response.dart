@@ -279,6 +279,8 @@ class ListCkMatHang {
   String? dvt;
   double? soLuong;
   String? kieuCK;
+  dynamic group_dk;
+  dynamic ten_ck;
 
   ListCkMatHang(
       {this.sttRecCk,
@@ -288,7 +290,7 @@ class ListCkMatHang {
         this.maHangTang,
         this.tenHangTang,
         this.dvt,
-        this.soLuong, this.kieuCK});
+        this.soLuong, this.kieuCK, this.group_dk,this.ten_ck});
 
   ListCkMatHang.fromJson(Map<String, dynamic> json) {
     sttRecCk = json['stt_rec_ck'];
@@ -300,9 +302,11 @@ class ListCkMatHang {
     dvt = json['dvt'];
     soLuong = json['so_luong'];
     kieuCK = json['kieu_ck'];
+    group_dk = json['group_dk'];
+    ten_ck = json['ten_ck'];
   }
 
-  Map<String, dynamic> toJson() {
+    Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = <String, dynamic>{};
     data['stt_rec_ck'] = sttRecCk;
     data['ma_ck'] = maCk;
@@ -313,6 +317,8 @@ class ListCkMatHang {
     data['dvt'] = dvt;
     data['so_luong'] = soLuong;
     data['kieu_ck'] = kieuCK;
+    data['group_dk'] = group_dk;
+    data['ten_ck'] = ten_ck;
     return data;
   }
 }

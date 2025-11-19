@@ -82,221 +82,331 @@ class _OptionsFilterDateState extends State<OptionsFilterDate> {
   }
 
   Widget buildPage(BuildContext context,OptionsInputState state){
-    return Padding(
-      padding: const EdgeInsets.only(top: 35,bottom: 35),
-      child: AlertDialog(
-        content: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+    return Dialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
+      elevation: 0,
+      backgroundColor: Colors.transparent,
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              offset: const Offset(0, 4),
+              blurRadius: 20,
+              spreadRadius: 0,
+            ),
+          ],
+        ),
+        child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Column(children: [
-                Text('Bộ lọc',style: TextStyle(fontWeight: FontWeight.bold),),
-                SizedBox(height: 10,),
-                Divider(),
-                SizedBox(height: 10,),
-            ],),
+            // Header
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: subColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.filter_list_rounded,
+                    color: subColor,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    'Bộ lọc',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 20,
+                      color: Colors.black87,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ),
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => Navigator.pop(context),
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Icon(
+                        Icons.close_rounded,
+                        size: 20,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
             Visibility(
               visible: widget.listStatus?.isNotEmpty == true,
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SizedBox(
-                      height: 40,
-                      child: Row(
-                        children: [
-                          const Text(
-                            "Trạng thái",
-                            textAlign: TextAlign.right,
-                            style: TextStyle(fontSize: 12),
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
-                          ),
-                          Expanded(child: genderStatus2()),
-                          const SizedBox(width: 5,)
-                        ],
-                      )
+                  _buildFilterSection(
+                    'Trạng thái',
+                    genderStatus2(),
                   ),
-                  SizedBox(
-                      height: 40,
-                      child: Row(
-                        children: [
-                          const Text(
-                            "Loại           ",
-                            textAlign: TextAlign.right,
-                            style: TextStyle(fontSize: 12),
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
-                          ),
-                          Expanded(child: genderType()),
-                          const SizedBox(width: 5,)
-                        ],
-                      )
+                  const SizedBox(height: 16),
+                  _buildFilterSection(
+                    'Loại',
+                    genderType(),
                   ),
-                  const SizedBox(
-                    height: 10,
-                  ),
-                  ///or
+                  const SizedBox(height: 20),
                   Row(
                     children: [
                       Expanded(
                         child: Divider(
                           height: 1,
-                          color: Colors.blue.withOpacity(0.8),
+                          color: Colors.grey.shade300,
                         ),
                       ),
-                      const SizedBox(width: 3,),
-                      const Text(
-                        'Hoặc',
-                        style: TextStyle(fontSize: 12,color: Colors.grey),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Text(
+                          'HOẶC',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey.shade500,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 1,
+                          ),
+                        ),
                       ),
-                      const SizedBox(width: 3,),
                       Expanded(
                         child: Divider(
                           height: 1,
-                          color: Colors.blue.withOpacity(0.8),
+                          color: Colors.grey.shade300,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(
-                    height: 15,
-                  ),
+                  const SizedBox(height: 20),
                 ],
               ),
             ),
-            ///FromDate
-            Container(
-              padding:const EdgeInsets.only(left: 12,right: 2,top: 10,bottom: 10),
-              height: 45,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                  border: Border.all(color: grey.withOpacity(0.8),width: 1),
-                  borderRadius: const BorderRadius.all(Radius.circular(8))
+            // Date Range Section
+            _buildDateField(
+              context,
+              label: 'Từ ngày',
+              date: Utils.parseStringDateToString(
+                _bloc.dateFrom.toString(),
+                Const.DATE_TIME_FORMAT,
+                Const.DATE_FORMAT_1,
               ),
-              child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: <Widget>[
-                    Row(
-                      children: [
-                        const Text('Từ ngày: ',style:  TextStyle(color: Colors.black,fontSize: 12),textAlign: TextAlign.center,),
-                        const SizedBox(width: 5,),
-                        Text(Utils.parseStringDateToString(_bloc.dateFrom.toString(), Const.DATE_TIME_FORMAT,Const.DATE_FORMAT_1),style: const TextStyle(color: Colors.black,fontSize: 12),textAlign: TextAlign.center,maxLines: 1,overflow: TextOverflow.ellipsis,),
-                      ],
-                    ),
-                    SizedBox(
-                      width: 50,
-                      child: InkWell(
-                        onTap: (){
-                          Utils.dateTimePickerCustom(context).then((value){
-                            if(value != null){
-                              setState(() {
-                                _bloc.add(DateFrom(value));
-                              });
-                            }
-                          });
-                        },
-                        child: const Icon(Icons.event,color: Colors.blueGrey,size: 22,),
-                      ),
-                    ),
-                  ]),
+              icon: Icons.calendar_today_rounded,
+              onTap: () {
+                Utils.dateTimePickerCustom(context).then((value) {
+                  if (value != null) {
+                    setState(() {
+                      _bloc.add(DateFrom(value));
+                    });
+                  }
+                });
+              },
             ),
-            const SizedBox(
-              height: 10,
-            ),
-            ///ToDate
-            Container(
-              padding:const EdgeInsets.only(left: 12,right: 2,top: 10,bottom: 10),
-              height: 45,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                  border: Border.all(color: grey.withOpacity(0.8),width: 1),
-                  borderRadius: const BorderRadius.all(Radius.circular(8))
+            const SizedBox(height: 16),
+            _buildDateField(
+              context,
+              label: 'Đến ngày',
+              date: Utils.parseStringDateToString(
+                _bloc.dateTo.toString(),
+                Const.DATE_TIME_FORMAT,
+                Const.DATE_FORMAT_1,
               ),
-              child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: <Widget>[
-                    Row(
-                      children: [
-                        const Text('Tới ngày: ',style:  TextStyle(color: Colors.black,fontSize: 12),textAlign: TextAlign.center,),
-                        const SizedBox(width: 5,),
-                        Text(Utils.parseStringDateToString(_bloc.dateTo.toString(), Const.DATE_TIME_FORMAT,Const.DATE_FORMAT_1),style: const TextStyle(color: Colors.black,fontSize: 12),textAlign: TextAlign.center,maxLines: 1,overflow: TextOverflow.ellipsis,),
-                      ],
-                    ),
-                    SizedBox(
-                      width: 50,
-                      child: InkWell(
-                        onTap: (){
-                          Utils.dateTimePickerCustom(context).then((value){
-                            if(value != null){
-                              setState(() {
-                                _bloc.add(DateTo(value));
-                              });
-                            }
-                          });
-                        },
-                        child: const Icon(Icons.event,color: Colors.blueGrey,size: 22,),
-                      ),
-                    ),
-                  ]),
+              icon: Icons.event_available_rounded,
+              onTap: () {
+                Utils.dateTimePickerCustom(context).then((value) {
+                  if (value != null) {
+                    setState(() {
+                      _bloc.add(DateTo(value));
+                    });
+                  }
+                });
+              },
             ),
-            const SizedBox(height: 25,),
-            ///Button
-            Padding(
-              padding: const EdgeInsets.only(left: 10,right: 10),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  GestureDetector(
+            const SizedBox(height: 28),
+            // Action Buttons
+            Row(
+              children: [
+                Expanded(
+                  child: _buildActionButton(
+                    label: 'Hủy',
+                    color: Colors.grey.shade300,
+                    textColor: Colors.grey.shade700,
                     onTap: () => Navigator.pop(context),
-                    child: Container(
-                      width: 90.0,
-                      height: 35.0,
-                      decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(18.0), color: grey),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            'Huỷ',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: white,
-                            ),
-                            textAlign: TextAlign.left,
-                          ),
-                        ],
-                      ),
-                    ),
                   ),
-                  GestureDetector(
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildActionButton(
+                    label: 'Áp dụng',
+                    color: subColor,
+                    textColor: Colors.white,
                     onTap: () {
-                      print(_bloc.getStringFromDateYMD(_bloc.dateTo));
-                     Navigator.pop(context,[statusType,_bloc.statusCode,'',_bloc.getStringFromDateYMD(_bloc.dateFrom),_bloc.getStringFromDateYMD(_bloc.dateTo),statusTypeName]);
+                      Navigator.pop(context, [
+                        statusType,
+                        _bloc.statusCode,
+                        '',
+                        _bloc.getStringFromDateYMD(_bloc.dateFrom),
+                        _bloc.getStringFromDateYMD(_bloc.dateTo),
+                        statusTypeName,
+                      ]);
                     },
-                    child: Container(
-                      width: 90.0,
-                      height: 35.0,
-                      decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(18.0), color: orange),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            'Chọn',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: white,
-                            ),
-                            textAlign: TextAlign.left,
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                ],
-              ),
+                  ),
+                ),
+              ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterSection(String title, Widget child) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey.shade700,
+            letterSpacing: 0.2,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey.shade300, width: 1),
+            borderRadius: BorderRadius.circular(12),
+            color: Colors.grey.shade50,
+          ),
+          child: child,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDateField(
+    BuildContext context, {
+    required String label,
+    required String date,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey.shade700,
+            letterSpacing: 0.2,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.shade300, width: 1),
+                borderRadius: BorderRadius.circular(12),
+                color: Colors.white,
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    icon,
+                    size: 20,
+                    color: subColor,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      date,
+                      style: const TextStyle(
+                        color: Colors.black87,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 16,
+                    color: Colors.grey.shade400,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionButton({
+    required String label,
+    required Color color,
+    required Color textColor,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              if (color == subColor)
+                BoxShadow(
+                  color: color.withOpacity(0.3),
+                  offset: const Offset(0, 2),
+                  blurRadius: 4,
+                ),
+            ],
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: textColor,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.3,
+              ),
+            ),
+          ),
         ),
       ),
     );

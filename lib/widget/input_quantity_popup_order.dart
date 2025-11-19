@@ -51,6 +51,7 @@ class InputQuantityPopupOrder extends StatefulWidget {
   final String? nameNVKD;
   final String? tenThue;
   final dynamic thueSuat;
+  final double? originalPrice; // Giá gốc ban đầu từ API
 
   const InputQuantityPopupOrder({Key? key,
     required this.codeProduction, required this.nameProduction,required this.price,this.giaGui,required this.title,required this.quantity,
@@ -58,7 +59,7 @@ class InputQuantityPopupOrder extends StatefulWidget {
     required this.findStock,required this.listStock, required this.quantityStock,this.typeValues,
     this.isCreateItemHolder,required this.listObjectJson, this.updateValues, required this.listQuyDoiDonViTinh,
     required this.nuocsx, required this.quycach,
-    this.idNVKD, this.nameNVKD, this.tenThue, this.thueSuat
+    this.idNVKD, this.nameNVKD, this.tenThue, this.thueSuat, this.originalPrice,
   }) : super(key: key);
 
   @override
@@ -68,13 +69,14 @@ class InputQuantityPopupOrder extends StatefulWidget {
 class _InputQuantityPopupOrderState extends State<InputQuantityPopupOrder> {
 
   /// Kiểm tra xem có cho phép sửa giá hay không dựa trên các điều kiện:
-  /// - Nếu editPriceWidthValuesEmptyOrZero = true: Chỉ cho sửa khi giá = 0
+  /// - Nếu editPriceWidthValuesEmptyOrZero = true: Chỉ cho sửa khi giá gốc (originalPrice) = 0 hoặc null
   /// - Nếu editPriceWidthValuesEmptyOrZero = false && editPrice = true: Cho phép sửa
   /// - Nếu editPriceWidthValuesEmptyOrZero = false && editPrice = false: Không cho sửa
   bool get canEditPrice {
     if (Const.editPriceWidthValuesEmptyOrZero == true) {
-      // Chỉ cho sửa giá khi giá = 0 hoặc rỗng
-      return widget.price == 0;
+      // Chỉ cho sửa giá khi giá gốc ban đầu = 0 hoặc null
+      // Điều này cho phép user tiếp tục sửa giá nhiều lần nếu giá ban đầu từ API là 0
+      return (widget.originalPrice ?? widget.price) == 0;
     } else {
       // Logic cũ: phụ thuộc vào Const.editPrice
       return Const.editPrice == true;
@@ -137,14 +139,9 @@ class _InputQuantityPopupOrderState extends State<InputQuantityPopupOrder> {
     _orderBloc.add(GetPrefs());
     giaGui = widget.giaGui??0;
     nameProductController.text = widget.nameProduction;
-   if(widget.listStock.isNotEmpty && widget.listStock.isNotEmpty && Const.takeFirstStockInList == true){
+   if(widget.listStock.isNotEmpty){
      nameStore = widget.listStock[0].tenKho.toString().trim();
      codeStore = widget.listStock[0].maKho.toString().trim();
-   }
-   else{
-     if(widget.listStock.isNotEmpty) {
-       nameStore = 'Chọn kho xuất hàng';
-     }
    }
     if(giaGui > 0){
       giaGuiController.text = Utils.formatMoneyStringToDouble(giaGui);

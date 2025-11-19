@@ -20,18 +20,6 @@ class DownloadFileSuccessEvent extends CartEvent {
   String toString() => 'DownloadFileSuccessEvent';
 }
 
-class TotalDiscountAndMoneyForAppEvent extends CartEvent {
-
-  final List<Product> listProduct;
-  final bool viewUpdateOrder;
-  final bool reCalculator;
-
-  TotalDiscountAndMoneyForAppEvent({required this.listProduct,required this.viewUpdateOrder,required this.reCalculator});
-
-  @override
-  String toString() => 'TotalDiscountAndMoneyForAppEvent {listProduct: $listProduct,}';
-}
-
 class CheckDisCountWhenUpdateEvent extends CartEvent {
 
   final String sttRec;
@@ -646,4 +634,13 @@ class CalculatorTaxForItemEvent extends CartEvent {
 class UpdateListOrder extends CartEvent {
   @override
   String toString() => 'UpdateListOrder';
+}
+
+class GetGiftProductListEvent extends CartEvent {
+  final String maNhom;
+
+  GetGiftProductListEvent({required this.maNhom});
+
+  @override
+  String toString() => 'GetGiftProductListEvent {maNhom: $maNhom}';
 }

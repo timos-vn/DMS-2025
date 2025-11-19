@@ -571,7 +571,38 @@ class CheckInBloc extends Bloc<CheckInEvent,CheckInState>{
 
   void _saveTimeCheckOut(SaveTimeCheckOut event, Emitter<CheckInState> emitter)async{
     emitter(CheckInLoading());
-    DataLocal.dateTimeStartCheckIn = event.dateTime.toString();
+    
+    DataLocal.idCurrentCheckIn = (event.idCheckIn.toString() + event.idCustomer.trim());
+    
+    // Kiểm tra xem check-in đã tồn tại chưa để giữ lại thời gian check-in ban đầu
+    String timeCheckInToUse = event.dateTime.toString();
+    ItemCheckInOffline? existingCheckIn;
+    
+    if(listDataCheckInCheck.isNotEmpty){
+      bool checkIsExits = listDataCheckInCheck.any((element) => element.id == DataLocal.idCurrentCheckIn);
+      if(checkIsExits == true){
+        existingCheckIn = listDataCheckInCheck.firstWhere((element) => element.id == DataLocal.idCurrentCheckIn);
+        // Nếu check-in đã tồn tại, sử dụng thời gian check-in ban đầu từ database
+        if(existingCheckIn.timeCheckIn != null && existingCheckIn.timeCheckIn!.isNotEmpty){
+          timeCheckInToUse = existingCheckIn.timeCheckIn!;
+        }
+      }
+    } else {
+      // Load từ database nếu listDataCheckInCheck rỗng
+      listDataCheckInCheck = await getListDataCheckInFromDb();
+      if(listDataCheckInCheck.isNotEmpty){
+        bool checkIsExits = listDataCheckInCheck.any((element) => element.id == DataLocal.idCurrentCheckIn);
+        if(checkIsExits == true){
+          existingCheckIn = listDataCheckInCheck.firstWhere((element) => element.id == DataLocal.idCurrentCheckIn);
+          if(existingCheckIn.timeCheckIn != null && existingCheckIn.timeCheckIn!.isNotEmpty){
+            timeCheckInToUse = existingCheckIn.timeCheckIn!;
+          }
+        }
+      }
+    }
+    
+    DataLocal.dateTimeStartCheckIn = timeCheckInToUse;
+    
     // if(DataLocal.latLongLocation.isEmpty && event.latLong.isEmpty){
     //   // currentLocation = await locateUser();
     //   // List<Placemark> placePoint = await placemarkFromCoordinates(currentLocation!.latitude,currentLocation!.longitude);
@@ -581,7 +612,6 @@ class CheckInBloc extends Bloc<CheckInEvent,CheckInState>{
     //   getUserLocation();
     // }
 
-    DataLocal.idCurrentCheckIn = (event.idCheckIn.toString() + event.idCustomer.trim());
     ItemCheckInOffline itemCheckIn = ItemCheckInOffline(
       id: (event.idCheckIn.toString() + event.idCustomer.trim()),
       maKh: event.idCustomer.toString().trim(),
@@ -589,9 +619,9 @@ class CheckInBloc extends Bloc<CheckInEvent,CheckInState>{
       latlong: event.latLong.isEmpty == true ? DataLocal.latLongLocation : event.latLong,
       diaChi: DataLocal.addressCheckInCustomer,
       idCheckIn: event.idCheckIn.toString().trim(),
-      timeCheckIn: event.dateTime.toString(),
-      openStore: '',
-      timeCheckOut: '',
+      timeCheckIn: timeCheckInToUse, // Sử dụng thời gian check-in ban đầu nếu đã tồn tại
+      openStore: existingCheckIn?.openStore ?? '',
+      timeCheckOut: existingCheckIn?.timeCheckOut ?? '',
       tieuDe: event.title,
       ngayCheckin: event.ngayCheckIn.toString(),
       numberTimeCheckOut: event.numberTimeCheckOut
@@ -606,6 +636,9 @@ class CheckInBloc extends Bloc<CheckInEvent,CheckInState>{
          print('add1');
          listDataCheckInCheck.add(itemCheckIn);
          await db.addListCheckIn(itemCheckIn);
+       } else {
+         // Nếu đã tồn tại, update với thông tin mới nhưng giữ nguyên timeCheckIn ban đầu
+         await db.updateListCheckIn(itemCheckIn);
        }
     }else {
       print('add2');
@@ -616,7 +649,7 @@ class CheckInBloc extends Bloc<CheckInEvent,CheckInState>{
     AppSettings valuesCheckOut = AppSettings(
       (event.idCheckIn.toString() + event.idCustomer.trim()),
         event.title,
-        event.dateTime.toString(),
+        timeCheckInToUse, // Sử dụng thời gian check-in ban đầu nếu đã tồn tại
     );
     await db.addAppSettings(valuesCheckOut);
     listAppSettings = await getListFromDb();

@@ -57,9 +57,9 @@ class _QuantityInfoBoxState extends State<QuantityInfoBox> {
       children: [
         Container(
           height: 35,
-          padding: const EdgeInsets.symmetric(horizontal: 2),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(6),
             color: grey_100,
           ),
           child: Row(
@@ -68,11 +68,11 @@ class _QuantityInfoBoxState extends State<QuantityInfoBox> {
               Text(
                 widget.contractQuantity != null 
                   ? "SL: ${widget.contractQuantity} ${widget.unit}"
-                  : "SL: ${Utils.formatQuantity(widget.quantity)} ${widget.unit}",
+                  : "SL: ${Utils.formatQuantity(widget.quantity)} - ${widget.unit}",
                 style: TextStyle(
                   fontSize: 12.5,
-                  color: widget.contractQuantity != null ? Colors.green : accent,
-                  fontWeight: widget.contractQuantity != null ? FontWeight.bold : FontWeight.normal,
+                  color: widget.contractQuantity != null ? Colors.green : Colors.black,
+                  fontWeight: widget.contractQuantity != null ? FontWeight.bold : FontWeight.w600,
                 ),
                 textAlign: TextAlign.center,
               ),

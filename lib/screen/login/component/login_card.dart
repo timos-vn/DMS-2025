@@ -67,7 +67,7 @@ class _LoginCardState extends State<LoginCard> with TickerProviderStateMixin {
   late AnimationController _submitController;
 
   ///Timer
-  Timer _timer = Timer(const Duration(milliseconds: 1), () {});
+  Timer? _timer;
   int start = 3;
   bool waitingLoad = false;
 
@@ -85,7 +85,7 @@ class _LoginCardState extends State<LoginCard> with TickerProviderStateMixin {
             _nameController.text = !Utils.isEmpty(DataLocal.accountName) ? DataLocal.accountName : '';
             _passController.text = !Utils.isEmpty(DataLocal.passwordAccount) ? DataLocal.passwordAccount : '';
           });
-          timer.cancel();
+          _timer?.cancel();
         } else {
           start--;
         }
@@ -128,6 +128,94 @@ class _LoginCardState extends State<LoginCard> with TickerProviderStateMixin {
         dialog!.update(progress);
       }
     });
+  }
+
+  Future<void> _showValidationDialog() async {
+    return showDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black.withOpacity(0.5),
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              color: Colors.white,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Icon
+                Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.warning_amber_outlined,
+                    color: Colors.orange,
+                    size: 30,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Title
+                const Text(
+                  'Thông tin chưa đầy đủ',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                // Message
+                const Text(
+                  'Vui lòng nhập đầy đủ Host ID, Tên đăng nhập và Mật khẩu để tiếp tục.',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.black54,
+                    height: 1.4,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+                // OK Button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color.fromARGB(255, 0, 51, 114),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Đã hiểu',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
 
@@ -217,6 +305,16 @@ class _LoginCardState extends State<LoginCard> with TickerProviderStateMixin {
 
   Future<bool> _submit() async {
     FocusScope.of(context).requestFocus(FocusNode());
+
+    // Validate all fields are filled before proceeding
+    final hotIdValue = _hotIdController.text.trim();
+    final usernameValue = _nameController.text.trim();
+    final passwordValue = _passController.text.trim();
+
+    if (hotIdValue.isEmpty || usernameValue.isEmpty || passwordValue.isEmpty) {
+      _showValidationDialog();
+      return false;
+    }
 
     _formKey.currentState!.save();
     await _submitController.forward();

@@ -23,33 +23,45 @@ class GetListFieldLookup extends FilterEvent {
   final bool isLoadMore;
   final String? controller;
   final String? listItem;
+  final int? pageIndex;
 
-  GetListFieldLookup({this.searchTextCode,this.searchTextName,this.isRefresh = false, this.isLoadMore = false,this.controller,this.listItem});
+  GetListFieldLookup(
+      {this.searchTextCode,
+      this.searchTextName,
+      this.isRefresh = false,
+      this.isLoadMore = false,
+      this.controller,
+      this.listItem,
+      this.pageIndex});
 
   @override
-  String toString() => 'GetListFieldLookup {searchTextCode: $searchTextCode,searchTextName: $searchTextName ,isRefresh $isRefresh & isLoadMore $isLoadMore, controller $controller, listItem: $listItem}';
+  String toString() =>
+      'GetListFieldLookup {searchTextCode: $searchTextCode,searchTextName: $searchTextName ,isRefresh $isRefresh & isLoadMore $isLoadMore, controller $controller, listItem: $listItem, pageIndex: $pageIndex}';
 }
-class AddItemSelectedEvent extends FilterEvent {
 
+class AddItemSelectedEvent extends FilterEvent {
   final ReportFieldLookupResponseData id;
   final bool checked;
 
-  AddItemSelectedEvent(this.id,this.checked);
+  AddItemSelectedEvent(this.id, this.checked);
 
   @override
   String toString() => 'AddItemSelectedEvent {id: $id, checked: $checked}';
 }
+
 class SearchConditions extends FilterEvent {
   final String? searchTextCode;
   final String? searchTextName;
   final bool isLoadMore;
   final bool isRefresh;
-  SearchConditions({this.searchTextCode,this.searchTextName,this.isLoadMore = false, this.isRefresh = false});
+  SearchConditions(
+      {this.searchTextCode,
+      this.searchTextName,
+      this.isLoadMore = false,
+      this.isRefresh = false});
 
   @override
   String toString() {
     return 'SearchConditions{searchTextCode: $searchTextCode,searchTextName: $searchTextName isLoadMore: $isLoadMore, isRefresh: $isRefresh}';
   }
 }
-
-

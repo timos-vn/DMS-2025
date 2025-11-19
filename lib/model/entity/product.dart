@@ -70,6 +70,9 @@ class Product extends Equatable {
   
   // Số lượng khả dụng khi add từ contract (lưu vào SQLite)
   double? availableQuantity;
+  
+  // Giá gốc ban đầu từ API (dùng để kiểm tra cho phép sửa giá)
+  double? originalPrice;
 
 
   Product({this.code,this.maVt2 = '', this.name, this.name2, this.dvt, this.description, this.price = 0,this.priceAfterTax,this.valuesTax,
@@ -81,6 +84,7 @@ class Product extends Equatable {
     this.idNVKD,this.nameNVKD,this.nuocsx,this.quycach,this.maThue,this.tenThue,this.thueSuat,
     this.applyPriceAfterTax,this.discountByHand,this.discountPercentByHand,this.ckntByHand,this.priceOk,this.woPrice,this.woPriceAfter,this.sttRec0,
     this.availableQuantity,
+    this.originalPrice,
   });
 
 
@@ -145,7 +149,8 @@ class Product extends Equatable {
         priceOk = map['priceOk'],
         woPrice = map['woPrice'],
         woPriceAfter = map['woPriceAfter'],
-        availableQuantity = map['availableQuantity'];
+        availableQuantity = map['availableQuantity'],
+        originalPrice = map['originalPrice'];
 
   Map<String, dynamic> toMapForDb() {
     final Map<String, dynamic> data = <String, dynamic>{};
@@ -214,6 +219,7 @@ class Product extends Equatable {
     data['woPrice'] = woPrice;
     data['woPriceAfter'] = woPriceAfter;
     data['availableQuantity'] = availableQuantity;
+    data['originalPrice'] = originalPrice;
     return data;
   }
 

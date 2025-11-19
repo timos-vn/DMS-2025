@@ -54,20 +54,10 @@ class CartLoading extends CartState {
   String toString() => 'CartLoading';
 }
 
-class TotalMoneyForAppSuccess extends CartState {
-
-  final bool reCalculator;
-
-  TotalMoneyForAppSuccess(this.reCalculator);
-
-  @override
-  String toString() => 'TotalMoneyForAppSuccess{} }';
-}
-
 class TotalMoneyUpdateOrderSuccess extends CartState {
 
   @override
-  String toString() => 'TotalMoneyForAppSuccess{} }';
+  String toString() => 'TotalMoneyUpdateOrderSuccess{} }';
 }
 
 class TotalMoneyForServerSuccess extends CartState {
@@ -439,5 +429,12 @@ class GetListVvHdSuccess extends CartState {
   @override
   String toString() {
     return 'SearchItemSuccess{}';
+  }
+}
+
+class GetGiftProductListSuccess extends CartState {
+  @override
+  String toString() {
+    return 'GetGiftProductListSuccess{}';
   }
 }

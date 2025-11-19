@@ -65,7 +65,7 @@ class DetailApprovalBloc extends Bloc<DetailApprovalEvent, DetailApprovalState> 
 
   void _seenApprovalEvent(SeenApprovalEvent event, Emitter<DetailApprovalState> emitter)async{
     emitter(DetailApprovalLoading());
-    print('Checking');
+    print('Checking : ${_accessToken} - ${event.sttRec}');
     DetailApprovalState state = _handlerSeenApproval(await _networkFactory!.getHTMLApproval(_accessToken!,event.sttRec));
     emitter(state);
   }
@@ -116,14 +116,14 @@ class DetailApprovalBloc extends Bloc<DetailApprovalEvent, DetailApprovalState> 
       GetHTMLApprovalResponse response = GetHTMLApprovalResponse.fromJson(data as Map<String,dynamic>);
       _htmlDetailApproval = response.data;
       List<ListValuesFile> listFiles = response.listValuesFile!;
-      listFiles.forEach((element) {
+      for (var element in listFiles) {
         ListValuesFilesView item = ListValuesFilesView(
             fileName: element.fileName,
             fileData: Utils.hexToUint8List(element.fileData.toString()),
             fileExt: element.fileExt
         );
         listImage.add(item);
-      });
+      }
       if(_htmlDetailApproval?.isNotEmpty == true){
         return GetHTMLApprovalSuccess(htmlDetailApproval: _htmlDetailApproval.toString(),listImage: listImage);
       }else {

@@ -269,48 +269,7 @@ class _ConfirmScreenState extends State<ConfirmScreen>with TickerProviderStateMi
             }
           }
           if(state.keyLoad == 'First'){
-
-            /// Check xem list sản phẩm đã chọn CK chưa nếu chọn rồi thì thay thế nó vào req mới.
-
-            if(DataLocal.listObjectDiscount.isNotEmpty){
-              for (var element in DataLocal.listObjectDiscount) {
-                if(listItem.split(',').any((item) => item.toString().trim() == element.itemProduct.toString().trim()) == true){
-                  if(_bloc.listPromotion.isNotEmpty){
-                    int indexItem = -1;
-                    String reListPromotion = _bloc.listPromotion;
-                    for(int i = 0; i<= _bloc.listPromotion.split(',').length;){
-                      if(_bloc.listPromotion.split(',')[i].toString().trim() == element.itemDiscountOld.toString().trim()){
-                        indexItem = i;
-                        break;
-                      }
-                      break;
-                    }
-                   if(indexItem >= 0){
-                     reListPromotion = reListPromotion.split(',').removeAt(indexItem);
-                     reListPromotion = '$reListPromotion,${element.itemDiscountNew}';
-                     _bloc.listPromotion = reListPromotion;
-                     DataLocal.listCKVT = DataLocal.listCKVT.split(',').removeAt(indexItem);
-                     DataLocal.listCKVT = '${DataLocal.listCKVT},${'${element.itemDiscountNew.toString().trim()}-${element.itemProduct.toString().trim()}'}';
-                   }
-                  }
-                }
-              }
-            }
-
-            for (var a in DataLocal.listOrderDiscount) {
-              _bloc.listOrder[_bloc.listOrder.indexWhere((b) => a.code.toString().trim() == b.code.toString().trim())] = a;
-            }
-            _bloc.add(GetListItemApplyDiscountEvent(
-                listCKVT: DataLocal.listCKVT,
-                listPromotion: _bloc.listPromotion,
-                listItem: listItem,
-                listQty: listQty,
-                listPrice: listPrice,
-                listMoney: listMoney,
-                warehouseId: codeStore,
-                customerId: _bloc.codeCustomer.toString(),
-                keyLoad: 'Second' //false
-            ));
+            setState(() {});
           }
           else if(state.keyLoad != 'First' && Const.freeDiscount == true && _bloc.chooseTax == true){
             _bloc.add(CalculatorDiscountEvent(addOnProduct: false,reLoad: true, addTax: true));
@@ -432,7 +391,7 @@ class _ConfirmScreenState extends State<ConfirmScreen>with TickerProviderStateMi
         }
         else if(state is PickStoreNameSuccess){}
         else if(state is UpdateProductCountOrderFromCheckInSuccess){
-          _bloc.add(TotalDiscountAndMoneyForAppEvent(listProduct: _bloc.listProductOrderAndUpdate,viewUpdateOrder:false,reCalculator: true));
+          getDiscountProduct('Second');
         }
         else if(state is GrantCameraPermission){
           getImage();
@@ -658,7 +617,6 @@ class _ConfirmScreenState extends State<ConfirmScreen>with TickerProviderStateMi
       if(Const.stockList.isNotEmpty){
         _bloc.storeCode = Const.stockList[_bloc.storeIndex].stockCode;
       }
-      //_bloc.add(TotalDiscountAndMoneyForAppEvent(listProduct: widget.listOrder!,viewUpdateOrder: false,reCalculator: true));
       _bloc.add(GetListProductFromDB(addOrderFromCheckIn: widget.orderFromCheckIn, getValuesTax: false,key: ''));
     }
     if(widget.viewUpdateOrder == true){
@@ -1386,7 +1344,7 @@ class _ConfirmScreenState extends State<ConfirmScreen>with TickerProviderStateMi
                 dragDismissible: false,
                 children: [
                   Visibility(
-                    visible: _bloc.listOrder[index].gifProduct != true,
+                    visible: false,
                     child: SlidableAction(
                       onPressed:(_) {
                         setState(() {
@@ -1448,7 +1406,7 @@ class _ConfirmScreenState extends State<ConfirmScreen>with TickerProviderStateMi
                       label: 'Chiết khấu',
                     ),
                   ),
-                  const SizedBox(width: 2,),
+                  const SizedBox.shrink(),
                   Visibility(
                     visible: Const.isVv == true,
                     child: SlidableAction(
@@ -1511,108 +1469,7 @@ class _ConfirmScreenState extends State<ConfirmScreen>with TickerProviderStateMi
                 dragDismissible: false,
                 children: [
                   Visibility(
-                    visible: !Utils.isEmpty(_bloc.listOrder[index].listDiscount??[]),
-                    child: SlidableAction(
-                      onPressed:(_) {
-                        if(_bloc.listOrder.any((element) => element.maVtGoc.toString().trim() == _bloc.listOrder[index].code.toString().trim()) == true){
-                          SearchItemResponseData itemExits =  _bloc.listOrder.firstWhere((element) => element.maVtGoc.toString().trim() == _bloc.listOrder[index].code.toString().trim());
-                          if(itemExits.code  != ''){
-                            _bloc.maHangTangOld = itemExits.code.toString().trim();
-                            _bloc.codeDiscountOld = itemExits.maCkOld.toString().trim();
-                          }
-                        }
-                        showDialog(
-                            context: context,
-                            builder: (context) {
-                              return WillPopScope(
-                                  onWillPop: () async => true,
-                                  child:  CustomViewDiscountComponent(
-                                    iconData: Icons.card_giftcard_rounded,
-                                    title: 'Chương trình Khuyến Mại',
-                                    listDiscountTotal: const [],
-                                    maHangTangOld: _bloc.maHangTangOld,
-                                    codeDiscountOld: _bloc.codeDiscountOld,
-                                    listDiscount: _bloc.listOrder[index].listDiscount??[],
-                                  )
-                              );
-                            }).then((value){
-                          if(value != '' && value[0] == 'Yeah'){
-                            /// add list
-                            /// check trùng
-                            /// xoá list
-                            ListCk itemCKs = value[4] as ListCk;
-                            ListCk itemCKOld = ListCk();
-                            if(value[5] != null){
-                              itemCKOld = value[5] as ListCk;
-                            }
-                            if(_bloc.listPromotion.isNotEmpty && _bloc.listPromotion.contains(itemCKOld.sttRecCk.toString().trim()) == true){
-                              _bloc.listPromotion = _bloc.listPromotion.replaceFirst(itemCKOld.sttRecCk.toString().trim(), itemCKs.sttRecCk.toString().trim(),index);
-                              _bloc.codeDiscountSelecting = itemCKs.sttRecCk.toString().trim();
-                            }
-                            else{
-                              _bloc.listPromotion = _bloc.listPromotion == '' ? itemCKs.sttRecCk.toString() : '${_bloc.listPromotion},${itemCKs.sttRecCk.toString()}';
-                              _bloc.codeDiscountSelecting = itemCKs.sttRecCk.toString().trim();
-                            }
-                            if(DataLocal.listCKVT.isNotEmpty && DataLocal.listCKVT.contains('${itemCKOld.sttRecCk.toString().trim()}-${itemCKOld.maVt.toString().trim()}') == true){
-                              DataLocal.listCKVT = DataLocal.listCKVT.replaceFirst('${itemCKOld.sttRecCk.toString().trim()}-${itemCKOld.maVt.toString().trim()}', '${itemCKs.sttRecCk.toString().trim()}-${itemCKs.maVt.toString().trim()}',index);
-                            }
-                            else{
-                              DataLocal.listCKVT = DataLocal.listCKVT == '' ? '${itemCKs.sttRecCk.toString().trim()}-${itemCKs.maVt.toString().trim()}' : '${DataLocal.listCKVT},${'${itemCKs.sttRecCk.toString().trim()}-${itemCKs.maVt.toString().trim()}'}';
-                            }
-                            if(_bloc.listOrder.any((a) => a.code.toString().trim() == itemCKs.maVt.toString().trim() && a.gifProduct != true) == true){
-                              int indexWhere = _bloc.listOrder.indexWhere((b) => b.code.toString().trim() == itemCKs.maVt.toString().trim() && b.gifProduct != true);
-                              if(_bloc.listOrder[indexWhere].maCk.toString().isNotEmpty && _bloc.listOrder[indexWhere].maCk!.contains(value[1])){
-                                _bloc.listOrder[indexWhere].maCk?.replaceAll(value[1], value[2]);
-                                _bloc.listOrder[indexWhere].maCkOld?.replaceAll(value[1], value[2]);
-                              }else {
-                                _bloc.listOrder[indexWhere].maCk = _bloc.listOrder[indexWhere].maCk == '' ? value[2] : '${_bloc.listOrder[indexWhere].maCk},${value[2]}';
-                                _bloc.listOrder[indexWhere].maCkOld = _bloc.listOrder[indexWhere].maCkOld == '' ? value[2] : '${_bloc.listOrder[indexWhere].maCkOld},${value[2]}';
-                              }
-                              _bloc.listOrder[indexWhere].maVtGoc = itemCKs.maVt.toString();
-                              _bloc.listOrder[indexWhere].sctGoc = itemCKs.sttRecCk.toString().trim();
-                            }
-                            _bloc.allowed2 = true;
-
-                            ObjectDiscount ojb = ObjectDiscount(
-                                itemProduct: _bloc.listOrder[index].code.toString(),
-                                itemDiscountNew: itemCKs.sttRecCk.toString().trim(),
-                                itemDiscountOld: itemCKOld.sttRecCk.toString().trim()
-                            );
-
-                            if(DataLocal.listObjectDiscount.any((c) => c.itemProduct.toString().trim() == ojb.itemProduct.toString().trim()) == false){
-                              DataLocal.listObjectDiscount.add(ojb);
-                            }else{
-                              DataLocal.listObjectDiscount.removeWhere((d) => d.itemProduct.toString().trim() == ojb.itemProduct.toString().trim());
-                              DataLocal.listObjectDiscount.add(ojb);
-                            }
-                            if(DataLocal.listOrderDiscount.any((c) => c.code.toString().trim() == _bloc.listOrder[index].code.toString().trim()) == false){
-                              DataLocal.listOrderDiscount.add(_bloc.listOrder[index]);
-                            }
-                            _bloc.add(GetListItemApplyDiscountEvent(
-                                listCKVT: DataLocal.listCKVT,
-                                listPromotion: _bloc.listPromotion,
-                                listItem: listItem,
-                                listQty: listQty,
-                                listPrice: listPrice,
-                                listMoney: listMoney,
-                                warehouseId: codeStore,
-                                customerId: _bloc.codeCustomer.toString(),
-                                keyLoad: 'Second'
-                            ));
-                          }
-                        });
-                      },
-                      borderRadius:const BorderRadius.all(Radius.circular(8)),
-                      padding:const EdgeInsets.all(10),
-                      backgroundColor: const Color(0xFF0EBB00),
-                      foregroundColor: Colors.white,
-                      icon: Icons.gif_box_outlined,
-                      label: 'CK',
-                    ),
-                  ),
-                  const SizedBox(width: 2,),
-                  Visibility(
-                    visible: _bloc.listOrder[index].gifProduct != true,
+                    visible: false,
                     child: SlidableAction(
                       onPressed:(_) {
                         gift = false;
@@ -1628,9 +1485,9 @@ class _ConfirmScreenState extends State<ConfirmScreen>with TickerProviderStateMi
                       label: 'Sửa',
                     ),
                   ),
-                  const SizedBox(width: 2,),
+                  const SizedBox.shrink(),
                   Visibility(
-                    visible: _bloc.listOrder[index].gifProduct != true,
+                    visible: false,
                     child: SlidableAction(
                       onPressed:(_) {
                         itemSelect = _bloc.listOrder[index];
@@ -2159,349 +2016,351 @@ class _ConfirmScreenState extends State<ConfirmScreen>with TickerProviderStateMi
         itemBuilder: (context,index){
           return Slidable(
               key: const ValueKey(1),
-              startActionPane: ActionPane(
-                motion: const ScrollMotion(),
-                // extentRatio: 0.25,
-                dragDismissible: false,
-                children: [
-                  Visibility(
-                    visible: Const.isVv == true,
-                    child: SlidableAction(
-                      onPressed:(_) {
-                        setState(() {
-                          if(DataLocal.listProductGift[index].chooseVuViec == true){
-                            DataLocal.listProductGift[index].chooseVuViec = false;
-                            DataLocal.listProductGift[index].idVv = '';
-                            DataLocal.listProductGift[index].idHd = '';
-                            DataLocal.listProductGift[index].nameVv = '';
-                            DataLocal.listProductGift[index].nameHd = '';
-                            DataLocal.listProductGift[index].idHdForVv = '';
-                            Utils.showCustomToast(context, Icons.check_circle_outline, 'Đã huỷ áp dụng CTBH cho mặt hàng này');
-                          }
-                          else{
-                            showModalBottomSheet(
-                                context: context,
-                                isDismissible: true,
-                                isScrollControlled: true,
-                                shape: const RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.only(topLeft: Radius.circular(25.0), topRight: Radius.circular(25.0)),
-                                ),
-                                backgroundColor: Colors.white,
-                                builder: (builder){
-                                  return buildPopupVvHd();
-                                }
-                            ).then((value){
-                              if(value != null){
-                                if(value[0] == 'ReLoad' && value[1] != '' && value[1] !='null'){
-                                  setState(() {
-                                    DataLocal.listProductGift[index].chooseVuViec = true;
-                                    DataLocal.listProductGift[index].idVv = _bloc.idVv;
-                                    DataLocal.listProductGift[index].nameVv = _bloc.nameVv;
-                                    DataLocal.listProductGift[index].idHd = _bloc.idHd;
-                                    DataLocal.listProductGift[index].nameHd = _bloc.nameHd;
-                                    DataLocal.listProductGift[index].idHdForVv = _bloc.idHdForVv;
-                                  });
-                                }else{
-                                  DataLocal.listProductGift[index].chooseVuViec = false;
-                                }
-                              }else{
-                                DataLocal.listProductGift[index].chooseVuViec = false;
-                              }
-                            });
-                          }
-                        });
-                      },
-                      borderRadius:const BorderRadius.all(Radius.circular(8)),
-                      backgroundColor: DataLocal.listProductGift[index].chooseVuViec == false ? const Color(0xFFA8B1A6) : const Color(
-                          0xFF2DC703),
-                      foregroundColor: Colors.white,
-                      icon: Icons.description,
-                      label: 'CTBH',
-                    ),
-                  )
-                ],
-              ),
-              endActionPane: ActionPane(
-                motion: const DrawerMotion(),
-                // extentRatio: 0.25,
-                dragDismissible: false,
-                children: [
-                  SlidableAction(
-                    onPressed:(_) {
-                      _bloc.totalProductGift = _bloc.totalProductGift - DataLocal.listProductGift[index].count!;
-                      _bloc.add(AddOrDeleteProductGiftEvent(false,DataLocal.listProductGift[index]));
-                    },
-                    borderRadius:const BorderRadius.all(Radius.circular(8)),
-                    backgroundColor: const Color(0xFFC90000),
-                    foregroundColor: Colors.white,
-                    icon: Icons.delete_forever,
-                    label: 'Delete',
-                  ),
-                ],
-              ),
-              child: GestureDetector(
-                onTap: (){
-                  gift = true;
-                  indexSelectGift = index;
-                  _bloc.add(GetListStockEvent(itemCode: DataLocal.listProductGift[index].code.toString(),getListGroup: false,lockInputToCart: true, checkStockEmployee: Const.checkStockEmployee == true ? true : false));
-                },
-                child: Card(
-                  semanticContainer: true,
-                  margin: const EdgeInsets.only(left: 10,right: 10,top: 5,bottom: 5),
-                  child: Padding(
-                    padding: const EdgeInsets.only(left: 8,right: 6,top: 10,bottom: 10),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.max,
+              startActionPane: Const.isVv == true
+                  ? ActionPane(
+                      motion: const ScrollMotion(),
+                      // extentRatio: 0.25,
+                      dragDismissible: false,
                       children: [
-                        Container(
-                            width: 50,
-                            height: 50,
-                            padding: const EdgeInsets.all(5),
-                            decoration: BoxDecoration(
-                              borderRadius: const BorderRadius.all(Radius.circular(6)),
-                              color:  const Color(0xFF0EBB00),
-                              boxShadow: <BoxShadow>[
-                                BoxShadow(
-                                    color: Colors.grey.shade200,
-                                    offset: const Offset(2, 4),
-                                    blurRadius: 5,
-                                    spreadRadius: 2)
-                              ],),
-                            child: const Icon(Icons.card_giftcard_rounded ,size: 16,color: Colors.white,)),
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.only(left: 10,right: 3,top: 6,bottom: 5),
-                            width: double.infinity,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisAlignment: MainAxisAlignment.start,
-                              children: [
-                                Row(
+                        Visibility(
+                          visible: false,
+                          child: SlidableAction(
+                            onPressed:(_) {
+                              setState(() {
+                                if(DataLocal.listProductGift[index].chooseVuViec == true){
+                                  DataLocal.listProductGift[index].chooseVuViec = false;
+                                  DataLocal.listProductGift[index].idVv = '';
+                                  DataLocal.listProductGift[index].idHd = '';
+                                  DataLocal.listProductGift[index].nameVv = '';
+                                  DataLocal.listProductGift[index].nameHd = '';
+                                  DataLocal.listProductGift[index].idHdForVv = '';
+                                  Utils.showCustomToast(context, Icons.check_circle_outline, 'Đã huỷ áp dụng CTBH cho mặt hàng này');
+                                }
+                                else{
+                                  showModalBottomSheet(
+                                      context: context,
+                                      isDismissible: true,
+                                      isScrollControlled: true,
+                                      shape: const RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.only(topLeft: Radius.circular(25.0), topRight: Radius.circular(25.0)),
+                                      ),
+                                      backgroundColor: Colors.white,
+                                      builder: (builder){
+                                        return buildPopupVvHd();
+                                      }
+                                  ).then((value){
+                                    if(value != null){
+                                      if(value[0] == 'ReLoad' && value[1] != '' && value[1] !='null'){
+                                        _bloc.listOrder[index].chooseVuViec = true;
+                                        _bloc.listOrder[index].idVv = _bloc.idVv;
+                                        _bloc.listOrder[index].nameVv = _bloc.nameVv;
+                                        _bloc.listOrder[index].idHd = _bloc.idHd;
+                                        _bloc.listOrder[index].nameHd = _bloc.nameHd;
+                                        _bloc.listOrder[index].idHdForVv = _bloc.idHdForVv;
+                                        _bloc.add(CalculatorDiscountEvent(addOnProduct: true,product: _bloc.listOrder[index],reLoad: false, addTax: false));
+                                      }else{
+                                        _bloc.listOrder[index].chooseVuViec = false;
+                                      }
+                                    }
+                                    else{
+                                      _bloc.listOrder[index].chooseVuViec = false;
+                                    }
+                                  });
+                                }
+                              });
+                            },
+                            borderRadius:const BorderRadius.all(Radius.circular(8)),
+                            padding:const EdgeInsets.all(10),
+                            backgroundColor: _bloc.listOrder[index].chooseVuViec == false ? const Color(0xFFA8B1A6) : const Color(0xFF2DC703),
+                            foregroundColor: Colors.white,
+                            icon: Icons.description,
+                            label: 'CTBH',
+                          ),
+                        ),
+                      ],
+                    )
+                  : null,
+                  endActionPane: ActionPane(
+                    motion: const DrawerMotion(),
+                    // extentRatio: 0.25,
+                    dragDismissible: false,
+                    children: [
+                      SlidableAction(
+                        onPressed:(_) {
+                          _bloc.totalProductGift = _bloc.totalProductGift - DataLocal.listProductGift[index].count!;
+                          _bloc.add(AddOrDeleteProductGiftEvent(false,DataLocal.listProductGift[index]));
+                        },
+                        borderRadius:const BorderRadius.all(Radius.circular(8)),
+                        backgroundColor: const Color(0xFFC90000),
+                        foregroundColor: Colors.white,
+                        icon: Icons.delete_forever,
+                        label: 'Delete',
+                      ),
+                    ],
+                  ),
+                  child: GestureDetector(
+                    onTap: (){
+                      gift = true;
+                      indexSelectGift = index;
+                      _bloc.add(GetListStockEvent(itemCode: DataLocal.listProductGift[index].code.toString(),getListGroup: false,lockInputToCart: true, checkStockEmployee: Const.checkStockEmployee == true ? true : false));
+                    },
+                    child: Card(
+                      semanticContainer: true,
+                      margin: const EdgeInsets.only(left: 10,right: 10,top: 5,bottom: 5),
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 8,right: 6,top: 10,bottom: 10),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.max,
+                          children: [
+                            Container(
+                                width: 50,
+                                height: 50,
+                                padding: const EdgeInsets.all(5),
+                                decoration: BoxDecoration(
+                                  borderRadius: const BorderRadius.all(Radius.circular(6)),
+                                  color:  const Color(0xFF0EBB00),
+                                  boxShadow: <BoxShadow>[
+                                    BoxShadow(
+                                        color: Colors.grey.shade200,
+                                        offset: const Offset(2, 4),
+                                        blurRadius: 5,
+                                        spreadRadius: 2)
+                                  ],),
+                                child: const Icon(Icons.card_giftcard_rounded ,size: 16,color: Colors.white,)),
+                            Expanded(
+                              child: Container(
+                                padding: const EdgeInsets.only(left: 10,right: 3,top: 6,bottom: 5),
+                                width: double.infinity,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment: MainAxisAlignment.start,
                                   children: [
-                                    Expanded(
-                                        child: Text.rich(
-                                          TextSpan(
-                                            children: [
-                                              TextSpan(
-                                                text: '[${DataLocal.listProductGift[index].code.toString().trim()}] ',
-                                                style: const TextStyle(fontWeight: FontWeight.normal,fontSize: 12,color:  Color(
-                                                    0xff555a55)),
-                                              ),
-                                              TextSpan(
-                                                text: DataLocal.listProductGift[index].name.toString().trim(),
-                                                style: const TextStyle(fontWeight: FontWeight.bold,fontSize: 12),
-                                              ),
-                                            ],
-                                          ),
-                                        )
-                                    ),
-                                    const SizedBox(width: 10,),
-                                    Column(
+                                    Row(
                                       children: [
-                                        (DataLocal.listProductGift[index].price! > 0 && DataLocal.listProductGift[index].price == DataLocal.listProductGift[index].priceAfter ) ?
-                                            Container()
-                                            :
-                                        Text(
-                                         ((widget.currencyCode == "VND"
-                                              ?
-                                         DataLocal.listProductGift[index].price
-                                              :
-                                         DataLocal.listProductGift[index].price))
-                                              == 0 ? 'Giá đang cập nhật' : '${widget.currencyCode == "VND"
-                                              ?
-                                          Utils.formatMoneyStringToDouble(DataLocal.listProductGift[index].price??0)
-                                              :
-                                          Utils.formatMoneyStringToDouble(DataLocal.listProductGift[index].price??0)} ₫'
-                                          ,
-                                          textAlign: TextAlign.left,
-                                          style: TextStyle(color:
-                                          ((widget.currencyCode == "VND"
-                                              ?
-                                          DataLocal.listProductGift[index].price
-                                              :
-                                          DataLocal.listProductGift[index].price)) == 0
-                                              ?
-                                          Colors.grey : Colors.red, fontSize: 10, decoration: ((widget.currencyCode == "VND"
-                                              ?
-                                          DataLocal.listProductGift[index].price
-                                              :
-                                          DataLocal.listProductGift[index].price)) == 0 ? TextDecoration.none : TextDecoration.lineThrough),
-                                        ),
-                                        const SizedBox(height: 3,),
-                                        Visibility(
-                                          visible: DataLocal.listProductGift[index].priceAfter! > 0,
-                                          child: Text(
-                                            '${Utils.formatMoneyStringToDouble(DataLocal.listProductGift[index].priceAfter??0)} ₫',
-                                            textAlign: TextAlign.left,
-                                            style: const TextStyle(color: Color(
-                                                0xff067902), fontSize: 13,fontWeight: FontWeight.w700),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 5,),
-                                Visibility(
-                                  visible: Const.lockStockInItem == false,
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Flexible(
-                                        child: Const.lockStockInItem == false
-                                            ?
-                                        Text(
-                                          '${(DataLocal.listProductGift[index].stockName.toString().isNotEmpty && DataLocal.listProductGift[index].stockName.toString() != 'null') ? DataLocal.listProductGift[index].stockName : 'Chọn kho xuất hàng'}',
-                                          textAlign: TextAlign.left,
-                                          style: TextStyle(fontWeight: FontWeight.normal,fontSize: 12,color:
-                                          (DataLocal.listProductGift[index].stockName.toString().isNotEmpty && DataLocal.listProductGift[index].stockName.toString() != 'null')
-                                              ?
-                                          const Color(0xff358032)
-                                              :
-                                          Colors.red
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        )
-                                            :
-                                        Container(),
-                                      ),
-                                      const SizedBox(width: 20,),
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.end,
-                                        crossAxisAlignment: CrossAxisAlignment.end,
-                                        children: [
-                                          Text(
-                                            'KL Tặng:',
-                                            style: TextStyle(color: DataLocal.listProductGift[index].gifProduct == true ? Colors.red : Colors.black.withOpacity(0.7), fontSize: 11),
-                                            textAlign: TextAlign.left,
-                                          ),
-                                          const SizedBox(
-                                            width: 5,
-                                          ),
-                                          Text("${DataLocal.listProductGift[index].count?.toInt()??0} (${DataLocal.listProductGift[index].dvt.toString().trim()})",
-                                            style: TextStyle(color: DataLocal.listProductGift[index].gifProduct == true ? Colors.red : blue, fontSize: 12),
-                                            textAlign: TextAlign.left,
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Visibility(
-                                  visible: Const.isVv == true || Const.isHd == true,
-                                  child: Padding(
-                                    padding: EdgeInsets.only(top: Const.lockStockInItem == false ? 0 : 5),
-                                    child: Row(
-                                      children: [
-                                        Flexible(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            mainAxisAlignment: MainAxisAlignment.start,
-                                            children: [
-                                              Visibility(
-                                                visible: Const.isVv == true,
-                                                child: Row(
-                                                  mainAxisAlignment: MainAxisAlignment.start,
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: [
-                                                    const Text(
-                                                      'Chương trình bán hàng:',
-                                                      style: TextStyle(color: Colors.blueGrey, fontSize: 11),
-                                                      textAlign: TextAlign.left,
-                                                    ),
-                                                    const SizedBox(
-                                                      width: 5,
-                                                    ),
-                                                    Flexible(
-                                                        child:
-                                                        Text(
-                                                          '${(DataLocal.listProductGift[index].idVv.toString() != '' && DataLocal.listProductGift[index].idVv.toString() != 'null') ? DataLocal.listProductGift[index].nameVv : 'Chọn Chương trình bán hàng'}',
-                                                          textAlign: TextAlign.left,
-                                                          style: TextStyle(fontWeight: FontWeight.normal,fontSize: 12,color:
-                                                          (DataLocal.listProductGift[index].idVv.toString() != '' && DataLocal.listProductGift[index].idVv.toString() != 'null')
-                                                              ?
-                                                          Colors.blueGrey
-                                                              :
-                                                          Colors.red
-                                                          ),
-                                                          maxLines: 1,
-                                                          overflow: TextOverflow.ellipsis,
-                                                        )
-                                                    ),
-                                                  ],
-                                                ),
+                                        Expanded(
+                                            child: Text.rich(
+                                              TextSpan(
+                                                children: [
+                                                  TextSpan(
+                                                    text: '[${DataLocal.listProductGift[index].code.toString().trim()}] ',
+                                                    style: const TextStyle(fontWeight: FontWeight.normal,fontSize: 12,color:  Color(
+                                                        0xff555a55)),
+                                                  ),
+                                                  TextSpan(
+                                                    text: DataLocal.listProductGift[index].name.toString().trim(),
+                                                    style: const TextStyle(fontWeight: FontWeight.bold,fontSize: 12),
+                                                  ),
+                                                ],
                                               ),
-                                              Visibility(
-                                                visible: Const.isHd == true,
-                                                child: Row(
-                                                  mainAxisAlignment: MainAxisAlignment.start,
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: [
-                                                    const Text(
-                                                      'Hợp đồng:',
-                                                      style: TextStyle(color: Colors.blueGrey, fontSize: 11),
-                                                      textAlign: TextAlign.left,
-                                                    ),
-                                                    const SizedBox(
-                                                      width: 5,
-                                                    ),
-                                                    Flexible(
-                                                        child:
-                                                        Text(
-                                                          '${(DataLocal.listProductGift[index].idHd.toString().isNotEmpty && DataLocal.listProductGift[index].idHd.toString() != 'null') ? DataLocal.listProductGift[index].nameHd : 'Chọn hợp đồng'}',
-                                                          textAlign: TextAlign.left,
-                                                          style: TextStyle(fontWeight: FontWeight.normal,fontSize: 12,color:
-                                                          (DataLocal.listProductGift[index].idHd.toString().isNotEmpty && DataLocal.listProductGift[index].idHd.toString() != 'null') == true
-                                                              ?
-                                                          Colors.blueGrey
-                                                              :
-                                                          Colors.red
-                                                          ),
-                                                          maxLines: 1,
-                                                          overflow: TextOverflow.ellipsis,
-                                                        )
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ],
-                                          ),
+                                            )
                                         ),
-                                        const SizedBox(width: 5,),
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.end,
-                                          crossAxisAlignment: CrossAxisAlignment.end,
+                                        const SizedBox(width: 10,),
+                                        Column(
                                           children: [
+                                            (DataLocal.listProductGift[index].price! > 0 && DataLocal.listProductGift[index].price == DataLocal.listProductGift[index].priceAfter ) ?
+                                                Container()
+                                                :
                                             Text(
-                                              'KL Tặng:',
-                                              style: TextStyle(color: DataLocal.listProductGift[index].gifProduct == true ? Colors.red : Colors.black.withOpacity(0.7), fontSize: 11),
+                                             ((widget.currencyCode == "VND"
+                                                  ?
+                                             DataLocal.listProductGift[index].price
+                                                  :
+                                             DataLocal.listProductGift[index].price))
+                                                  == 0 ? 'Giá đang cập nhật' : '${widget.currencyCode == "VND"
+                                                  ?
+                                              Utils.formatMoneyStringToDouble(DataLocal.listProductGift[index].price??0)
+                                                  :
+                                              Utils.formatMoneyStringToDouble(DataLocal.listProductGift[index].price??0)} ₫'
+                                              ,
                                               textAlign: TextAlign.left,
+                                              style: TextStyle(color:
+                                              ((widget.currencyCode == "VND"
+                                                  ?
+                                              DataLocal.listProductGift[index].price
+                                                  :
+                                              DataLocal.listProductGift[index].price)) == 0
+                                                  ?
+                                              Colors.grey : Colors.red, fontSize: 10, decoration: ((widget.currencyCode == "VND"
+                                                  ?
+                                              DataLocal.listProductGift[index].price
+                                                  :
+                                              DataLocal.listProductGift[index].price)) == 0 ? TextDecoration.none : TextDecoration.lineThrough),
                                             ),
-                                            const SizedBox(
-                                              width: 5,
-                                            ),
-                                            Text("${DataLocal.listProductGift[index].count?.toInt()??0} (${DataLocal.listProductGift[index].dvt.toString().trim()})",
-                                              style: TextStyle(color: DataLocal.listProductGift[index].gifProduct == true ? Colors.red : blue, fontSize: 12),
-                                              textAlign: TextAlign.left,
+                                            const SizedBox(height: 3,),
+                                            Visibility(
+                                              visible: DataLocal.listProductGift[index].priceAfter! > 0,
+                                              child: Text(
+                                                '${Utils.formatMoneyStringToDouble(DataLocal.listProductGift[index].priceAfter??0)} ₫',
+                                                textAlign: TextAlign.left,
+                                                style: const TextStyle(color: Color(
+                                                    0xff067902), fontSize: 13,fontWeight: FontWeight.w700),
+                                              ),
                                             ),
                                           ],
                                         ),
                                       ],
                                     ),
-                                  ),
+                                    const SizedBox(height: 5,),
+                                    Visibility(
+                                      visible: Const.lockStockInItem == false,
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Flexible(
+                                            child: Const.lockStockInItem == false
+                                                ?
+                                            Text(
+                                              '${(DataLocal.listProductGift[index].stockName.toString().isNotEmpty && DataLocal.listProductGift[index].stockName.toString() != 'null') ? DataLocal.listProductGift[index].stockName : 'Chọn kho xuất hàng'}',
+                                              textAlign: TextAlign.left,
+                                              style: TextStyle(fontWeight: FontWeight.normal,fontSize: 12,color:
+                                              (DataLocal.listProductGift[index].stockName.toString().isNotEmpty && DataLocal.listProductGift[index].stockName.toString() != 'null')
+                                                  ?
+                                              const Color(0xff358032)
+                                                  :
+                                              Colors.red
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            )
+                                                :
+                                            Container(),
+                                          ),
+                                          const SizedBox(width: 20,),
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.end,
+                                            crossAxisAlignment: CrossAxisAlignment.end,
+                                            children: [
+                                              Text(
+                                                'KL Tặng:',
+                                                style: TextStyle(color: DataLocal.listProductGift[index].gifProduct == true ? Colors.red : Colors.black.withOpacity(0.7), fontSize: 11),
+                                                textAlign: TextAlign.left,
+                                              ),
+                                              const SizedBox(
+                                                width: 5,
+                                              ),
+                                              Text("${DataLocal.listProductGift[index].count?.toInt()??0} (${DataLocal.listProductGift[index].dvt.toString().trim()})",
+                                                style: TextStyle(color: DataLocal.listProductGift[index].gifProduct == true ? Colors.red : blue, fontSize: 12),
+                                                textAlign: TextAlign.left,
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Visibility(
+                                      visible: Const.isVv == true || Const.isHd == true,
+                                      child: Padding(
+                                        padding: EdgeInsets.only(top: Const.lockStockInItem == false ? 0 : 5),
+                                        child: Row(
+                                          children: [
+                                            Flexible(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                mainAxisAlignment: MainAxisAlignment.start,
+                                                children: [
+                                                  Visibility(
+                                                    visible: Const.isVv == true,
+                                                    child: Row(
+                                                      mainAxisAlignment: MainAxisAlignment.start,
+                                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                                      children: [
+                                                        const Text(
+                                                          'Chương trình bán hàng:',
+                                                          style: TextStyle(color: Colors.blueGrey, fontSize: 11),
+                                                          textAlign: TextAlign.left,
+                                                        ),
+                                                        const SizedBox(
+                                                          width: 5,
+                                                        ),
+                                                        Flexible(
+                                                            child:
+                                                            Text(
+                                                              '${(DataLocal.listProductGift[index].idVv.toString() != '' && DataLocal.listProductGift[index].idVv.toString() != 'null') ? DataLocal.listProductGift[index].nameVv : 'Chọn Chương trình bán hàng'}',
+                                                              textAlign: TextAlign.left,
+                                                              style: TextStyle(fontWeight: FontWeight.normal,fontSize: 12,color:
+                                                              (DataLocal.listProductGift[index].idVv.toString() != '' && DataLocal.listProductGift[index].idVv.toString() != 'null')
+                                                                  ?
+                                                              Colors.blueGrey
+                                                                  :
+                                                              Colors.red
+                                                              ),
+                                                              maxLines: 1,
+                                                              overflow: TextOverflow.ellipsis,
+                                                            )
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                  Visibility(
+                                                    visible: Const.isHd == true,
+                                                    child: Row(
+                                                      mainAxisAlignment: MainAxisAlignment.start,
+                                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                                      children: [
+                                                        const Text(
+                                                          'Hợp đồng:',
+                                                          style: TextStyle(color: Colors.blueGrey, fontSize: 11),
+                                                          textAlign: TextAlign.left,
+                                                        ),
+                                                        const SizedBox(
+                                                          width: 5,
+                                                        ),
+                                                        Flexible(
+                                                            child:
+                                                            Text(
+                                                              '${(DataLocal.listProductGift[index].idHd.toString().isNotEmpty && DataLocal.listProductGift[index].idHd.toString() != 'null') ? DataLocal.listProductGift[index].nameHd : 'Chọn hợp đồng'}',
+                                                              textAlign: TextAlign.left,
+                                                              style: TextStyle(fontWeight: FontWeight.normal,fontSize: 12,color:
+                                                              (DataLocal.listProductGift[index].idHd.toString().isNotEmpty && DataLocal.listProductGift[index].idHd.toString() != 'null') == true
+                                                                  ?
+                                                              Colors.blueGrey
+                                                                  :
+                                                              Colors.red
+                                                              ),
+                                                              maxLines: 1,
+                                                              overflow: TextOverflow.ellipsis,
+                                                            )
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            const SizedBox(width: 5,),
+                                            Row(
+                                              mainAxisAlignment: MainAxisAlignment.end,
+                                              crossAxisAlignment: CrossAxisAlignment.end,
+                                              children: [
+                                                Text(
+                                                  'KL Tặng:',
+                                                  style: TextStyle(color: DataLocal.listProductGift[index].gifProduct == true ? Colors.red : Colors.black.withOpacity(0.7), fontSize: 11),
+                                                  textAlign: TextAlign.left,
+                                                ),
+                                                const SizedBox(
+                                                  width: 5,
+                                                ),
+                                                Text("${DataLocal.listProductGift[index].count?.toInt()??0} (${DataLocal.listProductGift[index].dvt.toString().trim()})",
+                                                  style: TextStyle(color: DataLocal.listProductGift[index].gifProduct == true ? Colors.red : blue, fontSize: 12),
+                                                  textAlign: TextAlign.left,
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ],
+                              ),
                             ),
-                          ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
-                  ),
-                ),
-              )
-          );
-        }
+                  )
+              );
+            }
 
     );
   }

@@ -225,10 +225,26 @@ class InfoCPNBloc extends Bloc<InfoCPNEvent,InfoCPNState>{
   //   }
   // }
 
-  getTokenFCM() {
-    FirebaseMessaging.instance.getToken().then((token) {
-      deviceToken = token;
-    });
+  getTokenFCM() async {
+    try {
+      // On iOS, wait for APNS token first
+      if (Platform.isIOS) {
+        final apnsToken = await FirebaseMessaging.instance.getAPNSToken();
+        if (apnsToken != null) {
+          deviceToken = await FirebaseMessaging.instance.getToken();
+        } else {
+          print('APNS token not available yet');
+          deviceToken = null;
+        }
+      } else {
+        // On Android, directly get the token
+        deviceToken = await FirebaseMessaging.instance.getToken();
+      }
+    } catch (e) {
+      print('Error getting FCM token: $e');
+      // Continue without token if not available
+      deviceToken = null;
+    }
   }
 
   Future<bool> getPermissionUser()async{
@@ -304,6 +320,7 @@ class InfoCPNBloc extends Bloc<InfoCPNEvent,InfoCPNState>{
       Const.isHd = response.masterAppSettings?.isHd == 1 ? true : false;
       Const.lockStockInItem = response.masterAppSettings?.lockStockInItem == 1 ? true : false;
       Const.lockStockInCart = response.masterAppSettings?.lockStockInCart == 1 ? true : false;
+      Const.lockStockInItemGift = response.masterAppSettings?.lockStockInItemGift == 1 ? true : false;
 
       Const.checkGroup = response.masterAppSettings?.checkGroup == 1 ? true : false;
       Const.chooseAgentSaleOut = response.masterAppSettings?.chooseAgentSaleOut == 1 ? true : false;
@@ -316,7 +333,7 @@ class InfoCPNBloc extends Bloc<InfoCPNEvent,InfoCPNState>{
       Const.chooseStatusToSaleOut = response.masterAppSettings?.chooseStatusToSaleOut == 1 ? true : false;
       Const.chooseStateWhenCreateNewOpenStore = response.masterAppSettings?.chooseStateWhenCreateNewOpenStore == 1 ? true : false;
       Const.editPrice = response.masterAppSettings?.editPrice == 1 ? true : false;
-      Const.approveOrder = response.masterAppSettings?.approveOrder == 1 ? true : false;
+      // Const.approveOrder = response.masterAppSettings?.approveOrder == 1 ? true : false;
 
       Const.dateEstDelivery = response.masterAppSettings?.dateEstDelivery == 1 ? true : false;
       Const.typeProduction = response.masterAppSettings?.typeProduction == 1 ? true : false;
@@ -344,6 +361,8 @@ class InfoCPNBloc extends Bloc<InfoCPNEvent,InfoCPNState>{
       Const.editPriceWidthValuesEmptyOrZero = response.masterAppSettings?.editPriceWidthValuesEmptyOrZero == 1 ? true : false;
       Const.noCheckDayOff = response.masterAppSettings?.noCheckDayOff == 1 ? true : false;
       Const.autoAddAgentFromSaleOut = response.masterAppSettings?.autoAddAgentFromSaleOut == 1 ? true : false;
+      Const.discountSpecialAdd = response.masterAppSettings?.discountSpecialAdd == 1 ? true : false;
+      Const.addProductionSameQuantity = response.masterAppSettings?.addProductionSameQuantity == 1 ? true : false;
 
       DataLocal.listTypeDelivery = response.listTypeDelivery??[];
       DataLocal.listAgency = response.listAgency??[];
@@ -595,6 +614,11 @@ class InfoCPNBloc extends Bloc<InfoCPNEvent,InfoCPNState>{
           else if(element.menuId == '01.00.30'){
             Const.infoEmployee = true;
           }
+
+          else if(element.menuId == '01.05.38'){
+            Const.approveNewStore = true; //Duyệt mở mới
+          }
+
           // Menu
           else if(element.menuId == '01.00.32'){
             Const.report = true; // báo cáo tổng hợp

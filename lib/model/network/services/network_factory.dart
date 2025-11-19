@@ -1,7 +1,9 @@
 // ignore_for_file: prefer_interpolation_to_compose_strings
 
 import 'dart:convert';
+import 'dart:io';  // Thêm để bypass SSL
 import 'package:dio/dio.dart';
+import 'package:dio/io.dart';  // Thêm để bypass SSL
 import 'package:dms/model/network/request/apply_discount_request.dart';
 import 'package:dms/model/network/request/get_list_notification_request.dart';
 import 'package:flutter/material.dart';
@@ -77,10 +79,38 @@ class NetWorkFactory{
     // }
     _dio = Dio(BaseOptions(
       baseUrl: "$host${port!=0?":$port":""}",
-      receiveTimeout: Duration(milliseconds:20000),
-      connectTimeout: Duration(milliseconds:20000),
+      receiveTimeout: Duration(milliseconds:60000),  // Tăng từ 20s -> 60s
+      connectTimeout: Duration(milliseconds:30000),  // Tăng từ 20s -> 30s
+      sendTimeout: Duration(milliseconds:30000),     // Thêm sendTimeout
+      validateStatus: (status) {
+        // Chấp nhận tất cả status code để tự xử lý
+        return status != null && status > 0;
+      },
     ));
+    // ⚠️ UNCOMMENT DÒNG BÊN DƯỚI NẾU CẦN BYPASS SSL (DEVELOPMENT ONLY)
+    // _bypassSslCertificate();
+    
     _setupLoggingInterceptor();
+    
+    // Log để debug
+    logger.i("=== NetWorkFactory initialized ===");
+    logger.i("BaseURL: $host${port!=0?":$port":""}");
+  }
+  
+  /// ⚠️ CHỈ DÙNG CHO DEVELOPMENT - XOÁ KHI RELEASE PRODUCTION!
+  /// Bypass SSL certificate validation
+  void _bypassSslCertificate() {
+    (_dio!.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
+      final client = HttpClient();
+      client.badCertificateCallback = (X509Certificate cert, String host, int port) {
+        logger.w("⚠️ WARNING: Accepting bad certificate for $host:$port");
+        logger.w("Certificate subject: ${cert.subject}");
+        logger.w("Certificate issuer: ${cert.issuer}");
+        return true; // Accept all certificates
+      };
+      return client;
+    };
+    logger.w("⚠️⚠️⚠️ SSL BYPASS ENABLED - DEVELOPMENT ONLY ⚠️⚠️⚠️");
   }
 
   void _setupLoggingInterceptor(){
@@ -90,8 +120,11 @@ class NetWorkFactory{
     _dio!.interceptors.add(InterceptorsWrapper(
       onRequest:(RequestOptions options, handler){
         logger.d("--> ${options.method} ${options.path}");
+        logger.d("Full URL: ${options.uri}");  // Thêm full URL để debug
+        logger.d("Headers: ${options.headers}");  // Thêm headers
         logger.d("Content type: ${options.contentType}");
         logger.d("Request body: ${options.data}");
+        logger.d("Query params: ${options.queryParameters}");  // Thêm query params
         logger.d("<-- END HTTP");
         return handler.next(options);
       },
@@ -116,9 +149,22 @@ class NetWorkFactory{
       },
         onError: (DioError error,handler) async{
           // Do something with response error
-          logger.e("DioError: ${error.message}");
+          logger.e("=== DIO ERROR ===");
+          logger.e("Error Type: ${error.type}");
+          logger.e("Error Message: ${error.message}");
+          logger.e("Request URL: ${error.requestOptions.uri}");
+          logger.e("Status Code: ${error.response?.statusCode}");
+          logger.e("Response Data: ${error.response?.data}");
+          logger.e("Response Headers: ${error.response?.headers}");
+          
           if(error.type == DioErrorType.connectionTimeout){
             Utils.showCustomToast(context, Icons.warning_amber_outlined, 'Đường truyền mạng không ổn định');
+          }
+          if(error.type == DioErrorType.receiveTimeout){
+            logger.e("Receive timeout - Server response quá lâu (>60s)");
+          }
+          if(error.type == DioErrorType.sendTimeout){
+            logger.e("Send timeout - Không gửi được request trong 30s");
           }
           if (error.response?.statusCode == 402) {
             try {
@@ -262,18 +308,29 @@ class NetWorkFactory{
           var errorData = error.response?.data;
           String? message;
           int? code;
+          
+          // Lấy status code trước
+          code = error.response?.statusCode ?? 0;
+          
+          // Xử lý errorData an toàn
           if (!Utils.isEmpty(errorData)) {
             if(errorData is String){
               message = 'Không tìm thấy địa chỉ host server';
-              code = 404;
-            } else{
-              message = errorData["message"].toString();
-              code = errorData["statusCode"];
+              if (code == 0) code = 404;
+            } else if(errorData is Map){
+              // Kiểm tra an toàn khi truy cập Map
+              try {
+                message = errorData["message"]?.toString();
+                if (errorData.containsKey("statusCode")) {
+                  code = errorData["statusCode"] as int?;
+                }
+              } catch (e) {
+                print('Error parsing errorData: $e');
+                message = null;
+              }
             }
           }
-          else {
-            code = error.response!.statusCode;
-          }
+          
           errorDescription = message ?? "ErrorCode" ': $code';
           print('OutNet 1');
           if (code == 401) {
@@ -302,7 +359,11 @@ class NetWorkFactory{
             // hostSingleton = HostSingleton();
             // hostSingleton.host = Const.HOST_URL;
             // hostSingleton.port = Const.PORT_URL;
-            Utils.showCustomToast(context, Icons.warning_amber_outlined, 'Có lỗi xảy ra, vui lòng liên hệ nhà cung cấp');
+            errorDescription = 'Không thể kết nối đến server. Vui lòng kiểm tra:\n'
+                '- Kết nối mạng\n'
+                '- Cấu hình Host ID\n'
+                '- Firewall/VPN';
+            Utils.showCustomToast(context, Icons.warning_amber_outlined, 'Không thể kết nối đến server');
             // pushNewScreen(context, screen: const LoginScreen(),withNavBar: false);
           }
           break;
@@ -1059,6 +1120,13 @@ class NetWorkFactory{
     return await requestApi(_dio!.post('/api/v1/discount/apply-discount-v2', options: Options(headers: {"Authorization": "Bearer $token"}), data: request.toJson()));
   }
 
+  Future<Object> getGiftProductList(String maNhom, String token) async {
+    return await requestApi(_dio!.get('/api/v1/order/danh-sach-nhom-hang-tang', 
+      options: Options(headers: {"Authorization": "Bearer $token"}),
+      queryParameters: {"maNhom": maNhom}
+    ));
+  }
+
   Future<Object> createOrderV3(ApplyDiscountRequest request, String token) async {
     return await requestApi(_dio!.post('/api/v1/discount/apply-discount-v2', options: Options(headers: {"Authorization": "Bearer $token"}), data: request.toJson()));
   }
@@ -1177,6 +1245,59 @@ class NetWorkFactory{
       "page_index": pageIndex,
       "page_count": pageCount,
     })); //["Authorization"] = "Bearer " + token
+  }
+
+  Future<Object> getNewStoreApprovalList({
+    required String token,
+    required String keySearch,
+    required String dateFrom,
+    required String dateTo,
+    int? status,
+    required int pageIndex,
+    required int pageCount,
+  }) async {
+    return await requestApi(_dio!.get(
+      '/api/v1/fulfillment/danh-sach-mo-moi-db',
+      options: Options(headers: {"Authorization": "Bearer $token"}),
+      queryParameters: {
+        "keySearch": keySearch,
+        "dateFrom": dateFrom,
+        "dateTo": dateTo,
+        "page_index": pageIndex,
+        "page_count": pageCount,
+        if (status != null) "status": status,
+      },
+    ));
+  }
+
+  Future<Object> getNewStoreApprovalDetail({
+    required String token,
+    required String idLead,
+  }) async {
+    return await requestApi(_dio!.get(
+      '/api/v1/fulfillment/chi-tiet-mo-moi-db',
+      options: Options(headers: {"Authorization": "Bearer $token"}),
+      queryParameters: {
+        "id_lead": idLead,
+      },
+    ));
+  }
+
+  Future<Object> approveNewStore({
+    required String token,
+    required String sttRec,
+    required int action,
+    required int phanCap,
+  }) async {
+    return await requestApi(_dio!.get(
+      '/api/v1/fulfillment/duyet-mo-moi-db',
+      options: Options(headers: {"Authorization": "Bearer $token"}),
+      queryParameters: {
+        "stt_rec": sttRec,
+        "action": action,
+        "phan_cap": phanCap,
+      },
+    ));
   }
   Future<Object> deleteOrderHistory(String token,String sttRec) async {
     return await requestApi(_dio!.post('/api/v1/order/order-cancel', options: Options(headers: {"Authorization": "Bearer $token"}), queryParameters: {

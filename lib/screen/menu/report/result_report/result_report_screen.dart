@@ -258,7 +258,8 @@ class AutoRowHeightDataGridSource extends DataGridSource {
   DataGridRowAdapter? buildRow(DataGridRow row) {
     TextStyle getStyleIndexFirst(){
        int index = dataGrid.indexOf(row);
-       // print(dataGrid[index].getCells().first.value.toString().trim() == "0" ? 'OKE NE' : "FAIL NE");
+        // print(dataGrid[index].getCells().first.value.toString().trim() == "0" ? 'OKE NE' : "FAIL NE");
+        print(dataGrid[index].getCells().last.value.toString().trim());
        if(dataGrid[index].getCells().first.value.toString().trim() == "1"){
          return const TextStyle(fontWeight: FontWeight.bold,color: Colors.green);
        }else{

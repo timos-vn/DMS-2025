@@ -140,10 +140,13 @@ class _CustomerRecentlyScreenState extends State<CustomerRecentlyScreen> {
                                           children: [
                                             const Icon(Icons.phone,size: 12,color: grey,),
                                             const SizedBox(width: 4,),
-                                            Text(
+                                            Flexible(
+                                              child: Text(
                                               _list[index].phone.toString(),
                                               style: const TextStyle(fontSize: 12,color: grey,),
-                                              maxLines: 2,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
                                             ),
                                           ],
                                         ),

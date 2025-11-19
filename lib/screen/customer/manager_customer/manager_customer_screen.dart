@@ -5,7 +5,6 @@ import 'package:dms/screen/customer/search_customer/search_customer_screen.dart'
 import 'package:dms/themes/colors.dart';
 import 'package:flutter/material.dart';
 
-import '../add_new_customer/new_customer_screen.dart';
 import 'customer_all_page/customer_all_screen.dart';
 
 
@@ -48,27 +47,55 @@ class _ManagerCustomerScreenState extends State<ManagerCustomerScreen> with Tick
       children: [
         Container(
           color: subColor,
-          padding: const EdgeInsets.fromLTRB(16, 40, 16, 16),
-          child: Row(
-            children: [
-              InkWell(
-                  onTap:()=>Navigator.pop(context),
-                  child: const Icon(Icons.arrow_back, color: Colors.white,size: 25,)),
-              const Expanded(
-                child: Center(
-                  child: Text('Quản lý khách hàng',
-                    style: TextStyle(
-                      color: white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
+          child: SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
+              child: Row(
+                children: [
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: IconButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.all(10),
+                      shape: const CircleBorder(),
+                    ),
+                    icon: const Icon(Icons.arrow_back_rounded, size: 24, color: Colors.white),
+                    tooltip: 'Quay lại',
+                  ),
+                  const SizedBox(width: 4),
+                  const Expanded(
+                    child: Center(
+                      child: Text(
+                        'Quản lý khách hàng',
+                        style: TextStyle(
+                          color: white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const SearchCustomerScreen(
+                          allowCustomerSearch: false,
+                          inputQuantity: false,
+                        ),
+                      ),
+                    ),
+                    style: IconButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.all(10),
+                      shape: const CircleBorder(),
+                    ),
+                    icon: const Icon(Icons.search, size: 24, color: Colors.white,),
+                    tooltip: 'Tìm kiếm khách hàng',
+                  ),
+                ],
               ),
-              InkWell(
-                  onTap:()=>Navigator.of(context).push(MaterialPageRoute(builder: (context)=> SearchCustomerScreen(allowCustomerSearch: false, inputQuantity: false,))),
-                  child: const Icon(Icons.search,color: white,)),
-            ],
+            ),
           ),
         ),
         Container(

@@ -105,7 +105,7 @@ class _SaleOutScreenState extends State<SaleOutScreen>with TickerProviderStateMi
     if (Const.autoAddAgentFromSaleOut != true) {
       // Không cho phép auto add → return
       return;
-    }
+    } 
     
     // Check Const.maNPP có hợp lệ không
     if (Const.maNPP.isNotEmpty && 
@@ -120,17 +120,17 @@ class _SaleOutScreenState extends State<SaleOutScreen>with TickerProviderStateMi
   void _showAgentLoadedDialog() {
     showDialog(
       context: context,
-      barrierDismissible: true,
+      barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          title: Row(
+          title: const Row(
             children: [
               Icon(Icons.check_circle, color: Colors.green, size: 28),
-              const SizedBox(width: 10),
-              const Text('Thông báo', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              SizedBox(width: 10),
+              Text('Thông báo', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             ],
           ),
           content: Column(
@@ -263,10 +263,15 @@ class _SaleOutScreenState extends State<SaleOutScreen>with TickerProviderStateMi
                   codeProduction: _bloc.listProductOrderAndUpdate[indexSelect].code.toString(),
                   listObjectJson: _bloc.listProductOrderAndUpdate[indexSelect].jsonOtherInfo.toString(), listQuyDoiDonViTinh: [],
                   nuocsx: '',quycach: '',tenThue: '',thueSuat: '',
+                  originalPrice: _bloc.listProductOrderAndUpdate[indexSelect].originalPrice,
                 );
               }).then((value){
-            if(double.parse(value[0].toString()) > 0){
+            if(value != null && double.parse(value[0].toString()) > 0){
               _bloc.listProductOrderAndUpdate[indexSelect].count = double.parse(value[0].toString());
+              // Cập nhật giá nếu có thay đổi (value[4] là giá)
+              if(value.length > 4 && value[4] != null){
+                _bloc.listProductOrderAndUpdate[indexSelect].price = double.parse(value[4].toString());
+              }
               _bloc.add(UpdateProductCountEvent(index: indexSelect,item: _bloc.listProductOrderAndUpdate[indexSelect]));
             }
           });
@@ -633,34 +638,21 @@ class _SaleOutScreenState extends State<SaleOutScreen>with TickerProviderStateMi
                                     ),
                                     const SizedBox(width: 10,),
                                     Column(
+                                      crossAxisAlignment: CrossAxisAlignment.end,
                                       children: [
-                                        // Text(
-                                        //   double.parse((Const.currencyCode == "VND"
-                                        //       ?
-                                        //   NumberFormat(Const.amountFormat).format(_bloc.listProductOrderAndUpdate[index].price??0)
-                                        //       :
-                                        //   NumberFormat(Const.amountNtFormat).format(_bloc.listProductOrderAndUpdate[index].price??0)))
-                                        //       == 0 ? 'Giá đang cập nhật' : (Const.currencyCode == "VND"
-                                        //       ?
-                                        //   NumberFormat(Const.amountFormat).format(_bloc.listProductOrderAndUpdate[index].price??0)
-                                        //       :
-                                        //   NumberFormat(Const.amountNtFormat).format(_bloc.listProductOrderAndUpdate[index].price??0))
-                                        //   ,
-                                        //   textAlign: TextAlign.left,
-                                        //   style: TextStyle(color: grey, fontSize: 10, decoration: double.parse((Const.currencyCode == "VND"
-                                        //       ?
-                                        //   NumberFormat(Const.amountFormat).format(_bloc.listProductOrderAndUpdate[index].price??0)
-                                        //       :
-                                        //   NumberFormat(Const.amountNtFormat).format(_bloc.listProductOrderAndUpdate[index].price??0))) == 0 ? TextDecoration.none : TextDecoration.lineThrough),
-                                        // ),
-                                        // const SizedBox(height: 3,),
-                                        Visibility(
-                                          visible: _bloc.listProductOrderAndUpdate[index].price! > 0,
-                                          child: Text(
-                                            '${Utils.formatMoneyStringToDouble(_bloc.listProductOrderAndUpdate[index].price??0)} ₫' ,
-                                            textAlign: TextAlign.left,
-                                            style: const TextStyle(color: Color(
-                                                0xff067902), fontSize: 13,fontWeight: FontWeight.w700),
+                                        Text(
+                                          (_bloc.listProductOrderAndUpdate[index].price ?? 0) == 0 
+                                              ? 'Giá đang cập nhật' 
+                                              : '${Utils.formatMoneyStringToDouble(_bloc.listProductOrderAndUpdate[index].price??0)} ₫',
+                                          textAlign: TextAlign.right,
+                                          style: TextStyle(
+                                            color: (_bloc.listProductOrderAndUpdate[index].price ?? 0) == 0 
+                                                ? Colors.grey 
+                                                : const Color(0xff067902), 
+                                            fontSize: (_bloc.listProductOrderAndUpdate[index].price ?? 0) == 0 ? 11 : 13,
+                                            fontWeight: (_bloc.listProductOrderAndUpdate[index].price ?? 0) == 0 
+                                                ? FontWeight.normal 
+                                                : FontWeight.w700
                                           ),
                                         ),
                                       ],
@@ -1217,7 +1209,7 @@ class _SaleOutScreenState extends State<SaleOutScreen>with TickerProviderStateMi
             const SizedBox(height: 22,),
             GestureDetector(
               onTap:(){
-                PersistentNavBarNavigator.pushNewScreen(context, screen: SearchCustomerScreen(selected: true,allowCustomerSearch: false, inputQuantity: false,),withNavBar: false).then((value){
+                PersistentNavBarNavigator.pushNewScreen(context, screen: const SearchCustomerScreen(selected: true,allowCustomerSearch: false, inputQuantity: false,),withNavBar: false).then((value){
                   if(!Utils.isEmpty(value)){
                     ManagerCustomerResponseData infoCustomer = value;
                     codeCustomer = infoCustomer.customerCode.toString();
@@ -1288,7 +1280,7 @@ class _SaleOutScreenState extends State<SaleOutScreen>with TickerProviderStateMi
             const SizedBox(height: 22,),
             GestureDetector(
               onTap:(){
-                PersistentNavBarNavigator.pushNewScreen(context, screen: SearchCustomerScreen(selected: true,typeName: true,allowCustomerSearch: false, inputQuantity: false,),withNavBar: false).then((value){
+                PersistentNavBarNavigator.pushNewScreen(context, screen: const SearchCustomerScreen(selected: true,typeName: true,allowCustomerSearch: false, inputQuantity: false,),withNavBar: false).then((value){
                   if(value != null){
                     ManagerCustomerResponseData infoCustomer = value;
                     codeAgent = infoCustomer.customerCode.toString();

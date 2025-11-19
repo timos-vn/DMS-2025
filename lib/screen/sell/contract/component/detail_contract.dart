@@ -94,19 +94,17 @@ class _DetailContractScreenState extends State<DetailContractScreen> with Ticker
             _showLoadingDialog(context);
           }
           else if(state is AddCartSuccess){
-              if(widget.isSearchItem){
-                // Hiển thị thông báo thành công
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    dismissDirection: DismissDirection.startToEnd,
-                    content: Text('Đã thêm $addedCount vật tư vào giỏ hàng'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
-
-                // Quay về màn cart_screen
+            if(widget.isSearchItem){
+              // Hiển thị dialog thành công thay cho SnackBar
+              _showSuccessDialog(
+                context,
+                title: 'Thêm vào giỏ hàng',
+                message: 'Đã thêm $addedCount vật tư vào giỏ hàng',
+              ).then((_) {
+                // Quay về màn cart_screen sau khi đóng dialog
                 Navigator.pop(context, 'refresh_cart');
-              }else{
+              });
+            }else{
                 _bloc.add(GetCountProductEvent(isNextScreen: true));
               }
             }
@@ -141,22 +139,12 @@ class _DetailContractScreenState extends State<DetailContractScreen> with Ticker
               // Dialog không tồn tại
             }
             
-            // Hiển thị error
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.error),
-                backgroundColor: Colors.red,
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                action: SnackBarAction(
-                  label: 'Đóng',
-                  textColor: Colors.white,
-                  onPressed: () {},
-                ),
-              ),
-            );
+          // Hiển thị dialog lỗi thay cho SnackBar
+          _showErrorDialog(
+            context,
+            title: 'Có lỗi xảy ra',
+            message: state.error,
+          );
           }
         },
         child: BlocBuilder<ContractBloc,ContractState>(
@@ -455,23 +443,17 @@ class _DetailContractScreenState extends State<DetailContractScreen> with Ticker
   }
 
   Widget _buildMaterialList() {
-    // Debug: In ra thông tin để kiểm tra
-    print('DEBUG: _bloc.listItemProduct.length = ${_bloc.listItemProduct.length}');
-    print('DEBUG: widget.isSearchItem = ${widget.isSearchItem}');
-    print('DEBUG: widget.cartItems = ${widget.cartItems?.length ?? 'null'}');
+
     
     // Lọc bỏ vật tư đã có trong giỏ hàng khi isSearchItem = true
     List<ListItem> filteredItems = _bloc.listItemProduct;
-    // Tạm thời comment logic lọc để debug
 
     if (widget.isSearchItem && widget.cartItems != null) {
       filteredItems = _bloc.listItemProduct.where((item) { 
         // Kiểm tra xem vật tư này đã có trong giỏ hàng chưa - sử dụng sttRec0 để so sánh
         bool existsInCart = widget.cartItems!.any((cartItem) => cartItem.sttRec0 == item.sttRec0);
-        print('DEBUG: Item ${item.maVt} (sttRec0: ${item.sttRec0}) existsInCart = $existsInCart');
         return !existsInCart; // Chỉ hiển thị vật tư chưa có trong giỏ hàng
       }).toList();
-      print('DEBUG: filteredItems.length = ${filteredItems.length}');
     }
 
     
@@ -588,7 +570,7 @@ class _DetailContractScreenState extends State<DetailContractScreen> with Ticker
                                     fontWeight: FontWeight.bold,
                                     color: Colors.black87,
                                   ),
-                                  maxLines: 2,
+                                  maxLines: 4,
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ],
@@ -920,6 +902,7 @@ class _DetailContractScreenState extends State<DetailContractScreen> with Ticker
                       onChanged: (value) {
                         if (debounce?.isActive ?? false) debounce!.cancel();
                         debounce = Timer(const Duration(milliseconds: 500), () {
+                          _bloc.listItemProduct.clear();
                           _bloc.add(GetDetailContractEvent(searchKey: Utils.convertKeySearch(searchController.text),pageIndex: selectedPage, sttRec: widget.contractMaster.sttRec.toString(),date: widget.contractMaster.ngayCt.toString().split('T').first, isSearchItem:  widget.isSearchItem));
                         });
                       },
@@ -945,6 +928,7 @@ class _DetailContractScreenState extends State<DetailContractScreen> with Ticker
                           onTap: () {
                             searchController.text = '';
                             // _searchFocus.requestFocus();
+                            _bloc.listItemProduct.clear();
                             _bloc.add(GetDetailContractEvent(searchKey: Utils.convertKeySearch(searchController.text),pageIndex: selectedPage, sttRec: widget.contractMaster.sttRec.toString(),date: widget.contractMaster.ngayCt.toString().split('T').first, isSearchItem:  widget.isSearchItem));
                           },
                           child: const Icon( Icons.clear, color: Colors.white),
@@ -1387,6 +1371,10 @@ class _DetailContractScreenState extends State<DetailContractScreen> with Ticker
           nameStock: selectedItem.tenKho ?? '',
           so_luong_kd: totalAvailableQuantity, // Lưu tổng khả dụng gốc cho maVt2 - FIX: đảm bảo fallback khi availableQuantity null
           availableQuantity: totalAvailableQuantity, // Lưu TỔNG khả dụng gốc cho maVt2 (10,000)
+          originalPrice: selectedItem.giaNt2, // Giá gốc ban đầu
+          maThue: selectedItem.maThue, // Mã thuế
+          tenThue: selectedItem.tenThue, // Tên thuế  
+          thueSuat: selectedItem.thueSuat, // Thuế suất (%)
         );
         
         // Thêm vào giỏ hàng (sử dụng sttRec0 làm key, THAY THẾ số lượng)
@@ -1609,6 +1597,128 @@ class _DetailContractScreenState extends State<DetailContractScreen> with Ticker
                 ),
               );
             },
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showSuccessDialog(BuildContext context, {required String title, required String message}) async {
+    return showDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black.withOpacity(0.5),
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.check_circle, color: Colors.green, size: 36),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  title,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  message,
+                  style: const TextStyle(fontSize: 14, color: Colors.black87),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.check, size: 18),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: mainColor,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      elevation: 0,
+                    ),
+                    label: const Text('Đóng', style: TextStyle(fontWeight: FontWeight.w600)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showErrorDialog(BuildContext context, {required String title, required String message}) async {
+    return showDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black.withOpacity(0.5),
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.error_outline, color: Colors.red, size: 36),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  title,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  message,
+                  style: const TextStyle(fontSize: 14, color: Colors.black87),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close, size: 18),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      elevation: 0,
+                    ),
+                    label: const Text('Đóng', style: TextStyle(fontWeight: FontWeight.w600)),
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },
