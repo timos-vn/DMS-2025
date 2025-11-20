@@ -37,7 +37,7 @@ class _DetailInfoCustomerScreenState extends State<DetailInfoCustomerScreen> {
 
   late DetailCustomerBloc _bloc;
   bool _hasPendingCheckIn = false;
-  ItemCheckInOffline? _pendingCheckIn;  
+  ItemCheckInOffline? _pendingCheckIn;
 
   List<Color> listColor = [Colors.blueAccent,Colors.lightGreen,Colors.pink,Colors.yellow];
 

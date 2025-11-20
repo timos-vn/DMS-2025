@@ -233,25 +233,25 @@ class _HistoryOrderDetailScreenState extends State<HistoryOrderDetailScreen> {
                                 padding: const EdgeInsets.only(bottom: 10,right: 10),
                                 child: InkWell(
                                   onTap: widget.approveOrder != true ? (){
-                                    // print(_bloc.lineItem);
-                                    // _bloc.lineItem.forEach((element) {
-                                    //
-                                    // });
-                                    if(_bloc.masterDetailOrder.status != 1 && _bloc.masterDetailOrder.status != 0){
+                                    final status = _bloc.masterDetailOrder.status;
+                                    final canEditByCode = status == 0 || status == 1;
+                                    final canEditByName = _isPendingApprovalStatusName(widget.statusName);
 
-                                    }else{
-                                      DataLocal.listObjectDiscount.clear();
-                                      DataLocal.listOrderDiscount.clear();
-                                      DataLocal.infoCustomer = ManagerCustomerResponseData();
-                                      DataLocal.transactionCode = "";
-                                      DataLocal.transaction = ListTransaction();
-                                      DataLocal.indexValuesTax = -1;
-                                      DataLocal.taxPercent = 0;
-                                      DataLocal.taxCode = '';
-                                      DataLocal.valuesTypePayment = '';
-                                      DataLocal.datePayment = '';
-                                      _bloc.add(AddProductToCartEvent());
+                                    if(!(canEditByCode || canEditByName)){
+                                      return;
                                     }
+
+                                    DataLocal.listObjectDiscount.clear();
+                                    DataLocal.listOrderDiscount.clear();
+                                    DataLocal.infoCustomer = ManagerCustomerResponseData();
+                                    DataLocal.transactionCode = "";
+                                    DataLocal.transaction = ListTransaction();
+                                    DataLocal.indexValuesTax = -1;
+                                    DataLocal.taxPercent = 0;
+                                    DataLocal.taxCode = '';
+                                    DataLocal.valuesTypePayment = '';
+                                    DataLocal.datePayment = '';
+                                    _bloc.add(AddProductToCartEvent());
                                   } : (){},
                                   child: Container(
                                     padding: const EdgeInsets.only(left: 16,right: 16,top: 10,bottom: 10),
@@ -569,14 +569,27 @@ class _HistoryOrderDetailScreenState extends State<HistoryOrderDetailScreen> {
   }
 
   bool _canEditOrCancel() {
-    if (widget.statusName == null || widget.statusName!.isEmpty) {
+    return _isDraftStatusName(widget.statusName) ||
+        _isPendingApprovalStatusName(widget.statusName);
+  }
+
+  bool _isDraftStatusName(String? statusName) {
+    if (statusName == null || statusName.trim().isEmpty) {
       return false;
     }
-    final statusNameLower = widget.statusName!.toLowerCase().trim();
-    return statusNameLower == 'lập ctừ' || 
-           statusNameLower == 'lập chứng từ' ||
-           statusNameLower.contains('lập ctừ') ||
-           statusNameLower.contains('lập chứng từ');
+    final statusNameLower = statusName.toLowerCase().trim();
+    return statusNameLower == 'lập ctừ' ||
+        statusNameLower == 'lập chứng từ' ||
+        statusNameLower.contains('lập ctừ') ||
+        statusNameLower.contains('lập chứng từ');
+  }
+
+  bool _isPendingApprovalStatusName(String? statusName) {
+    if (statusName == null || statusName.trim().isEmpty) {
+      return false;
+    }
+    final normalized = statusName.toLowerCase().trim();
+    return normalized == 'chờ duyệt' || normalized.contains('chờ duyệt');
   }
 
   buildAppBar(){

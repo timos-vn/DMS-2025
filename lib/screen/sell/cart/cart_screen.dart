@@ -1330,7 +1330,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
                   // Hiển thị khi có ít nhất 1 loại chiết khấu
                   visible: (_bloc.hasCknDiscount || _bloc.hasCkgDiscount || _bloc.hasHHDiscount) && _bloc.listOrder.isNotEmpty,
                   child: InkWell( 
-                      onTap: () => _showDiscountFlow(),
+                      onTap: () => _showDiscountFlow(), 
                       child:const Padding(
                         padding:  EdgeInsets.only(top: 0),
                         child: Icon(Icons.card_giftcard_rounded,size: 20,color: Colors.green,),
@@ -2094,6 +2094,12 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
     _bloc.selectedCktdttIds = selectedCktdttIds;
     _bloc.selectedCktdthGroups = selectedCktdthGroups;
 
+    // ✅ Apply all CKTDTT discounts (cộng dồn totalDiscountForOder)
+    if (selectedCktdttIds.isNotEmpty) {
+      print('💰 Applying ${selectedCktdttIds.length} CKTDTT discounts');
+      _applyAllCKTDTT(selectedCktdttIds);
+    }
+
     // ✅ Gọi API để sync tất cả thay đổi (CKG, CKTDTT, HH) với backend
     // Chỉ gọi API nếu có thay đổi
     bool hasChanges = selectedCkgIds.isNotEmpty || selectedCktdttIds.isNotEmpty || selectedHHIds.isNotEmpty;
@@ -2576,6 +2582,89 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
     print('💰 Updated listPromotion: ${_bloc.listPromotion}');
   }
 
+  // Apply all selected CKTDTT discounts (cộng dồn totalDiscountForOder)
+  void _applyAllCKTDTT(Set<String> selectedIds) {
+    print('💰 Applying ${selectedIds.length} CKTDTT discounts - START totalDiscountForOder=${_bloc.totalDiscountForOder ?? 0}');
+    
+    // Reset totalDiscountForOder và codeDiscountTD để tính lại từ đầu
+    double totalDiscountForOder = 0;
+    List<String> codeDiscountList = [];
+    List<String> sttRecCKList = [];
+    
+    // Parse listPromotion và listCKVT hiện tại
+    List<String> promoList = _bloc.listPromotion.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+    List<String> ckvtList = DataLocal.listCKVT.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+    
+    // Duyệt qua tất cả CKTDTT đã chọn
+    for (var cktdttItem in _bloc.listCktdtt) {
+      String sttRecCk = (cktdttItem.sttRecCk ?? '').trim();
+      
+      // ✅ Build cktdttId với format giống DiscountVoucherSelectionSheet: "sttRecCk"
+      String cktdttId = sttRecCk;
+      bool shouldApply = selectedIds.contains(cktdttId);
+      
+      if (shouldApply && sttRecCk.isNotEmpty) {
+        print('💰 Processing CKTDTT: cktdttId=$cktdttId, sttRecCk=$sttRecCk, tCkTtNt=${cktdttItem.tCkTtNt ?? 0}');
+        
+        // ✅ Cộng dồn totalDiscountForOder
+        double discountAmount = cktdttItem.tCkTtNt ?? 0;
+        totalDiscountForOder += discountAmount;
+        
+        // ✅ Thêm sttRecCk vào listPromotion nếu chưa có
+        if (!promoList.contains(sttRecCk)) {
+          promoList.add(sttRecCk);
+        }
+        
+        // ✅ Thêm sttRecCk vào listCKVT nếu chưa có
+        if (!ckvtList.contains(sttRecCk)) {
+          ckvtList.add(sttRecCk);
+        }
+        
+        // ✅ Lưu maCk và sttRecCk
+        String maCk = (cktdttItem.maCk ?? '').trim();
+        if (maCk.isNotEmpty && !codeDiscountList.contains(maCk)) {
+          codeDiscountList.add(maCk);
+        }
+        if (sttRecCk.isNotEmpty && !sttRecCKList.contains(sttRecCk)) {
+          sttRecCKList.add(sttRecCk);
+        }
+        
+        print('💰 CKTDTT: Added discount ${discountAmount} - Running total: $totalDiscountForOder');
+      } else {
+        // ✅ Remove nếu không được chọn
+        promoList.removeWhere((item) => item.trim() == sttRecCk);
+        ckvtList.removeWhere((item) => item.trim() == sttRecCk);
+      }
+    }
+    
+    // ✅ Update BLoC state
+    _bloc.totalDiscountForOder = totalDiscountForOder;
+    _bloc.listPromotion = promoList.join(',');
+    DataLocal.listCKVT = ckvtList.join(',');
+    
+    // ✅ Set codeDiscountTD (lấy mã đầu tiên hoặc join nếu cần)
+    if (codeDiscountList.isNotEmpty) {
+      _bloc.codeDiscountTD = codeDiscountList.first; // Hoặc có thể join: codeDiscountList.join(',')
+    } else {
+      _bloc.codeDiscountTD = '';
+    }
+    
+    // ✅ Set sttRecCKOld (lấy sttRecCk đầu tiên)
+    if (sttRecCKList.isNotEmpty) {
+      _bloc.sttRecCKOld = sttRecCKList.first;
+    } else {
+      _bloc.sttRecCKOld = '';
+    }
+    
+    print('💰 CKTDTT complete - Applied ${selectedIds.length} discounts, totalDiscountForOder=$totalDiscountForOder');
+    print('💰 Updated listPromotion: ${_bloc.listPromotion}');
+    print('💰 Updated listCKVT: ${DataLocal.listCKVT}');
+    print('💰 Updated codeDiscountTD: ${_bloc.codeDiscountTD}');
+    
+    // Recalculate totals
+    _recalculateTotalLocal();
+  }
+
   // Handle CKN selection (when user clicks checkbox and needs to select gifts)
   void _handleCKNSelection(Map<String, dynamic> result) async {
     final String groupKey = result['groupKey'];
@@ -2746,7 +2835,18 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
     bool ckvtExists = ckvtList.contains(sttRecCk);
     
     if (shouldApply) {
-      // ✅ ADD CKTDTT discount
+      // ✅ Cộng dồn totalDiscountForOder TRƯỚC KHI thêm vào listPromotion
+      // Chỉ cộng thêm nếu sttRecCk chưa có trong listPromotion (chưa được apply)
+      if (!promoExists) {
+        double currentDiscount = _bloc.totalDiscountForOder ?? 0;
+        double newDiscount = cktdttItem.tCkTtNt ?? 0;
+        _bloc.totalDiscountForOder = currentDiscount + newDiscount;
+        print('💰 CKTDTT: Added discount $newDiscount - Total: ${_bloc.totalDiscountForOder} (was $currentDiscount)');
+      } else {
+        print('💰 CKTDTT: sttRecCk $sttRecCk already exists in listPromotion, skipping discount addition');
+      }
+      
+      // ✅ ADD CKTDTT discount to listPromotion và listCKVT
       if (!promoExists) {
         _bloc.listPromotion = _bloc.listPromotion.isEmpty
           ? sttRecCk
@@ -2761,13 +2861,18 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
         ckvtExists = true;
       }
       
-      // Update codeDiscountTD and totalDiscountForOder
-      _bloc.codeDiscountTD = cktdttItem.maCk?.toString().trim() ?? '';
-      _bloc.sttRecCKOld = sttRecCk;
-      _bloc.totalDiscountForOder = cktdttItem.tCkTtNt ?? 0;
+      // ✅ Update codeDiscountTD (lấy mã đầu tiên hoặc giữ nguyên nếu đã có)
+      if (_bloc.codeDiscountTD.isEmpty) {
+        _bloc.codeDiscountTD = cktdttItem.maCk?.toString().trim() ?? '';
+      }
       
-      print('💰 CKTDTT: Added - listPromotion: ${_bloc.listPromotion}, listCKVT: ${DataLocal.listCKVT}');
-      print('💰 CKTDTT: codeDiscountTD=${_bloc.codeDiscountTD}, totalDiscountForOder=${_bloc.totalDiscountForOder}');
+      // ✅ Update sttRecCKOld (lấy sttRecCk đầu tiên)
+      if (_bloc.sttRecCKOld.isEmpty) {
+        _bloc.sttRecCKOld = sttRecCk;
+      }
+      
+      print('💰 CKTDTT: listPromotion: ${_bloc.listPromotion}, listCKVT: ${DataLocal.listCKVT}');
+      print('💰 CKTDTT: codeDiscountTD=${_bloc.codeDiscountTD}, sttRecCKOld=${_bloc.sttRecCKOld}, totalDiscountForOder=${_bloc.totalDiscountForOder}');
       
       // ✅ KHÔNG GỌI API NGAY KHI CLICK - Chỉ update UI local
       // API sẽ được gọi khi user đóng bottom sheet (batch update)
@@ -2784,20 +2889,48 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
         DataLocal.listCKVT = ckvtList.join(',');
       }
       
-      // Reset codeDiscountTD and totalDiscountForOder if this was the only CKTDTT
+      // ✅ Tính lại totalDiscountForOder từ tất cả CKTDTT còn lại được chọn
+      double totalDiscount = 0;
+      List<String> codeDiscountList = [];
+      List<String> sttRecCKList = [];
+      
+      for (var item in _bloc.listCktdtt) {
+        String itemSttRecCk = (item.sttRecCk ?? '').trim();
+        if (itemSttRecCk.isNotEmpty && _bloc.selectedCktdttIds.contains(itemSttRecCk)) {
+          double discountAmount = item.tCkTtNt ?? 0;
+          totalDiscount += discountAmount;
+          
+          String maCk = (item.maCk ?? '').trim();
+          if (maCk.isNotEmpty && !codeDiscountList.contains(maCk)) {
+            codeDiscountList.add(maCk);
+          }
+          if (itemSttRecCk.isNotEmpty && !sttRecCKList.contains(itemSttRecCk)) {
+            sttRecCKList.add(itemSttRecCk);
+          }
+        }
+      }
+      
+      _bloc.totalDiscountForOder = totalDiscount;
+      
+      // ✅ Reset codeDiscountTD và sttRecCKOld nếu không còn CKTDTT nào được chọn
       if (_bloc.selectedCktdttIds.isEmpty) {
         _bloc.codeDiscountTD = '';
         _bloc.sttRecCKOld = '';
         _bloc.totalDiscountForOder = 0;
       } else {
-        // If there are other CKTDTT selected, keep the first one
-        final firstSelected = _bloc.listCktdtt.firstWhere(
-          (item) => _bloc.selectedCktdttIds.contains((item.sttRecCk ?? '').trim()),
-          orElse: () => cktdttItem,
-        );
-        _bloc.codeDiscountTD = firstSelected.maCk?.toString().trim() ?? '';
-        _bloc.sttRecCKOld = (firstSelected.sttRecCk ?? '').trim();
-        _bloc.totalDiscountForOder = firstSelected.tCkTtNt ?? 0;
+        // ✅ Set codeDiscountTD (lấy mã đầu tiên)
+        if (codeDiscountList.isNotEmpty) {
+          _bloc.codeDiscountTD = codeDiscountList.first;
+        } else {
+          _bloc.codeDiscountTD = '';
+        }
+        
+        // ✅ Set sttRecCKOld (lấy sttRecCk đầu tiên)
+        if (sttRecCKList.isNotEmpty) {
+          _bloc.sttRecCKOld = sttRecCKList.first;
+        } else {
+          _bloc.sttRecCKOld = '';
+        }
       }
       
       print('💰 CKTDTT: Removed - listPromotion: ${_bloc.listPromotion}, listCKVT: ${DataLocal.listCKVT}');
@@ -3049,8 +3182,8 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
       
       // ✅ CRITICAL: Tính lại total LOCAL
       _recalculateTotalLocal();
-      
-      // ✅ Note: UI reads from _bloc.listOrder directly, so no need to sync with listProductOrderAndUpdate
+      // ✅ Đồng bộ listOrder -> listProductOrderAndUpdate để UI dùng chung dữ liệu mới nhất
+      _syncListOrderToUI();
       
       // ✅ KHÔNG GỌI API NGAY KHI CLICK - Chỉ update UI local
       // API sẽ được gọi khi user đóng bottom sheet (batch update)
@@ -5179,9 +5312,9 @@ customWidgetPayment('Chiết khấu:','- ${Utils.formatMoneyStringToDouble(_bloc
                       ?
                   'FreeShip'
                       :
-                  "${_bloc.codeDiscountTD.toString().trim()} ${_bloc.listCkTongDon.isEmpty ? '0 ₫'
+                  "${_bloc.codeDiscountTD.toString().trim()} ${(_bloc.totalDiscountForOder ?? 0) == 0 ? '0 ₫'
                       :
-                  '- ${Utils.formatMoneyStringToDouble(_bloc.listCkTongDon[0].tCkTt)} ₫'}"
+                  '- ${Utils.formatMoneyStringToDouble(_bloc.totalDiscountForOder ?? 0)} ₫'}"
               )),
           Padding(
             padding: const EdgeInsets.only(top: 15,bottom: 6,),

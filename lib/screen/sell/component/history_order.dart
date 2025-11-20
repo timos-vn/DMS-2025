@@ -11,7 +11,7 @@ import '../../options_input/options_input_screen.dart';
 import 'child_screen_order.dart';
 import 'history_order_detail_screen.dart';
 import '../sell_bloc.dart';
-import '../sell_event.dart';
+import '../sell_event.dart'; 
 import '../sell_state.dart';
 
 
@@ -133,12 +133,13 @@ class _HistoryOrderScreenState extends State<HistoryOrderScreen>  with TickerPro
               onRefresh: () async {
                 await Future.delayed(const Duration(seconds: 2));
                 // _bloc.add(GetListStageStatistic(unitId: widget.unitId,idStageStatistic:idStageStatistic.toString(),));
-              },
-              child: SizedBox(
-                height: double.infinity,width: double.infinity,
+              }, 
+              child: SizedBox.expand(
                 child: TabBarView(
-                    controller: tabController,
-                    children: List<Widget>.generate(DataLocal.listStatusToOrder.length, (int index) {
+                  controller: tabController,
+                  children: List<Widget>.generate(
+                    DataLocal.listStatusToOrder.length,
+                    (int index) {
                       for (int i = 0; i <= DataLocal.listStatusToOrder.length; i++) {
                         if (i == index) {
                           // tabController.addListener(() {
@@ -154,7 +155,9 @@ class _HistoryOrderScreenState extends State<HistoryOrderScreen>  with TickerPro
                         }
                       }
                       return const Text('');
-                    })),
+                    },
+                  ),
+                ),
               ),
             ),
           ),const SizedBox(height: 10,),
@@ -175,6 +178,7 @@ class _HistoryOrderScreenState extends State<HistoryOrderScreen>  with TickerPro
                 sttRec: listOrder[index].sttRec,
                 title: listOrder[index].tenKh,
                 status: (i != 0 && i != 1) ? false : true,
+                statusName: listOrder[index].statusname?.toString().trim(),
                 dateOrder: listOrder[index].ngayCt.toString(),
                 codeCustomer: listOrder[index].maKh.toString().trim(),
                 nameCustomer:  listOrder[index].tenKh.toString().trim(),
@@ -376,7 +380,8 @@ class _HistoryOrderScreenState extends State<HistoryOrderScreen>  with TickerPro
           Visibility(
             visible: show == true,
             child: Container(
-              margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+              width:  double.infinity,
+              margin: const EdgeInsets.fromLTRB(4, 0, 4, 8),
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.15),
                 borderRadius: BorderRadius.circular(12),
@@ -405,7 +410,7 @@ class _HistoryOrderScreenState extends State<HistoryOrderScreen>  with TickerPro
                 labelColor: subColor,
                 unselectedLabelColor: Colors.white,
                 labelPadding: EdgeInsets.zero,
-                isScrollable: DataLocal.listStatusToOrder.length > 3,
+                // isScrollable: DataLocal.listStatusToOrder.length > 3,
                 tabs: List<Widget>.generate(
                   DataLocal.listStatusToOrder.length,
                   (int index) {

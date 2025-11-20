@@ -86,7 +86,7 @@ class _ChildScreenOrderState extends State<ChildScreenOrder> {
               children: [
                 ListView.separated(
                   controller: _scrollController,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
                   physics: const BouncingScrollPhysics(),
                   itemBuilder: (BuildContext context, int index) {
                     return _buildOrderCard(context, index);

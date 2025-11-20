@@ -1337,140 +1337,75 @@ class _ConfirmScreenState extends State<ConfirmScreen>with TickerProviderStateMi
         itemCount: _bloc.listOrder.length,
         itemBuilder: (context,index){
           return Slidable(
-              key: const ValueKey(1),
-              startActionPane: Const.freeDiscount == false ? null : ActionPane(
+              key: ValueKey('confirm-${_bloc.listOrder[index].code}-$index'),
+              startActionPane: Const.isVv == true
+                  ? ActionPane(
                 motion: const ScrollMotion(),
-                // extentRatio: 0.25,
                 dragDismissible: false,
                 children: [
-                  Visibility(
-                    visible: false,
-                    child: SlidableAction(
-                      onPressed:(_) {
-                        setState(() {
-                          if(_bloc.listOrder[index].discountByHand == true){
-                            double sl = _bloc.listOrder[index].count!;
-                            double price = 0;
-                            if(_bloc.allowTaxPercent == true){
-                              price = _bloc.listOrder[index].priceAfterTax!;
-                            }else{
-                              price = _bloc.listOrder[index].price ?? 0;
-                            }
-                            double a = ((price * sl) * _bloc.listOrder[index].discountPercentByHand)/100;
-                            _bloc.listOrder[index].discountByHand = false;
-                            _bloc.totalDiscount = _bloc.totalDiscount -  a;
-                            _bloc.totalPayment  = _bloc.totalPayment   + a;
-                            _bloc.listOrder[index].discountPercentByHand = 0;
-                            _bloc.listOrder[index].ckntByHand = 0;
-                            _bloc.listOrder[index].priceAfter = _bloc.listOrder[index].price ?? 0;
-                            _bloc.add(CalculatorDiscountEvent(addOnProduct: false,product: _bloc.listOrder[index],reLoad: false, addTax: false));
-                            Utils.showCustomToast(context, Icons.check_circle_outline, 'Huỷ áp dụng chiết khấu tự do');
-                          }
-                          else{
-                            showDialog(
-                                barrierDismissible: true,
-                                context: context,
-                                builder: (context) {
-                                  return InputDiscountPercent(
-                                    title: 'Vui lòng nhập tỉ lệ chiết khấu',
-                                    subTitle: 'Vui lòng nhập tỉ lệ chiết khấu',
-                                    typeValues: '%',
-                                    percent: _bloc.listOrder[index].discountPercentByHand,
-                                  );
-                                }).then((value){
-                              if(value[0] == 'BACK'){
-                                _bloc.listOrder[index].discountByHand = true;
-                                double sl = _bloc.listOrder[index].count!;
-                                double price = _bloc.allowTaxPercent == true ?  _bloc.listOrder[index].priceAfterTax! : (_bloc.listOrder[index].price ?? 0);
-                                _bloc.listOrder[index].discountPercentByHand = double.parse(value[1].toString());
-                                _bloc.totalPayment = _bloc.totalPayment -  (price * sl * value[1] )/100;
-                                _bloc.listOrder[index].ckntByHand = (price * sl * value[1] )/100;
-                                _bloc.listOrder[index].priceAfter2 = price;//_bloc.listOrder[index].priceAfter;
-                                _bloc.listOrder[index].priceAfter = ((_bloc.listOrder[index].price ?? 0) - (((_bloc.listOrder[index].price ?? 0) * 1) * value[1])/100);
-
-                                Utils.showCustomToast(context, Icons.check_circle_outline, 'Đã áp dụng chiết khấu tự do');
+                  SlidableAction(
+                    onPressed:(_) {
+                      setState(() {
+                        if(_bloc.listOrder[index].chooseVuViec == true){
+                          _bloc.listOrder[index].chooseVuViec = false;
+                          _bloc.listOrder[index].idVv = '';
+                          _bloc.listOrder[index].idHd = '';
+                          _bloc.listOrder[index].nameVv = '';
+                          _bloc.listOrder[index].nameHd = '';
+                          _bloc.listOrder[index].idHdForVv = '';
+                          Utils.showCustomToast(context, Icons.check_circle_outline, 'Đã huỷ áp dụng CTBH cho mặt hàng này');
+                        }
+                        else{
+                          showModalBottomSheet(
+                              context: context,
+                              isDismissible: true,
+                              isScrollControlled: true,
+                              shape: const RoundedRectangleBorder(
+                                borderRadius: BorderRadius.only(topLeft: Radius.circular(25.0), topRight: Radius.circular(25.0)),
+                              ),
+                              backgroundColor: Colors.white,
+                              builder: (builder){
+                                return buildPopupVvHd();
+                              }
+                          ).then((value){
+                            if(value != null){
+                              if(value[0] == 'ReLoad' && value[1] != '' && value[1] !='null'){
+                                _bloc.listOrder[index].chooseVuViec = true;
+                                _bloc.listOrder[index].idVv = _bloc.idVv;
+                                _bloc.listOrder[index].nameVv = _bloc.nameVv;
+                                _bloc.listOrder[index].idHd = _bloc.idHd;
+                                _bloc.listOrder[index].nameHd = _bloc.nameHd;
+                                _bloc.listOrder[index].idHdForVv = _bloc.idHdForVv;
                                 _bloc.add(CalculatorDiscountEvent(addOnProduct: true,product: _bloc.listOrder[index],reLoad: false, addTax: false));
-                              }
-                            });
-                          }
-                        });
-                      },
-                      borderRadius:const BorderRadius.all(Radius.circular(8)),
-                      padding:const EdgeInsets.all(10),
-                      backgroundColor: _bloc.listOrder[index].discountByHand == true
-                          ?
-                      const Color(0xFFC7033B)
-                          : const Color(0xFFA8B1A6),
-                      foregroundColor: Colors.white,
-                      icon: Icons.discount,
-                      label: 'Chiết khấu',
-                    ),
-                  ),
-                  const SizedBox.shrink(),
-                  Visibility(
-                    visible: Const.isVv == true,
-                    child: SlidableAction(
-                      onPressed:(_) {
-                        setState(() {
-                          if(_bloc.listOrder[index].chooseVuViec == true){
-                            _bloc.listOrder[index].chooseVuViec = false;
-                            _bloc.listOrder[index].idVv = '';
-                            _bloc.listOrder[index].idHd = '';
-                            _bloc.listOrder[index].nameVv = '';
-                            _bloc.listOrder[index].nameHd = '';
-                            _bloc.listOrder[index].idHdForVv = '';
-                            Utils.showCustomToast(context, Icons.check_circle_outline, 'Đã huỷ áp dụng CTBH cho mặt hàng này');
-                          }
-                          else{
-                            showModalBottomSheet(
-                                context: context,
-                                isDismissible: true,
-                                isScrollControlled: true,
-                                shape: const RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.only(topLeft: Radius.circular(25.0), topRight: Radius.circular(25.0)),
-                                ),
-                                backgroundColor: Colors.white,
-                                builder: (builder){
-                                  return buildPopupVvHd();
-                                }
-                            ).then((value){
-                              if(value != null){
-                                if(value[0] == 'ReLoad' && value[1] != '' && value[1] !='null'){
-                                  _bloc.listOrder[index].chooseVuViec = true;
-                                  _bloc.listOrder[index].idVv = _bloc.idVv;
-                                  _bloc.listOrder[index].nameVv = _bloc.nameVv;
-                                  _bloc.listOrder[index].idHd = _bloc.idHd;
-                                  _bloc.listOrder[index].nameHd = _bloc.nameHd;
-                                  _bloc.listOrder[index].idHdForVv = _bloc.idHdForVv;
-                                  _bloc.add(CalculatorDiscountEvent(addOnProduct: true,product: _bloc.listOrder[index],reLoad: false, addTax: false));
-                                }else{
-                                  _bloc.listOrder[index].chooseVuViec = false;
-                                }
-                              }
-                              else{
+                              }else{
                                 _bloc.listOrder[index].chooseVuViec = false;
                               }
-                            });
-                          }
-                        });
-                      },
-                      borderRadius:const BorderRadius.all(Radius.circular(8)),
-                      padding:const EdgeInsets.all(10),
-                      backgroundColor: _bloc.listOrder[index].chooseVuViec == false ? const Color(0xFFA8B1A6) : const Color(0xFF2DC703),
-                      foregroundColor: Colors.white,
-                      icon: Icons.description,
-                      label: 'CTBH', /// VV & HĐ
-                    ),
-                  )
+                            }
+                            else{
+                              _bloc.listOrder[index].chooseVuViec = false;
+                            }
+                          });
+                        }
+                      });
+                    },
+                    borderRadius:const BorderRadius.all(Radius.circular(8)),
+                    padding:const EdgeInsets.all(10),
+                    backgroundColor: _bloc.listOrder[index].chooseVuViec == false ? const Color(0xFFA8B1A6) : const Color(0xFF2DC703),
+                    foregroundColor: Colors.white,
+                    icon: Icons.description,
+                    label: 'CTBH', /// VV & HĐ
+                  ),
                 ],
-              ),
-              endActionPane: ActionPane(
+              )
+                  : null,
+              endActionPane: widget.viewDetail == true
+                  ? null
+                  : ActionPane(
                 motion: const ScrollMotion(),
                 dragDismissible: false,
                 children: [
-                  Visibility(
-                    visible: false,
-                    child: SlidableAction(
+                  if (_bloc.listOrder[index].gifProduct != true)
+                    SlidableAction(
                       onPressed:(_) {
                         gift = false;
                         indexSelect = index;
@@ -1484,26 +1419,21 @@ class _ConfirmScreenState extends State<ConfirmScreen>with TickerProviderStateMi
                       icon: Icons.edit_calendar_outlined,
                       label: 'Sửa',
                     ),
-                  ),
-                  const SizedBox.shrink(),
-                  Visibility(
-                    visible: false,
-                    child: SlidableAction(
-                      onPressed:(_) {
-                        itemSelect = _bloc.listOrder[index];
-                        if(DataLocal.listCKVT.isNotEmpty && DataLocal.listCKVT.contains('${itemSelect.sttRecCK.toString().trim()}-${itemSelect.code.toString().trim()}') == true){
-                          DataLocal.listCKVT = DataLocal.listCKVT.replaceAll('${itemSelect.sctGoc.toString().trim()}-${itemSelect.code.toString().trim()}', '');
-                        }
-                        _bloc.add(DeleteProductFromDB(false,index,_bloc.listOrder[index].code.toString(),_bloc.listOrder[index].stockCode.toString()));
-                        _bloc.add(GetListProductFromDB(addOrderFromCheckIn: false, getValuesTax: false,key: ''));
-                      },
-                      borderRadius:const BorderRadius.all(Radius.circular(8)),
-                      padding:const EdgeInsets.all(10),
-                      backgroundColor: const Color(0xFFC90000),
-                      foregroundColor: Colors.white,
-                      icon: Icons.delete_forever,
-                      label: 'Xoá',
-                    ),
+                  SlidableAction(
+                    onPressed:(_) {
+                      itemSelect = _bloc.listOrder[index];
+                      if(DataLocal.listCKVT.isNotEmpty && DataLocal.listCKVT.contains('${itemSelect.sttRecCK.toString().trim()}-${itemSelect.code.toString().trim()}') == true){
+                        DataLocal.listCKVT = DataLocal.listCKVT.replaceAll('${itemSelect.sctGoc.toString().trim()}-${itemSelect.code.toString().trim()}', '');
+                      }
+                      _bloc.add(DeleteProductFromDB(false,index,_bloc.listOrder[index].code.toString(),_bloc.listOrder[index].stockCode.toString()));
+                      _bloc.add(GetListProductFromDB(addOrderFromCheckIn: false, getValuesTax: false,key: ''));
+                    },
+                    borderRadius:const BorderRadius.all(Radius.circular(8)),
+                    padding:const EdgeInsets.all(10),
+                    backgroundColor: const Color(0xFFC90000),
+                    foregroundColor: Colors.white,
+                    icon: Icons.delete_forever,
+                    label: 'Xoá',
                   ),
                 ],
               ),
@@ -3044,9 +2974,9 @@ class _ConfirmScreenState extends State<ConfirmScreen>with TickerProviderStateMi
                       ?
                   'FreeShip'
                       :
-                  "${_bloc.codeDiscountTD.toString().trim()} ${_bloc.listCkTongDon.isEmpty ? '0 ₫'
+                  "${_bloc.codeDiscountTD.toString().trim()} ${(_bloc.totalDiscountForOder ?? 0) == 0 ? '0 ₫'
                       :
-                  '- ${Utils.formatMoneyStringToDouble(_bloc.listCkTongDon[0].tCkTt)} ₫'}"
+                  '- ${Utils.formatMoneyStringToDouble(_bloc.totalDiscountForOder ?? 0)} ₫'}"
               )),
           Padding(
             padding: const EdgeInsets.only(top: 15,bottom: 6,),

@@ -2452,24 +2452,42 @@ class CartBloc extends Bloc<CartEvent,CartState>{
         totalMNPayment = totalMoneyDiscount?.tThanhToan ?? 0;
         
         // ✅ Cập nhật totalDiscountForOder từ listCkTongDon nếu có CKTDTT được chọn
+        // ✅ CỘNG DỒN tất cả CKTDTT đã chọn thay vì chỉ lấy 1
         if (response.listCkTongDon != null && response.listCkTongDon!.isNotEmpty) {
-          // Tìm CKTDTT đã được chọn
+          double totalDiscount = 0;
+          List<String> codeDiscountList = [];
+          
+          // ✅ Duyệt qua TẤT CẢ CKTDTT đã được chọn và cộng dồn
           for (var cktdttItem in response.listCkTongDon!) {
-            if (cktdttItem.kieuCK == 'CKTDTT' && selectedCktdttIds.contains((cktdttItem.sttRecCk ?? '').trim())) {
-              totalDiscountForOder = cktdttItem.tCkTtNt ?? 0;
-              codeDiscountTD = cktdttItem.maCk?.toString().trim() ?? '';
-              print('💰 CKTDTT: Updated from API response - totalDiscountForOder=$totalDiscountForOder, codeDiscountTD=$codeDiscountTD');
+            String sttRecCk = (cktdttItem.sttRecCk ?? '').trim();
+            if (cktdttItem.kieuCK == 'CKTDTT' && selectedCktdttIds.contains(sttRecCk)) {
+              double discountAmount = cktdttItem.tCkTtNt ?? 0;
+              totalDiscount += discountAmount;
               
-              // ✅ QUAN TRỌNG: API có thể chưa tính CKTDTT vào tThanhToan, nên cần trừ thủ công
-              // Nếu totalDiscountForOder > 0, trừ vào totalPayment
-              if (totalDiscountForOder > 0) {
-                totalPayment = totalPayment - totalDiscountForOder;
-                totalPaymentOld = totalPayment;
-                totalMNPayment = totalPayment;
-                print('💰 CKTDTT: Trừ chiết khấu tổng đơn vào totalPayment: ${totalMoneyDiscount?.tThanhToan} - $totalDiscountForOder = $totalPayment');
+              String maCk = (cktdttItem.maCk ?? '').trim();
+              if (maCk.isNotEmpty && !codeDiscountList.contains(maCk)) {
+                codeDiscountList.add(maCk);
               }
-              break; // Chỉ lấy CKTDTT đầu tiên được chọn
+              
+              print('💰 CKTDTT: Found selected discount - sttRecCk=$sttRecCk, tCkTtNt=$discountAmount, running total=$totalDiscount');
             }
+          }
+          
+          // ✅ Cập nhật totalDiscountForOder với tổng của tất cả CKTDTT
+          if (totalDiscount > 0) {
+            totalDiscountForOder = totalDiscount;
+            codeDiscountTD = codeDiscountList.isNotEmpty ? codeDiscountList.first : '';
+            print('💰 CKTDTT: Updated from API response - totalDiscountForOder=$totalDiscountForOder (sum of ${selectedCktdttIds.length} discounts), codeDiscountTD=$codeDiscountTD');
+            
+            // ✅ QUAN TRỌNG: API có thể chưa tính CKTDTT vào tThanhToan, nên cần trừ thủ công
+            // Trừ tổng chiết khấu vào totalPayment
+            totalPayment = totalPayment - totalDiscountForOder;
+            totalPaymentOld = totalPayment;
+            totalMNPayment = totalPayment;
+            print('💰 CKTDTT: Trừ chiết khấu tổng đơn vào totalPayment: ${totalMoneyDiscount?.tThanhToan} - $totalDiscountForOder = $totalPayment');
+          } else if (selectedCktdttIds.isNotEmpty) {
+            // ✅ Nếu có selectedCktdttIds nhưng không tìm thấy trong response, giữ nguyên giá trị hiện tại
+            print('💰 CKTDTT: Selected ${selectedCktdttIds.length} discounts but not found in API response, keeping current totalDiscountForOder=$totalDiscountForOder');
           }
         } else {
           // ✅ Nếu không có CKTDTT trong response nhưng đang có selectedCktdttIds, reset totalDiscountForOder
@@ -2477,6 +2495,9 @@ class CartBloc extends Bloc<CartEvent,CartState>{
             totalDiscountForOder = 0;
             codeDiscountTD = '';
             print('💰 CKTDTT: No CKTDTT selected, reset totalDiscountForOder=0');
+          } else {
+            // ✅ Nếu có selectedCktdttIds nhưng response không có, giữ nguyên giá trị hiện tại
+            print('💰 CKTDTT: Selected ${selectedCktdttIds.length} discounts but API response is empty, keeping current totalDiscountForOder=$totalDiscountForOder');
           }
         }
       }
