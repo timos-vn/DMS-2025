@@ -179,6 +179,7 @@ class _HistoryOrderScreenState extends State<HistoryOrderScreen>  with TickerPro
                 title: listOrder[index].tenKh,
                 status: (i != 0 && i != 1) ? false : true,
                 statusName: listOrder[index].statusname?.toString().trim(),
+                approveOrder: true,
                 dateOrder: listOrder[index].ngayCt.toString(),
                 codeCustomer: listOrder[index].maKh.toString().trim(),
                 nameCustomer:  listOrder[index].tenKh.toString().trim(),
@@ -380,7 +381,7 @@ class _HistoryOrderScreenState extends State<HistoryOrderScreen>  with TickerPro
           Visibility(
             visible: show == true,
             child: Container(
-              width:  double.infinity,
+              width: double.infinity,
               margin: const EdgeInsets.fromLTRB(4, 0, 4, 8),
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.15),
@@ -410,7 +411,10 @@ class _HistoryOrderScreenState extends State<HistoryOrderScreen>  with TickerPro
                 labelColor: subColor,
                 unselectedLabelColor: Colors.white,
                 labelPadding: EdgeInsets.zero,
-                // isScrollable: DataLocal.listStatusToOrder.length > 3,
+                isScrollable: DataLocal.listStatusToOrder.length > 6,
+                tabAlignment: DataLocal.listStatusToOrder.length <= 6
+                    ? TabAlignment.fill 
+                    : TabAlignment.start,
                 tabs: List<Widget>.generate(
                   DataLocal.listStatusToOrder.length,
                   (int index) {
@@ -432,16 +436,24 @@ class _HistoryOrderScreenState extends State<HistoryOrderScreen>  with TickerPro
     final status = statusItem.status?.toString().trim() ?? '';
     final statusName = statusItem.statusname?.toString() ?? '';
     final tabInfo = _getTabInfo(status);
+    final totalTabs = DataLocal.listStatusToOrder.length;
+    final isScrollable = totalTabs > 6;
     
     return Tab(
-      height: 48,
+      height: 68,
       child: AnimatedBuilder(
         animation: tabController,
         builder: (context, child) {
           final isSelected = tabController.index == index;
           
+          // Tối ưu padding dựa trên số lượng tab
+          final horizontalPadding = isScrollable ? 16.0 : 12.0;
+          
           return Container(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+            padding: EdgeInsets.symmetric(
+              horizontal: horizontalPadding,
+              vertical: 6,
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
@@ -449,27 +461,28 @@ class _HistoryOrderScreenState extends State<HistoryOrderScreen>  with TickerPro
               children: [
                 Icon(
                   tabInfo['icon'] as IconData,
-                  size: isSelected ? 18 : 16,
+                  size: isSelected ? 24 : 22,
                   color: isSelected 
                       ? subColor 
-                      : Colors.white.withOpacity(0.85),
+                      : Colors.white.withOpacity(0.9),
                 ),
-                const SizedBox(height: 3),
+                const SizedBox(height: 5),
                 Flexible(
                   child: Text(
                     statusName,
                     style: TextStyle(
-                      fontSize: 9.5,
+                      fontSize: isScrollable ? 11.5 : 11.0,
                       fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                       color: isSelected 
                           ? subColor 
-                          : Colors.white.withOpacity(0.85),
-                      letterSpacing: 0.05,
-                      height: 1.0,
+                          : Colors.white.withOpacity(0.9),
+                      letterSpacing: 0.1,
+                      height: 1.2,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,
+                    softWrap: true,
                   ),
                 ),
               ],

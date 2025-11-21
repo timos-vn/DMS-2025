@@ -408,7 +408,7 @@ class DetailOrderV3 {
     data['nameProduction'] = nameProduction;
 
     data['code'] = code;
-    data['sttRec0'] = sttRec0;
+    data['sttRec0'] = sttRec0 ?? '0';
     data['Count'] = count;
     data['Price'] = price;
     data['PriceAfter'] = priceAfter;

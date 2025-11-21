@@ -1091,6 +1091,17 @@ class CartBloc extends Bloc<CartEvent,CartState>{
     }
 
     for (var element in DataLocal.listProductGift) {
+      final rawHeSo = element.heSo.toString().replaceAll('null', '');
+      int heSoValue = 1;
+      if (rawHeSo.isNotEmpty) {
+        final normalized = rawHeSo.toUpperCase();
+        if (normalized.contains('TRUE') || normalized.contains('FALSE')) {
+          heSoValue = normalized.contains('TRUE') ? 1 : 0;
+        } else {
+          heSoValue = int.tryParse(rawHeSo) ?? 1;
+        }
+      }
+
       DetailOrderV3 item = DetailOrderV3(
           nameProduction: element.name,
           code: element.code,
@@ -1119,12 +1130,7 @@ class CartBloc extends Bloc<CartEvent,CartState>{
           tienGuiNT: element.giaGui * element.count!,
           giaGuiNT: element.giaGui,
           note: element.note,
-          heSo: element.heSo.toString().replaceAll('null', '').isNotEmpty ?
-          (element.heSo.toString().replaceAll('null', '').toUpperCase().contains('TRUE') || element.heSo.toString().replaceAll('null', '').toUpperCase().contains('FALSE'))
-              ?
-          (element.heSo.toString().replaceAll('null', '').toUpperCase().contains('TRUE') ? 1 : 0)
-              :
-          int.parse(element.heSo.toString()) : 1,
+          heSo: heSoValue,
           idNVKD: element.idNVKD,
           ncsx: element.nuocsx,quycach: element.quycach,
       );
@@ -1134,10 +1140,12 @@ class CartBloc extends Bloc<CartEvent,CartState>{
     List<DsCkTongDon> listCKTongDons = [];
 
     if(listCkTongDon.isNotEmpty){
+      final kieuCkRaw = listCkTongDon[0].kieuCK?.toString() ?? '';
+      final kieuCkValue = kieuCkRaw.isEmpty ? 0 : int.tryParse(kieuCkRaw) ?? 0;
       DsCkTongDon itemDSCK = DsCkTongDon(
           maCk:listCkTongDon[0].maCk,
           tCkTt: listCkTongDon[0].tlCkTt,
-          kieuCk: listCkTongDon[0].kieuCK != '' ? int.parse(listCkTongDon[0].kieuCK.toString()) : 0
+          kieuCk: kieuCkValue
       );
       listCKTongDons.add(itemDSCK);
     }
@@ -1147,7 +1155,7 @@ class CartBloc extends Bloc<CartEvent,CartState>{
       amount: totalPayment,
       tax: totalTax,
       fee: 0,
-      totalDiscountForItem: (totalDiscount - totalDiscountForOder),
+      totalDiscountForItem: (totalDiscount - totalDiscountForOder), 
       totalDiscountForOrder: totalDiscountForOder
     );
     CreateOrderV3Request request = CreateOrderV3Request(
@@ -1274,10 +1282,12 @@ class CartBloc extends Bloc<CartEvent,CartState>{
     List<DsCkTongDon> listCKTongDons = [];
 
     if(listCkTongDon.isNotEmpty){
+      final kieuCkRaw = listCkTongDon[0].kieuCK?.toString() ?? '';
+      final kieuCkValue = kieuCkRaw.isEmpty ? 0 : int.tryParse(kieuCkRaw) ?? 0;
       DsCkTongDon itemDSCK = DsCkTongDon(
           maCk:listCkTongDon[0].maCk,
           tCkTt: listCkTongDon[0].tlCkTt,
-          kieuCk: listCkTongDon[0].kieuCK != '' ? int.parse(listCkTongDon[0].kieuCK.toString()) : 0
+          kieuCk: kieuCkValue
       );
       listCKTongDons.add(itemDSCK);
     }

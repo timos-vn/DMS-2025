@@ -158,6 +158,7 @@ class _ChildScreenOrderState extends State<ChildScreenOrder> {
             sttRec: order.sttRec,
             title: order.tenKh,
             status: (order.status.toString().trim() != "0" && order.status.toString().trim() != "1") ? false : true,
+            approveOrder: true,
             dateOrder: order.ngayCt.toString(),
             codeCustomer: order.maKh.toString().trim(),
             nameCustomer: order.tenKh.toString().trim(),

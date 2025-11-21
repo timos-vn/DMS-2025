@@ -1,18 +1,14 @@
 // ignore_for_file: prefer_interpolation_to_compose_strings
 
 import 'dart:convert';
-import 'dart:io';  // Thêm để bypass SSL
 import 'package:dio/dio.dart';
-import 'package:dio/io.dart';  // Thêm để bypass SSL
 import 'package:dms/model/network/request/apply_discount_request.dart';
 import 'package:dms/model/network/request/get_list_notification_request.dart';
 import 'package:flutter/material.dart';
-import 'package:persistent_bottom_nav_bar/persistent_bottom_nav_bar.dart';
 
 import '../../../utils/const.dart';
 import '../../../utils/log.dart';
 import '../../../utils/utils.dart';
-import '../../database/data_local.dart';
 import '../../entity/entity_request.dart';
 import '../request/atccept_approval_request.dart';
 import '../request/config_request.dart';
@@ -33,7 +29,6 @@ import '../request/delivery_plan_request.dart';
 import '../request/detail_approval_request.dart';
 import '../request/detail_delivery_plan_request.dart';
 import '../request/discount_request.dart';
-import '../request/dynamic_form_request.dart';
 import '../request/get_item_shipping_request.dart';
 import '../request/get_list_checkin_request.dart';
 import '../request/inventory_request.dart';
@@ -97,22 +92,6 @@ class NetWorkFactory{
     logger.i("BaseURL: $host${port!=0?":$port":""}");
   }
   
-  /// ⚠️ CHỈ DÙNG CHO DEVELOPMENT - XOÁ KHI RELEASE PRODUCTION!
-  /// Bypass SSL certificate validation
-  void _bypassSslCertificate() {
-    (_dio!.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
-      final client = HttpClient();
-      client.badCertificateCallback = (X509Certificate cert, String host, int port) {
-        logger.w("⚠️ WARNING: Accepting bad certificate for $host:$port");
-        logger.w("Certificate subject: ${cert.subject}");
-        logger.w("Certificate issuer: ${cert.issuer}");
-        return true; // Accept all certificates
-      };
-      return client;
-    };
-    logger.w("⚠️⚠️⚠️ SSL BYPASS ENABLED - DEVELOPMENT ONLY ⚠️⚠️⚠️");
-  }
-
   void _setupLoggingInterceptor(){
     int maxCharactersPerLine = 200;
     refToken = Const.REFRESH_TOKEN;
@@ -147,7 +126,7 @@ class NetWorkFactory{
         logger.d("<-- END HTTP");
         return handler.next(response); // continue
       },
-        onError: (DioError error,handler) async{
+        onError: (DioException error,handler) async{
           // Do something with response error
           logger.e("=== DIO ERROR ===");
           logger.e("Error Type: ${error.type}");
@@ -157,13 +136,13 @@ class NetWorkFactory{
           logger.e("Response Data: ${error.response?.data}");
           logger.e("Response Headers: ${error.response?.headers}");
           
-          if(error.type == DioErrorType.connectionTimeout){
+          if(error.type == DioExceptionType.connectionTimeout){
             Utils.showCustomToast(context, Icons.warning_amber_outlined, 'Đường truyền mạng không ổn định');
           }
-          if(error.type == DioErrorType.receiveTimeout){
+          if(error.type == DioExceptionType.receiveTimeout){
             logger.e("Receive timeout - Server response quá lâu (>60s)");
           }
-          if(error.type == DioErrorType.sendTimeout){
+          if(error.type == DioExceptionType.sendTimeout){
             logger.e("Send timeout - Không gửi được request trong 30s");
           }
           if (error.response?.statusCode == 402) {
@@ -192,7 +171,7 @@ class NetWorkFactory{
                 return handler.next(error);
               });
               return handler.next(error);
-            } catch (e, st) {
+            } catch (e) {
               logger.e(e.toString());
             }
           }
@@ -1305,10 +1284,14 @@ class NetWorkFactory{
     }));
   }
   downloadFile(String token,String sttRec) async {
-    return await requestApi(_dio!.get('/api/v1/letter-authority/letter-download',
+    final response = await requestApi(
+        _dio!.get('/api/v1/letter-authority/letter-download',
         options: Options(responseType: ResponseType.bytes,headers: {"Authorization": "Bearer $token",'Content-Type': 'application/json'}), queryParameters: {
-      "LetterId": sttRec,
-    }),isDownloadFile: true);
+          "LetterId": sttRec,
+        }),isDownloadFile: true);
+    debugPrint(
+        'Download file response type: ${response.runtimeType}, length: ${response is List<int> ? response.length : 'unknown'}, sttRec: $sttRec');
+    return response;
   }
   Future<Object> approveOrder(String token,String sttRec) async {
     return await requestApi(_dio!.post('/api/v1/order/approve-order', options: Options(headers: {"Authorization": "Bearer $token"}),

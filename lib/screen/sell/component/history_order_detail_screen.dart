@@ -593,6 +593,8 @@ class _HistoryOrderDetailScreenState extends State<HistoryOrderDetailScreen> {
   }
 
   buildAppBar(){
+    print("adv");
+    print(Const.downFileFromDetailOrder);
     return Container(
       height: 83,
       width: double.infinity,
@@ -636,8 +638,9 @@ class _HistoryOrderDetailScreenState extends State<HistoryOrderDetailScreen> {
           const SizedBox(width: 10,),
           InkWell(
             onTap: (){
+              print(_bloc.masterDetailOrder.sttRec);
               if(Const.downFileFromDetailOrder == true){
-                if( _bloc.masterDetailOrder.sttRec.toString().replaceAll('null', '').isNotEmpty && (_bloc.masterDetailOrder.maGD.toString().replaceAll('null', '') == "5" || _bloc.masterDetailOrder.maGD.toString().replaceAll('null', '') == '6')){
+                if( _bloc.masterDetailOrder.sttRec.toString().replaceAll('null', '').isNotEmpty /*&& (_bloc.masterDetailOrder.maGD.toString().replaceAll('null', '') == "5" || _bloc.masterDetailOrder.maGD.toString().replaceAll('null', '') == '6')*/){
                   _bloc.add(DownloadFileEvent(sttRec: _bloc.masterDetailOrder.sttRec.toString()));
                 }else{
                   Utils.showCustomToast(context, Icons.warning_amber, 'Úi, Không lấy được mã phiếu.');
@@ -650,8 +653,8 @@ class _HistoryOrderDetailScreenState extends State<HistoryOrderDetailScreen> {
               child: Icon(
                 Icons.file_download_outlined,
                 size: 25,
-                color: Const.downFileFromDetailOrder == true ?
-                (_bloc.masterDetailOrder.status != 1 && _bloc.masterDetailOrder.status != 0 || widget.approveOrder == true) ? Colors.transparent : Colors.white :  Colors.transparent ,
+                color: Const.downFileFromDetailOrder == true ? Colors.white :
+                (/*_bloc.masterDetailOrder.status != 1 && _bloc.masterDetailOrder.status != 0 ||*/ widget.approveOrder == true) ? Colors.transparent : Colors.white
               ),
             ),
           )
@@ -659,7 +662,6 @@ class _HistoryOrderDetailScreenState extends State<HistoryOrderDetailScreen> {
       ),
     );
   }
-
 }
 
 

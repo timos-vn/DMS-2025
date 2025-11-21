@@ -170,7 +170,7 @@ class _NewStoreApprovalListScreenState extends State<NewStoreApprovalListScreen>
                 child: Row(
                   children: [
                     const SizedBox(width: 12),
-                    Icon(Icons.search, color: subColor),
+                    const Icon(Icons.search, color: subColor),
                     const SizedBox(width: 8),
                     Expanded(
                       child: TextField(
@@ -189,7 +189,7 @@ class _NewStoreApprovalListScreenState extends State<NewStoreApprovalListScreen>
                     ),
                     if (_searchController.text.isNotEmpty)
                       IconButton(
-                        icon: Icon(Icons.close, color: subColor),
+                        icon: const Icon(Icons.close, color: subColor),
                         onPressed: () {
                           _searchController.clear();
                           _bloc.add(const NewStoreApprovalListSearch(''));
@@ -198,10 +198,10 @@ class _NewStoreApprovalListScreenState extends State<NewStoreApprovalListScreen>
                   ],
                 ),
               )
-            : Text(
+            : const Text(
                 'Duyệt điểm bán mở mới',
-                key: const ValueKey('title'),
-                style: const TextStyle(
+                key: ValueKey('title'),
+                style: TextStyle(
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -286,7 +286,7 @@ class _NewStoreApprovalListScreenState extends State<NewStoreApprovalListScreen>
           const SizedBox(height: 8),
           Row(
             children: [
-              Icon(Icons.filter_alt_outlined, color: subColor),
+              const Icon(Icons.filter_alt_outlined, color: subColor),
               const SizedBox(width: 8),
               Expanded(
                 child: DropdownButtonHideUnderline(
@@ -302,7 +302,7 @@ class _NewStoreApprovalListScreenState extends State<NewStoreApprovalListScreen>
                             value: option['value'] as int?,
                             child: Text(
                               option['label'] as String,
-                              style: TextStyle(
+                              style: const TextStyle(
                                 color: subColor,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -354,7 +354,7 @@ class _NewStoreApprovalListScreenState extends State<NewStoreApprovalListScreen>
                   ),
                   Text(
                     value,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                       color: subColor,
@@ -363,7 +363,7 @@ class _NewStoreApprovalListScreenState extends State<NewStoreApprovalListScreen>
                 ],
               ),
             ),
-            Icon(Icons.keyboard_arrow_down, color: subColor),
+            const Icon(Icons.keyboard_arrow_down, color: subColor),
           ],
         ),
       ),
@@ -441,7 +441,7 @@ class _NewStoreApprovalListScreenState extends State<NewStoreApprovalListScreen>
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.location_on_outlined,
+                    const Icon(Icons.location_on_outlined,
                         size: 16, color: subColor),
                     const SizedBox(width: 6),
                     Expanded(
@@ -456,7 +456,7 @@ class _NewStoreApprovalListScreenState extends State<NewStoreApprovalListScreen>
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    Icon(Icons.phone, size: 16, color: subColor),
+                    const Icon(Icons.phone, size: 16, color: subColor),
                     const SizedBox(width: 6),
                     Text(
                       item.dienThoai!.trim(),
@@ -468,7 +468,7 @@ class _NewStoreApprovalListScreenState extends State<NewStoreApprovalListScreen>
               const SizedBox(height: 4),
               Row(
                 children: [
-                  Icon(Icons.person_outline,
+                  const Icon(Icons.person_outline,
                       size: 16, color: subColor),
                   const SizedBox(width: 6),
                   Expanded(
@@ -483,7 +483,7 @@ class _NewStoreApprovalListScreenState extends State<NewStoreApprovalListScreen>
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    Icon(Icons.access_time,
+                    const Icon(Icons.access_time,
                         size: 16, color: subColor),
                     const SizedBox(width: 6),
                     Text(
