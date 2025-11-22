@@ -2,7 +2,7 @@ name: dms
 description: "A new Flutter project."
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 
-version: 1.0.78+143
+version: 1.0.79+144
 
 environment:
   sdk: '>=3.5.4 <4.0.0'
@@ -79,6 +79,8 @@ dependencies:
   sticky_headers: ^0.3.0+2
   gs1_barcode_parser: ^1.1.2
   decimal: ^2.1.0
+  pdf: ^3.11.1
+  share_plus: ^10.1.2
 
   shorebird_code_push: 2.0.3
   restart_app:
@@ -114,3 +116,4 @@ flutter:
     - assets/icons/
     - assets/rive/
     - shorebird.yaml
+    - assets/fonts/Noto_Sans/

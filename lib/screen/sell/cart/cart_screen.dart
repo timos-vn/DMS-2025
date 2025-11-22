@@ -577,6 +577,12 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
           _bloc.selectedHHIds.clear();
           _bloc.listHH.clear();
           _bloc.hasHHDiscount = false;
+          _bloc.selectedCktdttIds.clear();
+          _bloc.listCktdtt.clear();
+          _bloc.hasCktdttDiscount = false;
+          _bloc.selectedCktdthGroups.clear();
+          _bloc.listCktdth.clear();
+          _bloc.hasCktdthDiscount = false;
           _bloc.add(DeleteAllProductFromDB());
           Utils.showCustomToast(context, Icons.check_circle_outline, widget.title.toString().contains('Đặt hàng') ? 'Yeah, Tạo đơn thành công' : 'Yeah, Cập nhật đơn thành công');
 
@@ -611,6 +617,12 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
           _bloc.selectedHHIds.clear();
           _bloc.listHH.clear();
           _bloc.hasHHDiscount = false;
+          _bloc.selectedCktdttIds.clear();
+          _bloc.listCktdtt.clear();
+          _bloc.hasCktdttDiscount = false;
+          _bloc.selectedCktdthGroups.clear();
+          _bloc.listCktdth.clear();
+          _bloc.hasCktdthDiscount = false;
           Utils.showCustomToast(context, Icons.check_circle_outline, widget.title.toString().contains('Đặt hàng') ? 'Yeah, Tạo đơn thành công' : 'Yeah, Cập nhật đơn thành công');
           Navigator.of(context).pop(Const.REFRESH);
         }
@@ -642,6 +654,12 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
           _bloc.selectedHHIds.clear();
           _bloc.listHH.clear();
           _bloc.hasHHDiscount = false;
+          _bloc.selectedCktdttIds.clear();
+          _bloc.listCktdtt.clear();
+          _bloc.hasCktdttDiscount = false;
+          _bloc.selectedCktdthGroups.clear();
+          _bloc.listCktdth.clear();
+          _bloc.hasCktdthDiscount = false;
           // Utils.showCustomToast(context, Icons.check_circle_outline, widget.title.toString().contains('Đặt hàng') ? 'Yeah, Tạo đơn thành công' : 'Yeah, Cập nhật đơn thành công');
           // Nếu tạo đơn từ hợp đồng, quay về detail_contract với thông tin refresh
           if (widget.isContractCreateOrder == true) {
@@ -1327,8 +1345,8 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
                 ),
                 const SizedBox(width: 20,),
                   Visibility(
-                  // Hiển thị khi có ít nhất 1 loại chiết khấu
-                  visible: (_bloc.hasCknDiscount || _bloc.hasCkgDiscount || _bloc.hasHHDiscount) && _bloc.listOrder.isNotEmpty,
+                  // Hiển thị khi có ít nhất 1 loại chiết khấu (CKN, CKG, HH, CKTDTT, CKTDTH)
+                  visible: (_bloc.hasCknDiscount || _bloc.hasCkgDiscount || _bloc.hasHHDiscount || _bloc.hasCktdttDiscount || _bloc.hasCktdthDiscount) && _bloc.listOrder.isNotEmpty,
                   child: InkWell( 
                       onTap: () => _showDiscountFlow(), 
                       child:const Padding(

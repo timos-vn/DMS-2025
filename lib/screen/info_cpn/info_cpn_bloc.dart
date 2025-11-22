@@ -497,6 +497,9 @@ class InfoCPNBloc extends Bloc<InfoCPNEvent,InfoCPNState>{
           else if(element.menuId == '01.02.08'){
             Const.downFileFromDetailOrder = true;
           }
+          else if(element.menuId == '01.02.09'){
+            Const.approveOrderFromHistoryOrder = true; // Duyệt đơn hàng trong lịch sử đơn
+          }
 
           /// Contract
           else if(element.menuId == '01.06.10'){
