@@ -255,7 +255,7 @@ class DMSBloc extends Bloc<DMSEvent,DMSState>{
       final items = event.currentDraft.historyList.map((item) {
         return HistoryRequestItem(
           sttRec: sttRec,
-          sttRec0: item.sttRec0 ?? 0,
+          sttRec0: item.sttRec0,
           maIn: item.maIn ?? '',
           tenIn: item.tenIn ?? '',
           maVt: item.maVt ?? '',
@@ -264,7 +264,7 @@ class DMSBloc extends Bloc<DMSEvent,DMSState>{
           maKho: item.maKho ?? '',
           maViTri: item.maViTri ?? '',
           dateTimeModify: Utils.parseDateToString(DateTime.now(), Const.DATE_SV),
-          soLuongKk: item.soLuongKk ?? 0,
+          soLuongKk: item.soLuongKk,
           userId: Const.userId
         );
       }).toList();
@@ -927,7 +927,7 @@ class DMSBloc extends Bloc<DMSEvent,DMSState>{
       await getUserLocation();
       
       // Bắt đầu quá trình map tuần tự
-      await _mapAddressSequentially(emitter);
+      await _mapAddressSequentially(emitter, event.useNewRegulation);
       
     } catch (e) {
       emitter(AutoMapAddressError(
@@ -938,7 +938,7 @@ class DMSBloc extends Bloc<DMSEvent,DMSState>{
     }
   }
 
-  Future<void> _mapAddressSequentially(Emitter<DMSState> emitter) async {
+  Future<void> _mapAddressSequentially(Emitter<DMSState> emitter, bool useNewRegulation) async {
     try {
       // Bắt đầu auto map address từ GPS
       print('Bắt đầu auto map address từ GPS...');
@@ -950,13 +950,13 @@ class DMSBloc extends Bloc<DMSEvent,DMSState>{
       // Bước 1: Tìm tỉnh/thành phố (API: province='', district='')
       String provinceName = nameTinhThanh; // Thử với tên gốc trước
       print('🔍 Bước 1 - Tìm tỉnh/thành: "$provinceName"');
-      String? provinceId = await _findProvinceByName(provinceName, emitter);
+      String? provinceId = await _findProvinceByName(provinceName, useNewRegulation, emitter);
       
       if (provinceId == null) {
         // Thử với tên đã chuẩn hóa
         String normalizedProvinceName = _normalizeAddressName(nameTinhThanh);
         print('🔄 Thử với tên chuẩn hóa: "$normalizedProvinceName"');
-        provinceId = await _findProvinceByName(normalizedProvinceName, emitter);
+        provinceId = await _findProvinceByName(normalizedProvinceName, useNewRegulation, emitter);
       }
       
       if (provinceId == null) {
@@ -969,44 +969,51 @@ class DMSBloc extends Bloc<DMSEvent,DMSState>{
       }
       print('✅ Tìm thấy tỉnh/thành: $provinceName (ID: $provinceId)');
 
-      // Bước 2: Tìm quận/huyện (API: province=ID, district='')
-      String districtName = nameQuanHuyen; // Thử với tên gốc trước
-      print('🔍 Bước 2 - Tìm quận/huyện: "$districtName" (tỉnh ID: $provinceId)');
-      String? districtId = await _findDistrictByName(districtName, provinceId, emitter);
-      
-      if (districtId == null) {
-        // Thử với tên đã chuẩn hóa
-        String normalizedDistrictName = _normalizeAddressName(nameQuanHuyen);
-        print('🔄 Thử với tên chuẩn hóa: "$normalizedDistrictName"');
-        districtId = await _findDistrictByName(normalizedDistrictName, provinceId, emitter);
+      String districtName = nameQuanHuyen;
+      late String districtId;
+      if(useNewRegulation){
+        print('⚙️ Chế độ nghị định mới - bỏ qua bước quận/huyện');
+        districtId = '';
+        districtName = '';
+      }else{
+        print('🔍 Bước 2 - Tìm quận/huyện: "$districtName" (tỉnh ID: $provinceId)');
+        String? districtResult = await _findDistrictByName(districtName, provinceId, useNewRegulation, emitter);
+        
+        if (districtResult == null) {
+          // Thử với tên đã chuẩn hóa
+          String normalizedDistrictName = _normalizeAddressName(nameQuanHuyen);
+          print('🔄 Thử với tên chuẩn hóa: "$normalizedDistrictName"');
+          districtResult = await _findDistrictByName(normalizedDistrictName, provinceId, useNewRegulation, emitter);
+        }
+        
+        if (districtResult == null) {
+          emitter(AutoMapAddressError(
+            errorTitle: 'Không tìm thấy quận/huyện',
+            errorMessage: 'Không thể tìm thấy quận/huyện: "$districtName" trong tỉnh "$provinceName".',
+            suggestion: 'Vui lòng kiểm tra lại địa chỉ hoặc chọn thủ công.',
+          ));
+          return;
+        }
+        districtId = districtResult;
+        print('✅ Tìm thấy quận/huyện: $districtName (ID: $districtId)');
       }
-      
-      if (districtId == null) {
-        emitter(AutoMapAddressError(
-          errorTitle: 'Không tìm thấy quận/huyện',
-          errorMessage: 'Không thể tìm thấy quận/huyện: "$districtName" trong tỉnh "$provinceName".',
-          suggestion: 'Vui lòng kiểm tra lại địa chỉ hoặc chọn thủ công.',
-        ));
-        return;
-      }
-      print('✅ Tìm thấy quận/huyện: $districtName (ID: $districtId)');
 
       // Bước 3: Tìm phường/xã (API: province=ID, district=ID)
       String communeName = namePhuongXa; // Thử với tên gốc trước
-      print('🔍 Bước 3 - Tìm phường/xã: "$communeName" (tỉnh ID: $provinceId, quận ID: $districtId)');
-      String? communeId = await _findCommuneByName(communeName, provinceId, districtId, emitter);
+      print('🔍 Bước 3 - Tìm phường/xã: "$communeName" (tỉnh ID: $provinceId${useNewRegulation ? '' : ', quận ID: $districtId'})');
+      String? communeId = await _findCommuneByName(communeName, provinceId, districtId, useNewRegulation, emitter);
       
       if (communeId == null) {
         // Thử với tên đã chuẩn hóa
         String normalizedCommuneName = _normalizeAddressName(namePhuongXa);
         print('🔄 Thử với tên chuẩn hóa: "$normalizedCommuneName"');
-        communeId = await _findCommuneByName(normalizedCommuneName, provinceId, districtId, emitter);
+        communeId = await _findCommuneByName(normalizedCommuneName, provinceId, districtId, useNewRegulation, emitter);
       }
       
       if (communeId == null) {
         // Thử tìm phường/xã mặc định
         print('⚠️ Không tìm thấy phường/xã, thử tìm phường/xã mặc định...');
-        communeId = await _findFirstCommuneInDistrict(provinceId, districtId, emitter);
+        communeId = await _findFirstCommuneInDistrict(provinceId, districtId, useNewRegulation, emitter);
         
         if (communeId == null) {
           emitter(AutoMapAddressError(
@@ -1022,7 +1029,7 @@ class DMSBloc extends Bloc<DMSEvent,DMSState>{
       // Thành công - emit state với dữ liệu đã map
       emitter(AutoMapAddressSuccess(
         provinceName: nameTinhThanh, // Sử dụng tên gốc từ GPS
-        districtName: nameQuanHuyen, // Sử dụng tên gốc từ GPS
+        districtName: useNewRegulation ? '' : nameQuanHuyen,
         communeName: namePhuongXa, // Sử dụng tên gốc từ GPS
         provinceId: provinceId,
         districtId: districtId,
@@ -1041,7 +1048,7 @@ class DMSBloc extends Bloc<DMSEvent,DMSState>{
     }
   }
 
-  Future<String?> _findProvinceByName(String provinceName, Emitter<DMSState> emitter) async {
+  Future<String?> _findProvinceByName(String provinceName, bool useNewRegulation, Emitter<DMSState> emitter) async {
     try {
       print('🔍 Tìm kiếm tỉnh/thành: $provinceName');
       
@@ -1052,7 +1059,8 @@ class DMSBloc extends Bloc<DMSEvent,DMSState>{
         '', // district rỗng
         1,
         100,
-        ''
+        '',
+        isDN2: useNewRegulation ? 1 : 0
       );
       
       DMSState state = _handleFindingProvince(data, 0);
@@ -1099,7 +1107,7 @@ class DMSBloc extends Bloc<DMSEvent,DMSState>{
     }
   }
 
-  Future<String?> _findDistrictByName(String districtName, String provinceId, Emitter<DMSState> emitter) async {
+  Future<String?> _findDistrictByName(String districtName, String provinceId, bool useNewRegulation, Emitter<DMSState> emitter) async {
     try {
       print('🔍 Tìm kiếm quận/huyện: $districtName (tỉnh ID: $provinceId)');
       
@@ -1110,7 +1118,8 @@ class DMSBloc extends Bloc<DMSEvent,DMSState>{
         '', // district rỗng
         1,
         150,
-        ''
+        '',
+        isDN2: useNewRegulation ? 1 : 0
       );
       
       DMSState state = _handleFindingProvince(data, 1);
@@ -1157,18 +1166,19 @@ class DMSBloc extends Bloc<DMSEvent,DMSState>{
     }
   }
 
-  Future<String?> _findCommuneByName(String communeName, String provinceId, String districtId, Emitter<DMSState> emitter) async {
+  Future<String?> _findCommuneByName(String communeName, String provinceId, String districtId, bool useNewRegulation, Emitter<DMSState> emitter) async {
     try {
-      print('🔍 Tìm kiếm phường/xã: $communeName (tỉnh ID: $provinceId, quận ID: $districtId)');
+      print('🔍 Tìm kiếm phường/xã: $communeName (tỉnh ID: $provinceId${useNewRegulation ? '' : ', quận ID: $districtId'})');
       
       // API Call: getListProvince(province=ID, district=ID) - lấy danh sách phường/xã theo quận/huyện
       Object data = await networkFactory!.getListProvince(
         _accessToken!,
         provinceId, // truyền ID province
-        districtId, // truyền ID district
+        districtId, // truyền ID district (rỗng nếu chế độ mới)
         1,
         150,
-        ''
+        '',
+        isDN2: useNewRegulation ? 1 : 0
       );
       
       DMSState state = _handleFindingProvince(data, 2);
@@ -1216,17 +1226,18 @@ class DMSBloc extends Bloc<DMSEvent,DMSState>{
   }
 
   // Hàm helper để tìm phường/xã đầu tiên trong quận/huyện
-  Future<String?> _findFirstCommuneInDistrict(String provinceId, String districtId, Emitter<DMSState> emitter) async {
+  Future<String?> _findFirstCommuneInDistrict(String provinceId, String districtId, bool useNewRegulation, Emitter<DMSState> emitter) async {
     try {
-      print('🔍 Tìm phường/xã đầu tiên trong quận/huyện (tỉnh ID: $provinceId, quận ID: $districtId)...');
+      print('🔍 Tìm phường/xã đầu tiên ${useNewRegulation ? "(bỏ qua quận/huyện)" : "(tỉnh ID: $provinceId, quận ID: $districtId)"}...');
       
       Object data = await networkFactory!.getListProvince(
         _accessToken!,
         provinceId, // truyền ID province
-        districtId, // truyền ID district
+        districtId, // truyền ID district (có thể rỗng)
         1,
         150,
-        ''
+        '',
+        isDN2: useNewRegulation ? 1 : 0
       );
       
       DMSState state = _handleFindingProvince(data, 2);

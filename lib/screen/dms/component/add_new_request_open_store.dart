@@ -75,6 +75,9 @@ class _AddNewRequestOpenStoreScreenState extends State<AddNewRequestOpenStoreScr
   int start = 3;
   bool waitingLoad = false;
 
+  // Chế độ địa chỉ: false = chế độ cũ (3 cấp), true = chế độ mới (2 cấp theo nghị định 7-2025)
+  bool useNewRegulation = false;
+
   // Cache for step completion status
   final Map<int, bool> _stepCompletionCache = {};
 
@@ -173,8 +176,11 @@ class _AddNewRequestOpenStoreScreenState extends State<AddNewRequestOpenStoreScr
 
   void _triggerAutoMapAddress() {
     // Chỉ auto map nếu chưa có dữ liệu địa chỉ
-    if (idProvince.isEmpty && idDistrict.isEmpty && idCommune.isEmpty) {
-      _bloc.add(AutoMapAddressFromGPSEvent());
+    if (idProvince.isEmpty && idCommune.isEmpty) {
+      // Chế độ mới: không cần kiểm tra District
+      if (useNewRegulation || idDistrict.isEmpty) {
+        _bloc.add(AutoMapAddressFromGPSEvent(useNewRegulation: useNewRegulation));
+      }
     }
   }
 
@@ -294,8 +300,8 @@ class _AddNewRequestOpenStoreScreenState extends State<AddNewRequestOpenStoreScr
     bool locationValid = _addressController.text.isNotEmpty &&
         idArea.isNotEmpty &&
         idProvince.isNotEmpty &&
-        idDistrict.isNotEmpty &&
-        idCommune.isNotEmpty;
+        idCommune.isNotEmpty &&
+        (useNewRegulation ? true : idDistrict.isNotEmpty); // Chế độ mới không cần District
 
     bool additionalInfoValid = idTour.isNotEmpty &&
         (Const.chooseStateWhenCreateNewOpenStore == true ? idState.isNotEmpty : true);
@@ -321,7 +327,7 @@ class _AddNewRequestOpenStoreScreenState extends State<AddNewRequestOpenStoreScr
     if (_addressController.text.isEmpty) missingFields.add('• Địa chỉ');
     if (idArea.isEmpty) missingFields.add('• Khu vực');
     if (idProvince.isEmpty) missingFields.add('• Tỉnh/Thành');
-    if (idDistrict.isEmpty) missingFields.add('• Quận/Huyện');
+    if (!useNewRegulation && idDistrict.isEmpty) missingFields.add('• Quận/Huyện');
     if (idCommune.isEmpty) missingFields.add('• Xã/Phường');
     if (idTour.isEmpty) missingFields.add('• Tour/Tuyến');
     if (Const.chooseStateWhenCreateNewOpenStore == true && idState.isEmpty) {
@@ -387,10 +393,16 @@ class _AddNewRequestOpenStoreScreenState extends State<AddNewRequestOpenStoreScr
             // Auto fill các trường địa chỉ
             setState(() {
               idProvince = state.provinceId;
-              idDistrict = state.districtId;
+              // Chế độ mới: không cần District
+              if (useNewRegulation) {
+                idDistrict = ''; // Clear District trong chế độ mới
+                _districtController.clear();
+              } else {
+                idDistrict = state.districtId;
+                _districtController.text = state.districtName;
+              }
               idCommune = state.communeId;
               _provinceController.text = state.provinceName;
-              _districtController.text = state.districtName;
               _communeController.text = state.communeName;
               _addressController.text = _bloc.currentAddress.toString();
               // Clear cache để update progress indicator
@@ -551,7 +563,8 @@ class _AddNewRequestOpenStoreScreenState extends State<AddNewRequestOpenStoreScr
         break;
       case 2: // Location
         isCompleted = idArea.isNotEmpty && idProvince.isNotEmpty &&
-            idDistrict.isNotEmpty && idCommune.isNotEmpty;
+            idCommune.isNotEmpty &&
+            (useNewRegulation ? true : idDistrict.isNotEmpty); // Chế độ mới không cần District
         break;
       case 3: // Additional
         isCompleted = idTour.isNotEmpty &&
@@ -670,7 +683,64 @@ class _AddNewRequestOpenStoreScreenState extends State<AddNewRequestOpenStoreScr
     return _buildSectionCard(
       title: 'Thông tin địa chỉ',
       icon: Icons.location_on_outlined,
+      trailingWidget: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            useNewRegulation ? 'Mới (2 cấp)' : 'Cũ (3 cấp)',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: subColor,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Switch(
+            value: useNewRegulation,
+            onChanged: (value) {
+              setState(() {
+                useNewRegulation = value;
+                // Clear dữ liệu địa chỉ khi chuyển chế độ
+                idProvince = '';
+                idDistrict = '';
+                idCommune = '';
+                _provinceController.clear();
+                _districtController.clear();
+                _communeController.clear();
+                _addressController.clear();
+                _clearStepCompletionCache();
+              });
+            },
+            activeColor: subColor,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+        ],
+      ),
       children: [
+        if (useNewRegulation)
+          Container(
+            padding: const EdgeInsets.all(8),
+            margin: const EdgeInsets.only(bottom: 8),
+            decoration: BoxDecoration(
+              color: Colors.green.shade50,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.check_circle_outline, size: 16, color: Colors.green.shade700),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Theo nghị định mới (7-2025): Chỉ cần Tỉnh và Xã/Phường',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.green.shade700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         Row(
           children: [
             Expanded(
@@ -728,31 +798,43 @@ class _AddNewRequestOpenStoreScreenState extends State<AddNewRequestOpenStoreScr
             ),
           ],
         ),
-        Row(
-          children: [
-            Expanded(
-              child: _buildSelectionField(
-                title: "Quận/Huyện",
-                hint: 'Chọn quận/huyện',
-                controller: _districtController,
-                onTap: () => _selectDistrict(),
-                enabled: idProvince.isNotEmpty,
-                isRequired: true,
+        // Ẩn Quận/Huyện nếu chế độ mới
+        if (!useNewRegulation)
+          Row(
+            children: [
+              Expanded(
+                child: _buildSelectionField(
+                  title: "Quận/Huyện",
+                  hint: 'Chọn quận/huyện',
+                  controller: _districtController,
+                  onTap: () => _selectDistrict(),
+                  enabled: idProvince.isNotEmpty,
+                  isRequired: true,
+                ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildSelectionField(
-                title: "Xã/Phường",
-                hint: 'Chọn xã/phường',
-                controller: _communeController,
-                onTap: () => _selectCommune(),
-                enabled: idDistrict.isNotEmpty,
-                isRequired: true,
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildSelectionField(
+                  title: "Xã/Phường",
+                  hint: 'Chọn xã/phường',
+                  controller: _communeController,
+                  onTap: () => _selectCommune(),
+                  enabled: idDistrict.isNotEmpty,
+                  isRequired: true,
+                ),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
+        // Hiển thị Xã/Phường trực tiếp từ Tỉnh nếu chế độ mới
+        if (useNewRegulation)
+          _buildSelectionField(
+            title: "Xã/Phường",
+            hint: 'Chọn xã/phường',
+            controller: _communeController,
+            onTap: () => _selectCommune(),
+            enabled: idProvince.isNotEmpty,
+            isRequired: true,
+          ),
         Row(
           children: [
             Expanded(
@@ -821,6 +903,7 @@ class _AddNewRequestOpenStoreScreenState extends State<AddNewRequestOpenStoreScr
     required String title,
     required IconData icon,
     required List<Widget> children,
+    Widget? trailingWidget,
   }) {
     return Container(
       width: double.infinity,
@@ -851,14 +934,20 @@ class _AddNewRequestOpenStoreScreenState extends State<AddNewRequestOpenStoreScr
               children: [
                 Icon(icon, color: subColor, size: 20),
                 const SizedBox(width: 8),
-                Text(
-                  title,
-                  style: TextStyle(
-                    color: subColor,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 16,
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      color: subColor,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
+                    ),
                   ),
                 ),
+                if (trailingWidget != null) ...[
+                  const SizedBox(width: 8),
+                  trailingWidget,
+                ],
               ],
             ),
           ),
@@ -1378,6 +1467,8 @@ class _AddNewRequestOpenStoreScreenState extends State<AddNewRequestOpenStoreScr
     String? idArea,
     required Function(String id, String name) onSuccess,
     String? errorMessage,
+    bool useNewRegulationMode = false,
+    bool forceCommuneLookup = false,
   }) {
     FocusScope.of(context).unfocus();
 
@@ -1394,6 +1485,8 @@ class _AddNewRequestOpenStoreScreenState extends State<AddNewRequestOpenStoreScr
         idDistrict: idDistrict ?? '',
         title: title,
         typeGetList: typeGetList,
+        useNewRegulation: useNewRegulationMode,
+        forceCommuneLookup: forceCommuneLookup,
       ),
       withNavBar: false,
     ).then((value) {
@@ -1423,13 +1516,18 @@ class _AddNewRequestOpenStoreScreenState extends State<AddNewRequestOpenStoreScr
     _handleSelection(
       title: 'Danh sách Tỉnh thành',
       typeGetList: 0,
+      useNewRegulationMode: useNewRegulation,
       onSuccess: (id, name) {
-        idProvince = id;
-        _provinceController.text = name;
-        idDistrict = '';
-        idCommune = '';
-        _districtController.clear();
-        _communeController.clear();
+        setState(() {
+          idProvince = id;
+          _provinceController.text = name;
+          // Clear District và Commune khi chọn Tỉnh mới
+          idDistrict = '';
+          idCommune = '';
+          _districtController.clear();
+          _communeController.clear();
+          _clearStepCompletionCache();
+        });
       },
     );
   }
@@ -1444,6 +1542,7 @@ class _AddNewRequestOpenStoreScreenState extends State<AddNewRequestOpenStoreScr
       title: 'Danh sách Quận huyện',
       typeGetList: 0,
       idProvince: idProvince,
+      useNewRegulationMode: useNewRegulation,
       onSuccess: (id, name) {
         idDistrict = id;
         _districtController.text = name;
@@ -1454,21 +1553,45 @@ class _AddNewRequestOpenStoreScreenState extends State<AddNewRequestOpenStoreScr
   }
 
   void _selectCommune() {
-    if (idDistrict.isEmpty) {
-      Utils.showCustomToast(context, Icons.warning_amber_outlined, 'Vui lòng chọn Quận/Huyện trước');
-      return;
-    }
+    // Chế độ mới: chỉ cần Tỉnh, không cần Quận/Huyện
+    if (useNewRegulation) {
+      if (idProvince.isEmpty) {
+        Utils.showCustomToast(context, Icons.warning_amber_outlined, 'Vui lòng chọn Tỉnh/Thành trước');
+        return;
+      }
+      
+      // Chọn Xã/Phường trực tiếp từ Tỉnh (không cần District)
+      _handleSelection(
+        title: 'Danh sách Xã phường',
+        typeGetList: 0,
+        idProvince: idProvince,
+        idDistrict: '', // Để trống trong chế độ mới
+          useNewRegulationMode: useNewRegulation,
+          forceCommuneLookup: true,
+        onSuccess: (id, name) {
+          idCommune = id;
+          _communeController.text = name;
+        },
+      );
+    } else {
+      // Chế độ cũ: cần cả Tỉnh và Quận/Huyện
+      if (idDistrict.isEmpty) {
+        Utils.showCustomToast(context, Icons.warning_amber_outlined, 'Vui lòng chọn Quận/Huyện trước');
+        return;
+      }
 
-    _handleSelection(
-      title: 'Danh sách Xã phường',
-      typeGetList: 0,
-      idProvince: idProvince,
-      idDistrict: idDistrict,
-      onSuccess: (id, name) {
-        idCommune = id;
-        _communeController.text = name;
-      },
-    );
+      _handleSelection(
+        title: 'Danh sách Xã phường',
+        typeGetList: 0,
+        idProvince: idProvince,
+        idDistrict: idDistrict,
+        useNewRegulationMode: useNewRegulation,
+        onSuccess: (id, name) {
+          idCommune = id;
+          _communeController.text = name;
+        },
+      );
+    }
   }
 
   void _selectTypeStore() {

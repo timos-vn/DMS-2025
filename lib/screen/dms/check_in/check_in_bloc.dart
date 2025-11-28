@@ -146,12 +146,14 @@ class CheckInBloc extends Bloc<CheckInEvent,CheckInState>{
 
   void _checkOutInventoryStock(CheckOutInventoryStock event, Emitter<CheckInState> emitter)async{
     emitter(CheckInLoading());
+    // Đảm bảo DataLocal.idCurrentCheckIn được set đúng cho khách hàng hiện tại
+    DataLocal.idCurrentCheckIn = (event.idCheckIn.toString() + event.idCustomer.trim());
     if(Const.checkInOnline == true){
       listImageCheckIn = await getListImageCheckInFromDb();
       listTicketOffLine = await db.getListTicketOffLine();
     }
-    // List<ItemCheckInOffline> listDataCheckInCheck = <ItemCheckInOffline>[];
-    // listDataCheckInCheck = await getListDataCheckInFromDb();
+    // Refresh listDataCheckInCheck từ database để đảm bảo có dữ liệu mới nhất
+    listDataCheckInCheck = await getListDataCheckInFromDb();
     ItemCheckInOffline itemCheckIn = ItemCheckInOffline();
     // print('listDataCheckInCheck: ${listDataCheckInCheck.length}');
     // print('-----');
@@ -166,6 +168,13 @@ class CheckInBloc extends Bloc<CheckInEvent,CheckInState>{
         ItemCheckInOffline itemValue = listDataCheckInCheck.firstWhere((element) => element.id == DataLocal.idCurrentCheckIn);
         if(itemValue.id != null){
           print('isJoin');
+          // Sử dụng DataLocal.dateTimeStartCheckIn thay vì itemValue.timeCheckIn để đảm bảo dùng đúng thời gian check-in của khách hàng hiện tại
+          String timeCheckInToUse = DataLocal.dateTimeStartCheckIn.isNotEmpty 
+              ? DataLocal.dateTimeStartCheckIn 
+              : (itemValue.timeCheckIn ?? '');
+          print('timeCheckInToUse: $timeCheckInToUse');
+          print('DataLocal.dateTimeStartCheckIn: ${DataLocal.dateTimeStartCheckIn}');
+          print('itemValue.timeCheckIn: ${itemValue.timeCheckIn}');
           itemCheckIn = ItemCheckInOffline(
               id: itemValue.id,
               tenCh: itemValue.tenCh,
@@ -173,7 +182,7 @@ class CheckInBloc extends Bloc<CheckInEvent,CheckInState>{
               latlong: itemValue.latlong,
               diaChi: itemValue.diaChi,
               idCheckIn: itemValue.idCheckIn,
-              timeCheckIn: itemValue.timeCheckIn,
+              timeCheckIn: timeCheckInToUse,
               openStore: event.openStore.toString(),
               timeCheckOut: DateFormat("yyyy-MM-ddTHH:mm:ss").format(DateTime.now()),
               tieuDe: itemValue.tieuDe,
@@ -256,6 +265,12 @@ class CheckInBloc extends Bloc<CheckInEvent,CheckInState>{
       }
       // print('join2');
       // print(event.itemCheckIn.latlong.toString().replaceAll('null', '').isNotEmpty ?  event.itemCheckIn.latlong.toString() :  event.itemCheckIn.gps.toString());
+      // Sử dụng DataLocal.dateTimeStartCheckIn nếu có, nếu không thì dùng từ event.itemCheckIn
+      // Đảm bảo sử dụng đúng thời gian check-in của khách hàng hiện tại
+      String timeCheckInToUse = DataLocal.dateTimeStartCheckIn.isNotEmpty 
+          ? DataLocal.dateTimeStartCheckIn 
+          : (event.itemCheckIn.timeCheckIn ?? '');
+      
       var formData = FormData.fromMap(
           {
             "CustomerID": event.idCustomer,
@@ -264,8 +279,8 @@ class CheckInBloc extends Bloc<CheckInEvent,CheckInState>{
             "Note": event.itemCheckIn.note,
             "IdAlbum": jsonString,
             "IdCheckIn": event.itemCheckIn.idCheckIn.toString(),
-            "TimeStartCheckIn": event.itemCheckIn.timeCheckIn,
-            "TimeCheckOut": event.itemCheckIn.timeCheckOut,
+            "TimeStartCheckIn": timeCheckInToUse,
+            "TimeCheckOut": event.itemCheckIn.timeCheckOut,  
             "OpenStore": event.itemCheckIn.openStore == 'true' ? 1 : 0,
             "Status": (event.itemCheckIn.timeCheckOut != '' && event.itemCheckIn.timeCheckOut != null) ? 1 : 0,
             "AddressDifferent" : DataLocal.addressDifferent,
@@ -273,7 +288,12 @@ class CheckInBloc extends Bloc<CheckInEvent,CheckInState>{
             "LongDifferent" : DataLocal.longDifferent,
           }
       );
-      // print('join3');
+      print('join3');
+      print('DataLocal.dateTimeStartCheckIn: ${DataLocal.dateTimeStartCheckIn}');
+      print('event.itemCheckIn.timeCheckIn: ${event.itemCheckIn.timeCheckIn}');
+      print('timeCheckInToUse (sẽ gửi lên server): $timeCheckInToUse');
+      print('TimeCheckOut: ${event.itemCheckIn.timeCheckOut.toString()}');
+      print('join3');
       if(listFileAlbumView.isNotEmpty){
         for (var element in listFileAlbumView) {
           formData.files.addAll([

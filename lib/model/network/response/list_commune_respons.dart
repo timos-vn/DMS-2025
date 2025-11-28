@@ -24,9 +24,9 @@ class ListCommuneResponse {
     if (this.data != null) {
       data['data'] = this.data!.map((v) => v.toJson()).toList();
     }
-    data['totalPage'] = this.totalPage;
-    data['statusCode'] = this.statusCode;
-    data['message'] = this.message;
+    data['totalPage'] = totalPage;
+    data['statusCode'] = statusCode;
+    data['message'] = message;
     return data;
   }
 }
@@ -46,9 +46,9 @@ class ListCommuneResponseData {
 
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = new Map<String, dynamic>();
-    data['ma_phuong'] = this.maPhuong;
-    data['ten_phuong'] = this.tenPhuong;
-    data['ten_phuong2'] = this.tenPhuong2;
+    data['ma_phuong'] = maPhuong;
+    data['ten_phuong'] = tenPhuong;
+    data['ten_phuong2'] = tenPhuong2;
     return data;
   }
 }

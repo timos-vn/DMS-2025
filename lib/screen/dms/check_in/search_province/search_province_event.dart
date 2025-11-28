@@ -19,8 +19,20 @@ class GetListProvinceEvent extends SearchProvinceEvent {
   final int typeGetList;
   final String keysText;
   final String? idArea;
+  final int isDN2;
+  final bool forceCommuneLookup;
 
-  GetListProvinceEvent({this.isRefresh = false, this.isLoadMore = false,this.idProvince,this.idDistrict,required this.typeGetList, required this.keysText, this.idArea});
+  GetListProvinceEvent({
+    this.isRefresh = false,
+    this.isLoadMore = false,
+    this.idProvince,
+    this.idDistrict,
+    required this.typeGetList,
+    required this.keysText,
+    this.idArea,
+    this.isDN2 = 0,
+    this.forceCommuneLookup = false,
+  });
 
   @override
   String toString() => 'GetListProvinceEvent {}';

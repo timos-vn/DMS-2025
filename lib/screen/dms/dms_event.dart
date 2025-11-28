@@ -47,8 +47,12 @@ class FindProvinceEvent extends DMSEvent {
 }
 
 class AutoMapAddressFromGPSEvent extends DMSEvent {
+  final bool useNewRegulation;
+
+  AutoMapAddressFromGPSEvent({this.useNewRegulation = false});
+
   @override
-  String toString() => 'AutoMapAddressFromGPSEvent';
+  String toString() => 'AutoMapAddressFromGPSEvent(useNewRegulation: $useNewRegulation)';
 }
 
 class GetListItemInventoryEvent extends DMSEvent {

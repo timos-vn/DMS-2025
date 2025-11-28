@@ -14,7 +14,6 @@ import '../../../../model/network/response/list_commune_respons.dart';
 import '../../../../model/network/response/list_district_response.dart';
 import '../../../../model/network/response/list_hinh_thuc_response.dart';
 import '../../../../model/network/response/list_province_response.dart';
-import '../../../../model/network/response/list_tour_response.dart';
 import '../../../../model/network/response/list_type_store_response.dart';
 import '../../../../themes/colors.dart';
 import '../../../../utils/debouncer.dart';
@@ -25,8 +24,19 @@ class SearchProvinceScreen extends StatefulWidget {
   final String title;
   final int typeGetList;
   final String idArea;
+  final bool useNewRegulation;
+  final bool forceCommuneLookup;  
 
-  const SearchProvinceScreen({Key? key, this.idProvince,this.idDistrict, required this.title,required this.typeGetList,required this.idArea}) : super(key: key);
+  const SearchProvinceScreen({
+    Key? key,
+    this.idProvince,
+    this.idDistrict,
+    required this.title,
+    required this.typeGetList,
+    required this.idArea,
+    this.useNewRegulation = false, 
+    this.forceCommuneLookup = false,
+  }) : super(key: key);
 
   @override
   State<StatefulWidget> createState() {
@@ -69,17 +79,29 @@ class SearchProvinceScreenState extends State<SearchProvinceScreen> {
       final maxScroll = _scrollController.position.maxScrollExtent;
       final currentScroll = _scrollController.position.pixels;
       if (maxScroll - currentScroll <= _scrollThreshold && !_hasReachedMax && _bloc.isScroll == true) {
+        int isDN2 = widget.useNewRegulation ? 1 : 0;
         if(widget.typeGetList == 0){
-          _bloc.add(GetListProvinceEvent(idArea: widget.idArea.toString(),idProvince: widget.idProvince,typeGetList: widget.typeGetList,idDistrict: widget.idDistrict ,isLoadMore: true, keysText: '',));
+          _bloc.add(GetListProvinceEvent(
+              idArea: widget.idArea.toString(),
+              idProvince: widget.idProvince,
+              typeGetList: widget.typeGetList,
+              idDistrict: widget.idDistrict,
+              isLoadMore: true,
+              keysText: '',
+              isDN2: isDN2,
+              forceCommuneLookup: widget.forceCommuneLookup));
         }
         else{
+          // Với các danh sách khác, tham số isDN2 không ảnh hưởng nhưng vẫn truyền để giữ chữ ký thống nhất
           _bloc.add(GetListProvinceEvent(
               idArea: widget.idArea.toString(),
               idProvince: widget.idProvince,
               typeGetList: widget.typeGetList,
               idDistrict: widget.idDistrict,
               keysText: Utils.convertKeySearch(_searchController.text),
-              isLoadMore: true)
+              isLoadMore: true,
+              isDN2: isDN2,
+              forceCommuneLookup: widget.forceCommuneLookup)
           );
         }
       }
@@ -99,19 +121,38 @@ class SearchProvinceScreenState extends State<SearchProvinceScreen> {
             bloc: _bloc,
             listener: (context, state) {
               if(state is GetPrefsSuccess){
-                _bloc.add(GetListProvinceEvent(idArea: widget.idArea.toString(),idProvince: widget.idProvince,typeGetList: widget.typeGetList,idDistrict: widget.idDistrict,keysText: ''));
+                _bloc.add(GetListProvinceEvent(
+                    idArea: widget.idArea.toString(),
+                    idProvince: widget.idProvince,
+                    typeGetList: widget.typeGetList,
+                    idDistrict: widget.idDistrict,
+                    keysText: '',
+                    isDN2: widget.useNewRegulation ? 1 : 0,
+                    forceCommuneLookup: widget.forceCommuneLookup));
               }
             },
             child: BlocBuilder<SearchProvinceBloc,SearchProvinceState>(
                 bloc: _bloc,
                 builder: (BuildContext context, SearchProvinceState state) {
-                  return widget.typeGetList == 1 ? buildBodyArea(context,state) :
-                  widget.typeGetList == 0?
-                  ((widget.idProvince!.isEmpty && widget.idDistrict!.isEmpty) ?
-                  buildBodyProvince(context, state) :
-                  (widget.idProvince!.isNotEmpty && widget.idDistrict!.isEmpty) ?
-                  buildBodyDistrict(context, state):buildBodyCommune(context, state)) :
-                  widget.typeGetList == 2 ? buildBodyStoreForm(context, state) : buildBodyTypeStore(context, state);
+                  if(widget.typeGetList == 1){
+                    return buildBodyArea(context,state);
+                  }else if(widget.typeGetList == 0){
+                    final bool showProvince = widget.idProvince!.isEmpty && widget.idDistrict!.isEmpty;
+                    final bool showDistrict = widget.idProvince!.isNotEmpty && widget.idDistrict!.isEmpty && !widget.forceCommuneLookup;
+                    final bool showCommune = widget.idDistrict!.isNotEmpty || (widget.forceCommuneLookup && widget.idProvince!.isNotEmpty);
+                    if(showProvince){
+                      return buildBodyProvince(context,state);
+                    }else if(showDistrict){
+                      return buildBodyDistrict(context,state);
+                    }else if(showCommune){
+                      return buildBodyCommune(context,state);
+                    }
+                    return buildBodyProvince(context,state);
+                  }else if(widget.typeGetList == 2){
+                    return buildBodyStoreForm(context,state);
+                  }else{
+                    return buildBodyTypeStore(context,state);
+                  }
                 })),
       ),
     );
@@ -812,7 +853,14 @@ class SearchProvinceScreenState extends State<SearchProvinceScreen> {
                                       _bloc.searchResultsTypeStore.clear();
                                     }
                                   }
-                                  _bloc.add(GetListProvinceEvent(idArea: widget.idArea.toString(),idProvince: widget.idProvince,typeGetList: widget.typeGetList,idDistrict: widget.idDistrict,keysText: Utils.convertKeySearch(_searchController.text)));
+                                  _bloc.add(GetListProvinceEvent(
+                                      idArea: widget.idArea.toString(),
+                                      idProvince: widget.idProvince,
+                                      typeGetList: widget.typeGetList,
+                                      idDistrict: widget.idDistrict,
+                                      keysText: Utils.convertKeySearch(_searchController.text),
+                                      isDN2: widget.useNewRegulation ? 1 : 0,
+                                      forceCommuneLookup: widget.forceCommuneLookup));
                                   //_bloc.add(SearchTypeStoreEvent(keysText:_searchController.text,type: widget.typeGetList));
                                 }
                               }

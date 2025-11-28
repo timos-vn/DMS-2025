@@ -87,7 +87,15 @@ class SearchProvinceBloc extends Bloc<SearchProvinceEvent,SearchProvinceState>{
         : InitialSearchProvinceState());
     if (isRefresh) {
       for (int i = 1; i <= _currentPage; i++) {
-        SearchProvinceState state = await handleCallApi(i,event.idProvince.toString(),event.idDistrict.toString(),event.typeGetList,event.keysText, event.idArea.toString());
+        SearchProvinceState state = await handleCallApi(
+            i,
+            event.idProvince.toString(),
+            event.idDistrict.toString(),
+            event.typeGetList,
+            event.keysText,
+            event.idArea.toString(),
+            event.isDN2,
+            event.forceCommuneLookup);
         if (state is! GetListProvinceSuccess) return;
       }
       return;
@@ -96,7 +104,15 @@ class SearchProvinceBloc extends Bloc<SearchProvinceEvent,SearchProvinceState>{
       isScroll = false;
       _currentPage++;
     }
-    SearchProvinceState state = await handleCallApi(_currentPage,event.idProvince.toString(),event.idDistrict.toString(),event.typeGetList,event.keysText, event.idArea.toString());
+    SearchProvinceState state = await handleCallApi(
+        _currentPage,
+        event.idProvince.toString(),
+        event.idDistrict.toString(),
+        event.typeGetList,
+        event.keysText,
+        event.idArea.toString(),
+        event.isDN2,
+        event.forceCommuneLookup);
     emitter(state);
   }
 
@@ -142,18 +158,24 @@ class SearchProvinceBloc extends Bloc<SearchProvinceEvent,SearchProvinceState>{
     return matches;
   }
 
-  Future<SearchProvinceState> handleCallApi(int pageIndex,String idProvince, String idDistrict,int typeGetList, String keysText, String idArea) async {
+  Future<SearchProvinceState> handleCallApi(int pageIndex,String idProvince, String idDistrict,int typeGetList, String keysText, String idArea, int isDN2, bool forceCommuneLookup) async {
    if(typeGetList == 0){
      if(idProvince.isEmpty && idDistrict.isEmpty){
-       SearchProvinceState state = _handleLoadListProvince(await _networkFactory!.getListProvince(_accessToken!,idProvince.trim(),idDistrict.trim(),pageIndex,100,idArea), pageIndex);
+       SearchProvinceState state = _handleLoadListProvince(
+         await _networkFactory!.getListProvince(_accessToken!,idProvince.trim(),idDistrict.trim(),pageIndex,100,idArea,isDN2: isDN2),
+         pageIndex);
        return state;
      }
-     else if(idProvince.isNotEmpty && idDistrict.isEmpty){
-       SearchProvinceState state = _handleLoadListDistrict(await _networkFactory!.getListProvince(_accessToken!,idProvince.trim(),idDistrict.trim(),pageIndex,150,idArea), pageIndex);
+     else if(idProvince.isNotEmpty && idDistrict.isEmpty && !forceCommuneLookup){
+       SearchProvinceState state = _handleLoadListDistrict(
+         await _networkFactory!.getListProvince(_accessToken!,idProvince.trim(),idDistrict.trim(),pageIndex,150,idArea,isDN2: isDN2),
+         pageIndex);
        return state;
      }
      else{
-       SearchProvinceState state = _handleLoadListCommune(await _networkFactory!.getListProvince(_accessToken!,idProvince.trim(),idDistrict.trim(),pageIndex,150,idArea), pageIndex);
+       SearchProvinceState state = _handleLoadListCommune(
+         await _networkFactory!.getListProvince(_accessToken!,idProvince.trim(),idDistrict.trim(),pageIndex,150,idArea,isDN2: isDN2),
+         pageIndex);
        return state;
      }
    }

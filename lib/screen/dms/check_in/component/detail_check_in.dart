@@ -107,13 +107,19 @@ class _DetailCheckInScreenState extends State<DetailCheckInScreen> with TickerPr
               }
               else{
                 if(widget.listAppSettings.isEmpty){
-                  // Sử dụng thời gian check-in ban đầu nếu đã có (khi restore pending check-in)
-                  // Nếu không có, sử dụng thời gian hiện tại (check-in mới)
+                  // Kiểm tra xem DataLocal.dateTimeStartCheckIn có phải của khách hàng hiện tại không
+                  // Nếu không, tạo thời gian check-in mới cho khách hàng này
+                  String currentCheckInId = (widget.idCheckIn.toString().trim() + widget.item.maKh.toString().trim());
                   String dateTimeToUse;
-                  if(DataLocal.dateTimeStartCheckIn.isNotEmpty){
+                  
+                  // Chỉ sử dụng DataLocal.dateTimeStartCheckIn nếu nó thuộc về khách hàng hiện tại
+                  if(DataLocal.dateTimeStartCheckIn.isNotEmpty && DataLocal.idCurrentCheckIn == currentCheckInId){
                     dateTimeToUse = DataLocal.dateTimeStartCheckIn;
                   } else {
+                    // Tạo thời gian check-in mới cho khách hàng này
                     dateTimeToUse = DateFormat("yyyy-MM-ddTHH:mm:ss").format(DateTime.now());
+                    // Clear giá trị cũ để đảm bảo không bị nhầm lẫn
+                    DataLocal.dateTimeStartCheckIn = '';
                   }
                   
                   _bloc.add(SaveTimeCheckOut(
@@ -497,8 +503,7 @@ class _DetailCheckInScreenState extends State<DetailCheckInScreen> with TickerPr
       }
     }
     else {
-      if(DateTime.now().isAfter(Utils.parseStringToDate(DataLocal.dateTimeStartCheckIn, Const.DATE_SV).add(Duration(minutes: widget.numberTimeCheckOut)))){
-
+      if(true/*DateTime.now().isAfter(Utils.parseStringToDate(DataLocal.dateTimeStartCheckIn, Const.DATE_SV).add(Duration(minutes: widget.numberTimeCheckOut)))*/){
         if(DataLocal.addImageToAlbum == true ){
           bool lock = false;
           for (var item in DataLocal.listItemAlbum) {

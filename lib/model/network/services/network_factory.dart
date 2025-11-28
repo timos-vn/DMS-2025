@@ -887,7 +887,7 @@ class NetWorkFactory{
     })); //["Authorization"] = "Bearer " + token
   }
 
-  Future<Object> getListProvince(String token, String idProvince,String idDistrict, int pageIndex, int pageCount, String idArea) async {
+  Future<Object> getListProvince(String token, String idProvince,String idDistrict, int pageIndex, int pageCount, String idArea, {int isDN2 = 0}) async {
     print("idArea");
     print(idArea);
 
@@ -895,8 +895,9 @@ class NetWorkFactory{
       "idProvince": idProvince,
       "idDistrict": idDistrict,
       "page_index": pageIndex,
-      "page_count": pageCount,
-      "idArea": idArea
+      "page_count": 1000,
+      "idArea": idArea,
+      "isND2": isDN2
     })); //["Authorization"] = "Bearer " + token
   }
 
