@@ -109,6 +109,9 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
   double? _pendingMaxQuantity;
   List<ListCkMatHang>? _pendingDiscountItems;
   String? _pendingDiscountType; // 'CKN' or 'CKTDTH'
+  String? _pendingCknGroupKey;
+  String? _pendingCktdthGroupKey;
+  GlobalKey<DiscountVoucherSelectionSheetState>? _discountSheetKey;
   
   // Flag to re-apply HH after API reload (từ CKG check/uncheck)
   bool _needReapplyHHAfterReload = false;
@@ -872,22 +875,50 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
           
           // API đã trả về danh sách hàng tặng, show popup step 2
           if(_pendingDiscountName != null && _pendingMaxQuantity != null && _pendingDiscountItems != null){
+            final pendingType = _pendingDiscountType ?? 'CKN';
+            final String? pendingGroupKey = pendingType == 'CKN'
+                ? _pendingCknGroupKey
+                : _pendingCktdthGroupKey;
             _showGiftProductSelectionPopup(
               discountName: _pendingDiscountName!,
               maxQuantity: _pendingMaxQuantity!,
               discountItems: _pendingDiscountItems!,
-              discountType: _pendingDiscountType ?? 'CKN', // Default to CKN for backward compatibility
+              discountType: pendingType, // Default to CKN for backward compatibility
+              groupKey: pendingGroupKey,
             );
             // Clear pending state
             _pendingDiscountName = null;
             _pendingMaxQuantity = null;
             _pendingDiscountItems = null;
             _pendingDiscountType = null;
+            if (pendingType == 'CKN') {
+              _pendingCknGroupKey = null;
+            } else if (pendingType == 'CKTDTH') {
+              _pendingCktdthGroupKey = null;
+            }
           }
         }
         else if(state is CartFailure){
           // ✅ Ẩn loading dialog khi có lỗi (nếu đang loading)
           _hideLoadingDialog();
+          if (_pendingDiscountType != null) {
+            final pendingType = _pendingDiscountType!;
+            final String? pendingGroupKey = pendingType == 'CKN'
+                ? _pendingCknGroupKey
+                : _pendingCktdthGroupKey;
+            if (pendingGroupKey != null) {
+              _handleGiftSelectionCancelled(pendingType, pendingGroupKey, showToast: false);
+            }
+            _pendingDiscountType = null;
+            if (pendingType == 'CKN') {
+              _pendingCknGroupKey = null;
+            } else if (pendingType == 'CKTDTH') {
+              _pendingCktdthGroupKey = null;
+            }
+            _pendingDiscountName = null;
+            _pendingMaxQuantity = null;
+            _pendingDiscountItems = null;
+          }
         }
       },
       bloc: _bloc,
@@ -1936,11 +1967,9 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
 
   // Main discount flow - Show voucher selection bottom sheet (E-commerce style)
   void _showDiscountFlow() async {
-    // ✅ Reload danh sách chiết khấu từ backend trước khi mở sheet
-    // Đảm bảo dữ liệu mới nhất sau khi user sửa số lượng sản phẩm
-    print('💰 Reloading discounts before opening sheet...');
-    _reloadDiscountsFromBackend();
+    // ❗️Không gọi API khi chỉ mở sheet – chỉ upload khi user nhấn "Áp dụng"
     
+    _discountSheetKey = GlobalKey<DiscountVoucherSelectionSheetState>();
     final result = await showModalBottomSheet<Map<String, dynamic>>(
       context: context,
       isScrollControlled: true,
@@ -1964,6 +1993,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
         maxChildSize: 0.95,
         expand: false,
         builder: (context, scrollController) => DiscountVoucherSelectionSheet(
+          key: _discountSheetKey,
           listCkn: _bloc.listCkn,
           listCkg: _bloc.listCkg,
           listHH: _bloc.listHH,
@@ -2027,6 +2057,8 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
         ),
       ),
     );
+
+    _discountSheetKey = null;
 
     if (result == null) {
       // ✅ User đóng bottom sheet mà không click "Áp dụng"
@@ -2563,7 +2595,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
           promoList.add(sttRecCk);
         }
         SearchItemResponseData gift = SearchItemResponseData(
-          code: hhItem.tenVt ?? '',
+          code: hhItem.maVt?.trim() ?? '',
           sttRec0: hhItem.sttRecCk?.trim() ?? '',
           name: hhItem.tenVt ?? 'Quà tặng',
           name2: hhItem.tenVt ?? 'Quà tặng',
@@ -2693,6 +2725,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
 
     // Save selected discount group (legacy)
     _bloc.selectedDiscountGroup = groupKey;
+    _pendingCknGroupKey = groupKey;
     
     // Add to multiple selection set
     _bloc.selectedCknGroups.add(groupKey);
@@ -2722,6 +2755,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
     
     // Add to multiple selection set
     _bloc.selectedCktdthGroups.add(groupKey);
+    _pendingCktdthGroupKey = groupKey;
 
     // Save pending state for BLocListener
     setState(() {
@@ -3307,7 +3341,14 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
     required double maxQuantity,
     required List<ListCkMatHang> discountItems,
     required String discountType, // 'CKN' or 'CKTDTH'
+    String? groupKey,
   }) async {
+    final String effectiveGroupKey = (groupKey ??
+            discountItems.first.group_dk?.toString() ??
+            discountItems.first.sttRecCk?.toString() ??
+            '')
+        .trim();
+    
     // Load existing selections
     Map<String, double> initialSelections = {};
     final currentSttRecCk = discountItems.first.sttRecCk?.toString().trim();
@@ -3337,16 +3378,40 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
       ),
     );
 
-    if (result == null || result.isEmpty) return;
+    if (result == null || result.isEmpty) {
+      _handleGiftSelectionCancelled(discountType, effectiveGroupKey);
+      return;
+    }
 
     // Process selected products
-    _processSelectedGiftProducts(result, discountItems.first, discountType);
+    _processSelectedGiftProducts(result, discountItems.first, discountType, effectiveGroupKey);
+  }
+
+  void _handleGiftSelectionCancelled(String discountType, String groupKey, {bool showToast = true}) {
+    if (groupKey.isEmpty) return;
+    if (discountType == 'CKN') {
+      _bloc.selectedCknGroups.remove(groupKey);
+      _discountSheetKey?.currentState?.unselectCknGroup(groupKey);
+    } else if (discountType == 'CKTDTH') {
+      _bloc.selectedCktdthGroups.remove(groupKey);
+      _discountSheetKey?.currentState?.unselectCktdthGroup(groupKey);
+    }
+    
+    if (showToast) {
+      Utils.showCustomToast(
+        context,
+        Icons.info_outline,
+        'Chưa chọn sản phẩm tặng',
+      );
+    }
+    setState(() {});
   }
 
   void _processSelectedGiftProducts(
     Map<String, double> selectedQuantities,
     ListCkMatHang discountItem,
     String discountType, // 'CKN' or 'CKTDTH'
+    String groupKey,
   ) {
     try {
       print('🎁 $discountType Debug: Processing selected gift products');
@@ -3414,6 +3479,18 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
 
       print('🎁 $discountType Debug: After - listProductGift has ${DataLocal.listProductGift.length} items');
       print('🎁 $discountType Debug: Total products added: $addedCount');
+      
+      if (groupKey.isNotEmpty) {
+        if (discountType == 'CKN') {
+          if (!_bloc.selectedCknGroups.contains(groupKey)) {
+            _bloc.selectedCknGroups.add(groupKey);
+          }
+        } else if (discountType == 'CKTDTH') {
+          if (!_bloc.selectedCktdthGroups.contains(groupKey)) {
+            _bloc.selectedCktdthGroups.add(groupKey);
+          }
+        }
+      }
 
       // Step 3: Trigger UI update via setState (no need for BLoC event)
       setState(() {});

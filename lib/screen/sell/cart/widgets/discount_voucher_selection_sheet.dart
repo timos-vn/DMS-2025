@@ -53,10 +53,10 @@ class DiscountVoucherSelectionSheet extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  State<DiscountVoucherSelectionSheet> createState() => _DiscountVoucherSelectionSheetState();
+  State<DiscountVoucherSelectionSheet> createState() => DiscountVoucherSelectionSheetState();
 }
 
-class _DiscountVoucherSelectionSheetState extends State<DiscountVoucherSelectionSheet> {
+class DiscountVoucherSelectionSheetState extends State<DiscountVoucherSelectionSheet> {
   // Local state for multiple selection (TẤT CẢ các loại dùng checkbox!)
   late Set<String> _selectedCkgIds;
   late Set<String> _selectedHHIds;
@@ -664,6 +664,23 @@ class _DiscountVoucherSelectionSheetState extends State<DiscountVoucherSelection
         ),
       ),
     );
+  }
+
+  // Allow parent widget to force unselect when user cancels gift dialog
+  void unselectCknGroup(String groupKey) {
+    if (!_selectedCknGroups.contains(groupKey)) return;
+    setState(() {
+      _selectedCknGroups.remove(groupKey);
+    });
+    widget.onRemoveCknGroup?.call(groupKey);
+  }
+
+  void unselectCktdthGroup(String groupKey) {
+    if (!_selectedCktdthGroups.contains(groupKey)) return;
+    setState(() {
+      _selectedCktdthGroups.remove(groupKey);
+    });
+    widget.onRemoveCktdthGroup?.call(groupKey);
   }
 }
 

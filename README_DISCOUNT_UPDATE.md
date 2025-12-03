@@ -1,3 +1,4 @@
+
 # 📚 Documentation Index - Discount System Update
 
 ## 🎯 **Tổng Quan**
