@@ -30,7 +30,7 @@ class SearchProductScreen extends StatefulWidget {
   final bool? viewUpdateOrder;
   final List<String>? listIdGroupProduct;
   final String? itemGroupCode;
-  final List<Product> listOrder;
+  final List<Product> listOrder; 
   final bool? inventoryControl;
   final bool? addProductFromCheckIn;
   final bool? addProductFromSaleOut;
@@ -761,7 +761,7 @@ class SearchProductScreenState extends State<SearchProductScreen> {
                           children: [
                             // Checkbox for multi-select with larger tap area
                             Visibility(
-                              visible: Const.addProductionSameQuantity == true,
+                              visible: true,
                               child: InkWell(
                                 onTap: () {
                                   // Toggle selection
@@ -845,10 +845,10 @@ class SearchProductScreenState extends State<SearchProductScreen> {
                                         children: [
                                           Expanded(
                                             child: Text(
-                                              '${_dataListSearch[index].name}',
+                                              '[${_dataListSearch[index].code.toString().trim()}] ${_dataListSearch[index].name}',
                                               textAlign: TextAlign.left,
                                               style: const TextStyle(fontWeight: FontWeight.bold,fontSize: 12),
-                                              maxLines: 2,
+                                              maxLines: 4,
                                               overflow: TextOverflow.ellipsis,
                                             ),
                                           ),
@@ -969,116 +969,62 @@ class SearchProductScreenState extends State<SearchProductScreen> {
                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         children: [
                                           Flexible(
-                                            child: Row(
-                                              children: [
-                                                Flexible(
-                                                  child: Container(
-                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                                                    decoration: BoxDecoration(
-                                                      color: const Color(0xfff5f5f5),
-                                                      borderRadius: BorderRadius.circular(8),
-                                                      border: Border.all(
-                                                        color: const Color(0xffe0e0e0),
-                                                        width: 1,
-                                                      ),
-                                                    ),
-                                                    child: Row(
-                                                      mainAxisSize: MainAxisSize.min,
-                                                      children: [
-                                                        const Icon(
-                                                          Icons.inventory_2,
-                                                          size: 12,
-                                                          color: Color(0xff666666),
-                                                        ),
-                                                        const SizedBox(width: 4),
-                                                        const Text(
-                                                          'Mã SP:',
-                                                          textAlign: TextAlign.left,
-                                                          style: TextStyle(
-                                                            fontWeight: FontWeight.w500,
-                                                            fontSize: 10,
-                                                            color: Color(0xff666666),
-                                                          ),
-                                                          maxLines: 1,
-                                                          overflow: TextOverflow.ellipsis,
-                                                        ),
-                                                        const SizedBox(width: 3),
-                                                        Flexible(
-                                                          child: Text(
-                                                            '${_dataListSearch[index].code}',
-                                                            textAlign: TextAlign.left,
-                                                            style: const TextStyle(
-                                                              fontWeight: FontWeight.w600,
-                                                              fontSize: 10,
-                                                              color: Color(0xff333333),
-                                                            ),
-                                                            maxLines: 1,
-                                                            overflow: TextOverflow.ellipsis,
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
+                                            child: Visibility(
+                                              visible: _dataListSearch[index].discountPercent! > 0,
+                                              child: Container(
+                                                decoration: BoxDecoration(
+                                                  gradient: const LinearGradient(
+                                                    colors: [Color(0xffe53e3e), Color(0xffc53030)],
+                                                    begin: Alignment.topLeft,
+                                                    end: Alignment.bottomRight,
                                                   ),
+                                                  borderRadius: BorderRadius.circular(12),
+                                                  boxShadow: [
+                                                    BoxShadow(
+                                                      color: const Color(0xffe53e3e).withOpacity(0.3),
+                                                      blurRadius: 4,
+                                                      offset: const Offset(0, 2),
+                                                    ),
+                                                  ],
                                                 ),
-                                              const SizedBox(width: 8,),
-                                              Visibility(
-                                                visible: _dataListSearch[index].discountPercent! > 0,
-                                                child: Container(
-                                                  decoration: BoxDecoration(
-                                                    gradient: const LinearGradient(
-                                                      colors: [Color(0xffe53e3e), Color(0xffc53030)],
-                                                      begin: Alignment.topLeft,
-                                                      end: Alignment.bottomRight,
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                child: Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    const Icon(
+                                                      Icons.local_offer,
+                                                      size: 12,
+                                                      color: Colors.white,
                                                     ),
-                                                    borderRadius: BorderRadius.circular(12),
-                                                    boxShadow: [
-                                                      BoxShadow(
-                                                        color: const Color(0xffe53e3e).withOpacity(0.3),
-                                                        blurRadius: 4,
-                                                        offset: const Offset(0, 2),
+                                                    const SizedBox(width: 4),
+                                                    const Text(
+                                                      'SALE',
+                                                      textAlign: TextAlign.left,
+                                                      style: TextStyle(
+                                                        fontWeight: FontWeight.w700,
+                                                        fontSize: 9,
+                                                        color: Colors.white,
+                                                        letterSpacing: 0.5,
                                                       ),
-                                                    ],
-                                                  ),
-                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                                  child: Row(
-                                                    mainAxisSize: MainAxisSize.min,
-                                                    children: [
-                                                      const Icon(
-                                                        Icons.local_offer,
-                                                        size: 12,
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                    const SizedBox(width: 3),
+                                                    Text(
+                                                      '${Utils.formatNumber(_dataListSearch[index].discountPercent!)}%',
+                                                      textAlign: TextAlign.left,
+                                                      style: const TextStyle(
+                                                        fontWeight: FontWeight.w700,
+                                                        fontSize: 9,
                                                         color: Colors.white,
                                                       ),
-                                                      const SizedBox(width: 4),
-                                                      const Text(
-                                                        'SALE',
-                                                        textAlign: TextAlign.left,
-                                                        style: TextStyle(
-                                                          fontWeight: FontWeight.w700,
-                                                          fontSize: 9,
-                                                          color: Colors.white,
-                                                          letterSpacing: 0.5,
-                                                        ),
-                                                        maxLines: 1,
-                                                        overflow: TextOverflow.ellipsis,
-                                                      ),
-                                                      const SizedBox(width: 3),
-                                                      Text(
-                                                        '${Utils.formatNumber(_dataListSearch[index].discountPercent!)}%',
-                                                        textAlign: TextAlign.left,
-                                                        style: const TextStyle(
-                                                          fontWeight: FontWeight.w700,
-                                                          fontSize: 9,
-                                                          color: Colors.white,
-                                                        ),
-                                                        maxLines: 1,
-                                                        overflow: TextOverflow.ellipsis,
-                                                      ),
-                                                    ],
-                                                  ),
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ],
                                                 ),
                                               ),
-                                            ],
-                                          ),
+                                            ),
                                           ),
                                           Row(
                                             mainAxisSize: MainAxisSize.min,
@@ -1241,51 +1187,48 @@ class SearchProductScreenState extends State<SearchProductScreen> {
             )
           ),
           // Cart icon for multi-select
-          Visibility(
-            visible: Const.addProductionSameQuantity == true,
-            child: Stack(
-              children: [
-                InkWell(
-                  onTap: () => _showMultiSelectQuantityPopup(),
+          Stack(
+            children: [
+              InkWell(
+                onTap: () => _showMultiSelectQuantityPopup(),
+                child: Container(
+                  width: 40,
+                  height: 50,
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: const Icon(
+                    Icons.shopping_cart,
+                    size: 25,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+              // Badge showing count
+              if (selectedProductCodes.isNotEmpty)
+                Positioned(
+                  right: 0,
+                  top: 0,
                   child: Container(
-                    width: 40,
-                    height: 50,
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: const Icon( 
-                      Icons.shopping_cart,
-                      size: 25,
-                      color: Colors.white,
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 18,
+                      minHeight: 18,
+                    ),
+                    child: Text(
+                      '${selectedProductCodes.length}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
                     ),
                   ),
                 ),
-                // Badge showing count
-                if (selectedProductCodes.isNotEmpty)
-                  Positioned(
-                    right: 0,
-                    top: 0,
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: Colors.red,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      constraints: const BoxConstraints(
-                        minWidth: 18,
-                        minHeight: 18,
-                      ),
-                      child: Text(
-                        '${selectedProductCodes.length}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
+            ],
           ),
         ],
       ),
@@ -1322,11 +1265,58 @@ class SearchProductScreenState extends State<SearchProductScreen> {
     _addMultipleProductsToCart(result);
   }
 
+  String _resolveStockCodeForProduct(SearchItemResponseData product) {
+    final productCode = _sanitizeStockValue(product.stockCode);
+    if (productCode.isNotEmpty) return productCode;
+
+    final fallback = _sanitizeStockValue(DataLocal.codeStockMater);
+    if (fallback.isNotEmpty) return fallback;
+
+    final defaultOrderStock = widget.listOrder.isNotEmpty
+        ? _sanitizeStockValue(widget.listOrder.first.codeStock)
+        : '';
+    return defaultOrderStock;
+  }
+
+  String _resolveStockNameForProduct(SearchItemResponseData product) {
+    final productName = _sanitizeStockValue(product.stockName);
+    if (productName.isNotEmpty) return productName;
+
+    final fallback = _sanitizeStockValue(DataLocal.nameStockMater);
+    if (fallback.isNotEmpty) return fallback;
+
+    final defaultOrderStockName = widget.listOrder.isNotEmpty
+        ? _sanitizeStockValue(widget.listOrder.first.nameStock)
+        : '';
+    return defaultOrderStockName;
+  }
+
+  String _sanitizeStockValue(String? value) {
+    if (value == null) return '';
+    final sanitized = value.replaceAll('null', '').trim();
+    return sanitized;
+  }
+
   // Add multiple products to cart
   void _addMultipleProductsToCart(double quantity) async {
     int successCount = 0;
     
     for (var product in selectedProducts.values) {
+      final resolvedStockCode = _resolveStockCodeForProduct(product);
+      final resolvedStockName = _resolveStockNameForProduct(product);
+
+      if (resolvedStockCode.isEmpty) {
+        Utils.showCustomToast(
+          context,
+          Icons.warning_amber_outlined,
+          'Vui lòng chọn kho trước khi thêm nhiều sản phẩm'
+        );
+        return;
+      }
+
+      product.stockCode = resolvedStockCode;
+      product.stockName = resolvedStockName;
+
       // Debug log giá sản phẩm
       print('DEBUG: Product ${product.code} - price: ${product.price}, woPrice: ${product.woPrice}, giaSuaDoi: ${product.giaSuaDoi}, priceAfter: ${product.priceAfter}, woPriceAfter: ${product.woPriceAfter}');
       
@@ -1370,6 +1360,8 @@ class SearchProductScreenState extends State<SearchProductScreen> {
           giaSuaDoi: giaBan, // Fix: Thêm giaSuaDoi - ưu tiên giaSuaDoi nếu có
           giaGui: giaGuiBan, // Thêm giaGui
           originalPrice: basePrice, // Lưu giá gốc ban đầu
+          codeStock: resolvedStockCode,
+          nameStock: resolvedStockName,
         );
         _bloc.add(AddProductSaleOutEvent(productItem: production));
       } else {
@@ -1415,6 +1407,8 @@ class SearchProductScreenState extends State<SearchProductScreen> {
           maThue: product.maThue, // Mã thuế
           tenThue: product.tenThue, // Tên thuế
           thueSuat: product.thueSuat, // Thuế suất (%)
+          codeStock: resolvedStockCode,
+          nameStock: resolvedStockName,
         );
         _bloc.add(AddCartEvent(productItem: production));
       }

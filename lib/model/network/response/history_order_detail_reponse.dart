@@ -174,6 +174,7 @@ class LineItems {
   int? kmYn;
   double? soLuong;
   double? soLuongKD;
+  double? soLuongDapUng;
   double? price = 0;
   double? ckNt;
   String? maCk;
@@ -206,6 +207,7 @@ class LineItems {
         this.kmYn,
         this.soLuong,
         this.soLuongKD = 0,
+        this.soLuongDapUng,
         this.price = 0,
         this.ckNt,
         this.maCk,
@@ -226,8 +228,9 @@ class LineItems {
     maVt = json['ma_vt'];
     tenVt = json['ten_vt'];
     kmYn = json['km_yn'];
-    soLuong = json['so_luong'];
-    soLuongKD = json['sl_khadung'];
+    soLuong = json['so_luong'] != null ? double.tryParse(json['so_luong'].toString()) : null;
+    soLuongKD = json['sl_khadung'] != null ? double.tryParse(json['sl_khadung'].toString()) : null;
+    soLuongDapUng = json['sl_dap_ung'] != null ? double.tryParse(json['sl_dap_ung'].toString()) : null;
     price = json['gia'];
     ckNt = json['ck_nt'];
     maCk = json['ma_ck'];
@@ -260,6 +263,7 @@ class LineItems {
     data['km_yn'] = kmYn;
     data['so_luong'] = soLuong;
     data['sl_khadung'] = soLuongKD;
+    data['sl_dap_ung'] = soLuongDapUng;
     data['gia'] = price;
     data['ck_nt'] = ckNt;
     data['ma_ck'] = maCk;

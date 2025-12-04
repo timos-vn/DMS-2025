@@ -11,6 +11,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../model/database/data_local.dart';
 import '../../../model/entity/item_check_in.dart';
+import '../../../model/network/response/detail_customer_response.dart';
 import '../../../model/network/response/list_checkin_response.dart';
 import '../../../services/location_service.dart';
 import '../../../themes/colors.dart';
@@ -24,6 +25,25 @@ import '../../sell/refund_order/component/list_order_completed_screen.dart';
 import 'detail_customer_event.dart';
 import 'detail_customer_state.dart';
 import 'detail_customer_bloc.dart';
+
+// Helper class for action buttons
+class ActionButtonItem {
+  final String title;
+  final String? subtitle;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+  final String? badge;
+
+  ActionButtonItem({
+    required this.title,
+    this.subtitle,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+    this.badge,
+  });
+}
 
 class DetailInfoCustomerScreen extends StatefulWidget {
   final String? idCustomer;
@@ -47,6 +67,63 @@ class _DetailInfoCustomerScreenState extends State<DetailInfoCustomerScreen> {
     super.initState();
     _bloc = DetailCustomerBloc(context);
     _bloc.add(GetPrefs());
+  }
+
+  // Helper function để format date string
+  String _formatDateString(String? dateString) {
+    if (dateString == null || dateString.isEmpty || dateString == 'null') {
+      return 'Chưa có thông tin';
+    }
+
+    try {
+      // Loại bỏ 'null' và trim
+      final cleaned = dateString.replaceAll('null', '').trim();
+      if (cleaned.isEmpty) {
+        return 'Chưa có thông tin';
+      }
+
+      // Thử parse với nhiều format khác nhau
+      DateTime? parsedDate;
+
+      // Thử ISO format trước (2025-01-15T10:30:00 hoặc 2025-01-15)
+      try {
+        parsedDate = DateTime.parse(cleaned);
+      } catch (_) {
+        // Thử format dd/MM/yyyy
+        try {
+          parsedDate = DateFormat('dd/MM/yyyy').parseStrict(cleaned);
+        } catch (_) {
+          // Thử format dd-MM-yyyy
+          try {
+            parsedDate = DateFormat('dd-MM-yyyy').parseStrict(cleaned);
+          } catch (_) {
+            // Thử format yyyy-MM-dd
+            try {
+              parsedDate = DateFormat('yyyy-MM-dd').parseStrict(cleaned);
+            } catch (_) {
+              // Nếu không parse được, trả về "Chưa có thông tin"
+              return 'Chưa có thông tin';
+            }
+          }
+        }
+      }
+
+      if (parsedDate != null) {
+        // Kiểm tra nếu là ngày mặc định (01/01/0001 hoặc năm < 1900) - không hợp lệ
+        if (parsedDate.year < 1900 || 
+            (parsedDate.year == 1 && parsedDate.month == 1 && parsedDate.day == 1)) {
+          return 'Chưa có thông tin';
+        }
+
+        // Format theo định dạng Việt Nam: dd/MM/yyyy
+        return DateFormat('dd/MM/yyyy').format(parsedDate);
+      }
+
+      return 'Chưa có thông tin';
+    } catch (e) {
+      // Nếu có lỗi, trả về "Chưa có thông tin"
+      return 'Chưa có thông tin';
+    }
   }
 
   Future<void> _openGoogleMapsWithAddress(String address) async {
@@ -187,310 +264,29 @@ class _DetailInfoCustomerScreenState extends State<DetailInfoCustomerScreen> {
       child: Column(
         children: [
           buildAppBar(),
-          const SizedBox(height: 10,),
           Expanded(
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(left: 16,top: 10,bottom: 10,right: 16),
-                  child: Card(
-                    elevation: 2,
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Center(child: Text(_bloc.detailCustomer.customerName??'',style: const TextStyle(color: blue,fontWeight: FontWeight.normal,fontSize: 18),)),
-                          const SizedBox(height: 8,),
-                          const Divider(
-                            height: 1,
-                            color: blue,
-                          ),
-                          const SizedBox(height: 8,),
-                          Row(
-                            children: [
-                              const Icon(Icons.phone,size: 13,color: grey,),
-                              const SizedBox(width: 8,),
-                              Text(
-                                _bloc.detailCustomer.phone??'',
-                                style: const TextStyle(fontSize: 13,color: grey,),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16,),
-                          Row(
-                            children: [
-                              const Icon(Icons.email,size: 13,color: grey,),
-                              const SizedBox(width: 8,),
-                              Flexible(
-                                child: Text(
-                                  _bloc.detailCustomer.email??'....',
-                                  style: const TextStyle(fontSize: 13,color: grey,),
-                                  maxLines: 1,overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16,),
-                          Row(
-                            children: [
-                              const Icon(Icons.location_on,size: 13,color: grey,),
-                              const SizedBox(width: 8,),
-                              Expanded(
-                                child: Text(
-                                  _bloc.detailCustomer.address??'',
-                                  style: const TextStyle(fontSize: 13,color: grey,),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              const SizedBox(width: 5,),
-                              IconButton(
-                                onPressed: (_bloc.detailCustomer.address?.replaceAll('null', '').trim().isNotEmpty == true) 
-                                  ? () => _openGoogleMapsWithAddress(_bloc.detailCustomer.address ?? '') 
-                                  : null,
-                                icon: Icon(
-                                  MdiIcons.mapOutline, 
-                                  color: (_bloc.detailCustomer.address?.replaceAll('null', '').trim().isNotEmpty == true) 
-                                    ? Colors.blueGrey 
-                                    : Colors.grey, 
-                                  size: 20,
-                                ),
-                                tooltip: 'Mở bản đồ',
-                                splashRadius: 20,
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16,),
-                          Row(
-                            children: [
-                              const Icon(FontAwesomeIcons.birthdayCake,size: 13,color: grey,),
-                              const SizedBox(width: 8,),
-                              Text(
-                                _bloc.detailCustomer.birthday.toString().replaceAll('null', '').isNotEmpty ?  _bloc.detailCustomer.birthday.toString() : 'Chưa có thông tin sinh nở của KH này',
-                                style: const TextStyle(fontSize: 13,color: grey,),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16,),
-                          Row(
-                            children: [
-                              const Icon(Icons.receipt_long,size: 13,color: grey,),
-                              const SizedBox(width: 8,),
-                              Text(
-                                (_bloc.detailCustomer.lastPurchaseDate.toString().replaceAll('null', '').isNotEmpty ) ?  _bloc.detailCustomer.lastPurchaseDate.toString() : 'KH này chưa từng mua hàng của bạn',
-                                style: const TextStyle(fontSize: 13,color: grey,),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                Visibility(
-                  visible: Const.createTaskFromCustomer == true && state is !DetailCustomerLoading,
-                  child: Padding(
-                    padding: const EdgeInsets.only(left: 16,right: 16),
-                    child: GestureDetector(
-                      onTap: (){
-                        _handleCheckInTap();
-                      },
-                      child: Card(
-                        elevation: 1,
-                        shape: const RoundedRectangleBorder(
-                            borderRadius: BorderRadius.all(Radius.circular(8))
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(12.0),
-                          child: Row(
-                            // mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Container(
-                                  padding:const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    borderRadius: const BorderRadius.all(Radius.circular(8)),
-                                    color: _hasPendingCheckIn ? Colors.orange : subColor,
-                                  ),
-                                  child: Center(
-                                      child: Icon(
-                                        _hasPendingCheckIn ? MdiIcons.clockOutline : MdiIcons.watchImport,
-                                        color: Colors.white,
-                                        size: 15,
-                                      )
-                                  )
-                              ),
-                              const SizedBox(width: 10,),
-                              Flexible(
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        'Check-in / Giám sát',
-                                        textAlign: TextAlign.left,
-                                        style: const TextStyle(fontWeight: FontWeight.normal),
-                                      ),
-                                    ),
-                                    if (_hasPendingCheckIn) ...[
-                                      const SizedBox(width: 8),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: Colors.orange,
-                                          borderRadius: BorderRadius.circular(10),
-                                        ),
-                                        child: const Text(
-                                          'Đang check-in',
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              ),//_bloc.listOtherData[index]?.value.toString()??'0.0'
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                Visibility(
-                  visible: state is !DetailCustomerLoading && Const.createNewOrderFromCustomer == true,
-                  child: Padding(
-                    padding: const EdgeInsets.only(left: 16,right: 16),
-                    child: GestureDetector(
-                      onTap: ()=>PersistentNavBarNavigator.pushNewScreen(context, screen: OrderScreen(
-                        nameCustomer: _bloc.detailCustomer.customerName,
-                        phoneCustomer: _bloc.detailCustomer.phone,
-                        addressCustomer: _bloc.detailCustomer.address,
-                        codeCustomer: _bloc.detailCustomer.customerCode,
-                      ),withNavBar: false),
-                      child: Card(
-                        elevation: 1,
-                        shape: const RoundedRectangleBorder(
-                            borderRadius: BorderRadius.all(Radius.circular(8))
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(12.0),
-                          child: Row(
-                            // mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Container(
-                                  padding:const EdgeInsets.all(8),
-                                  decoration:  BoxDecoration(
-                                    borderRadius: const BorderRadius.all(Radius.circular(8)),
-                                    color: mainColor,
-                                  ),
-                                  child: Center(
-                                      child: Icon(MdiIcons.cartOutline,size: 15,color: white,)
-                                  )
-                              ),
-                              const SizedBox(width: 10,),
-                              const Flexible(
-                                child: Text(
-                                  'Đặt đơn',
-                                  textAlign: TextAlign.left,
-                                  style: TextStyle(fontWeight: FontWeight.normal),
-                                ),
-                              ),//_bloc.listOtherData[index]?.value.toString()??'0.0'
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                Visibility(
-                  visible: Const.refundOrder == true && state is !DetailCustomerLoading,
-                  child: Padding(
-                    padding: const EdgeInsets.only(left: 16,right: 16),
-                    child: GestureDetector(
-                      onTap: ()=> PersistentNavBarNavigator.pushNewScreen(context, screen: OrderCompletedScreen(detailCustomer: _bloc.detailCustomer,),withNavBar: false),//_bloc.detailCustomer.customerCode.toString()
-                      child: Card(
-                        elevation: 1,
-                        shape: const RoundedRectangleBorder(
-                            borderRadius: BorderRadius.all(Radius.circular(8))
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(12.0),
-                          child: Row(
-                            // mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Container(
-                                  padding:const EdgeInsets.all(8),
-                                  decoration: const BoxDecoration(
-                                    borderRadius: BorderRadius.all(Radius.circular(8)),
-                                    color: subColor,
-                                  ),
-                                  child: Center(
-                                      child: Icon(MdiIcons.arrangeSendToBack,size: 15,color: white,)
-                                  )
-                              ),
-                              const SizedBox(width: 10,),
-                              const Flexible(
-                                child: Text(
-                                  'Lập phiếu hàng bán trả lại',
-                                  textAlign: TextAlign.left,
-                                  style: TextStyle(fontWeight: FontWeight.normal),
-                                ),
-                              ),//_bloc.listOtherData[index]?.value.toString()??'0.0'
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                Visibility(
-                  visible: Const.refundOrderSaleOut == true && state is !DetailCustomerLoading,
-                  child: Padding(
-                    padding: const EdgeInsets.only(left: 16,right: 16),
-                    child: GestureDetector(
-                      onTap: ()=> PersistentNavBarNavigator.pushNewScreen(context, screen: SaleOutCompletedScreen(detailAgency: _bloc.detailCustomer,),withNavBar: false),//_bloc.detailCustomer.customerCode.toString()
-                      child: Card(
-                        elevation: 1,
-                        shape: const RoundedRectangleBorder(
-                            borderRadius: BorderRadius.all(Radius.circular(8))
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(12.0),
-                          child: Row(
-                            // mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Container(
-                                  padding:const EdgeInsets.all(8),
-                                  decoration: const BoxDecoration(
-                                    borderRadius: BorderRadius.all(Radius.circular(8)),
-                                    color: Colors.deepPurpleAccent,
-                                  ),
-                                  child: Center(
-                                      child: Icon(MdiIcons.sendCheckOutline,size: 15,color: white,)
-                                  )
-                              ),
-                              const SizedBox(width: 10,),
-                              const Flexible(
-                                child: Text(
-                                  'Lập phiếu hàng bán trả lại Sale Out',
-                                  textAlign: TextAlign.left,
-                                  style: TextStyle(fontWeight: FontWeight.normal),
-                                ),
-                              ),//_bloc.listOtherData[index]?.value.toString()??'0.0'
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                listItem(context),
-              ],
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Compact Customer Info Card - Kết hợp tất cả thông tin
+                  _buildCompactCustomerCard(state),
+                  
+                  // Stats Horizontal Scroll - Compact
+                  if (_bloc.listOtherData != null && _bloc.listOtherData!.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    _buildCompactStats(),
+                  ],
+                  
+                  // Action Buttons - Compact List
+                  const SizedBox(height: 12),
+                  _buildCompactActionButtons(state),
+                  
+                  const SizedBox(height: 12),
+                ],
+              ),
             ),
           )
         ],
@@ -498,59 +294,578 @@ class _DetailInfoCustomerScreenState extends State<DetailInfoCustomerScreen> {
     );
   }
 
+  // Compact Customer Card - Kết hợp tất cả thông tin trong 1 card
+  Widget _buildCompactCustomerCard(DetailCustomerState state) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 0),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Header với avatar và tên
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [subColor, Color.fromARGB(255, 150, 185, 229)],
+              ),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(12),
+                topRight: Radius.circular(12),
+              ),
+            ),
+            child: Row(
+              children: [
+                // Avatar nhỏ gọn
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white,
+                    border: Border.all(color: Colors.white, width: 2),
+                  ),
+                  child: _bloc.detailCustomer.imageUrl != null && 
+                         _bloc.detailCustomer.imageUrl!.isNotEmpty &&
+                         _bloc.detailCustomer.imageUrl != 'null'
+                    ? ClipOval(
+                        child: CachedNetworkImage(
+                          imageUrl: _bloc.detailCustomer.imageUrl!,
+                          fit: BoxFit.cover,
+                          errorWidget: (context, url, error) => const Icon(
+                            Icons.person,
+                            size: 28,
+                            color: subColor,
+                          ),
+                        ),
+                      )
+                    : const Icon(
+                        Icons.person,
+                        size: 28,
+                        color: subColor,
+                      ),
+                ),
+                const SizedBox(width: 12),
+                // Tên và mã
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _bloc.detailCustomer.customerName ?? 'Chưa có tên',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (_bloc.detailCustomer.customerCode != null && 
+                          _bloc.detailCustomer.customerCode!.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            'Mã: ${_bloc.detailCustomer.customerCode}',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.9),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Thông tin chi tiết
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                _buildCompactInfoRow(
+                  icon: Icons.phone,
+                  label: 'Điện thoại',
+                  value: _bloc.detailCustomer.phone ?? 'Chưa có',
+                  color: Colors.green,
+                ),
+                const SizedBox(height: 12),
+                _buildCompactInfoRow(
+                  icon: Icons.email,
+                  label: 'Email',
+                  value: _bloc.detailCustomer.email ?? 'Chưa có',
+                  color: Colors.blue,
+                ),
+                const SizedBox(height: 12),
+                _buildCompactInfoRow(
+                  icon: Icons.location_on,
+                  label: 'Địa chỉ',
+                  value: _bloc.detailCustomer.address?.replaceAll('null', '').trim() ?? 'Chưa có',
+                  color: Colors.red,
+                  showMapButton: _bloc.detailCustomer.address?.replaceAll('null', '').trim().isNotEmpty == true,
+                  onMapTap: () => _openGoogleMapsWithAddress(_bloc.detailCustomer.address ?? ''),
+                ),
+                if (_bloc.detailCustomer.birthday != null && 
+                    _bloc.detailCustomer.birthday!.toString().replaceAll('null', '').isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  _buildCompactInfoRow(
+                    icon: FontAwesomeIcons.birthdayCake,
+                    label: 'Sinh nhật',
+                    value: _formatDateString(_bloc.detailCustomer.birthday),
+                    color: Colors.pink,
+                  ),
+                ],
+                if (_bloc.detailCustomer.lastPurchaseDate != null && 
+                    _bloc.detailCustomer.lastPurchaseDate!.toString().replaceAll('null', '').isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  _buildCompactInfoRow(
+                    icon: Icons.receipt_long,
+                    label: 'Mua hàng cuối',
+                    value: _formatDateString(_bloc.detailCustomer.lastPurchaseDate),
+                    color: Colors.orange,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCompactInfoRow({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+    bool showMapButton = false,
+    VoidCallback? onMapTap,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Icon(icon, size: 16, color: color),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: grey,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      value,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Colors.black87,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (showMapButton && onMapTap != null) ...[
+                    const SizedBox(width: 6),
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: onMapTap,
+                        borderRadius: BorderRadius.circular(16),
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: Colors.blueGrey.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Icon(
+                            MdiIcons.mapOutline,
+                            size: 16,
+                            color: Colors.blueGrey,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Compact Stats - Horizontal Scroll
+  Widget _buildCompactStats() {
+    if (_bloc.listOtherData == null || _bloc.listOtherData!.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 0),
+      height: 100,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        itemCount: _bloc.listOtherData!.length,
+        itemBuilder: (context, index) {
+          final item = _bloc.listOtherData![index];
+          return _buildCompactStatCard(item, index);
+        },
+      ),
+    );
+  }
+
+  Widget _buildCompactStatCard(OtherData item, int index) {
+    return Container(
+      width: 120,
+      margin: const EdgeInsets.only(right: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey.withOpacity(0.2)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Icon nhỏ
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: listColor[index % listColor.length].withOpacity(0.1),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: item.iconUrl != null && item.iconUrl!.isNotEmpty
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: CachedNetworkImage(
+                      imageUrl: item.iconUrl!,
+                      width: 16,
+                      height: 16,
+                      fit: BoxFit.cover,
+                      errorWidget: (context, url, error) => Icon(
+                        Icons.analytics_outlined,
+                        size: 16,
+                        color: listColor[index % listColor.length],
+                      ),
+                    ),
+                  )
+                : Icon(
+                    Icons.analytics_outlined,
+                    size: 16,
+                    color: listColor[index % listColor.length],
+                  ),
+            ),
+            const SizedBox(height: 8),
+            // Value
+            Text(
+              item.formatString != null && item.formatString!.isNotEmpty
+                ? NumberFormat(item.formatString).format(item.value ?? 0)
+                : (item.value ?? 0).toString(),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: listColor[index % listColor.length],
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 2),
+            // Label
+            Text(
+              item.text ?? '',
+              style: const TextStyle(
+                fontSize: 10,
+                color: grey,
+                fontWeight: FontWeight.w500,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Compact Action Buttons - List View
+  Widget _buildCompactActionButtons(DetailCustomerState state) {
+    List<ActionButtonItem> actions = [];
+    
+    if (Const.createTaskFromCustomer == true && state is !DetailCustomerLoading) {
+      actions.add(ActionButtonItem(
+        title: 'Check-in / Giám sát',
+        icon: _hasPendingCheckIn ? MdiIcons.clockOutline : MdiIcons.watchImport,
+        color: _hasPendingCheckIn ? Colors.orange : subColor,
+        onTap: _handleCheckInTap,
+        badge: _hasPendingCheckIn ? 'Đang check-in' : null,
+      ));
+    }
+    
+    if (state is !DetailCustomerLoading && Const.createNewOrderFromCustomer == true) {
+      actions.add(ActionButtonItem(
+        title: 'Đặt đơn',
+        icon: MdiIcons.cartOutline,
+        color: mainColor,
+        onTap: () => PersistentNavBarNavigator.pushNewScreen(
+          context,
+          screen: OrderScreen(
+            nameCustomer: _bloc.detailCustomer.customerName,
+            phoneCustomer: _bloc.detailCustomer.phone,
+            addressCustomer: _bloc.detailCustomer.address,
+            codeCustomer: _bloc.detailCustomer.customerCode,
+          ),
+          withNavBar: false,
+        ),
+      ));
+    }
+    
+    if (Const.refundOrder == true && state is !DetailCustomerLoading) {
+      actions.add(ActionButtonItem(
+        title: 'Trả lại hàng bán',
+        icon: MdiIcons.arrangeSendToBack,
+        color: subColor,
+        onTap: () => PersistentNavBarNavigator.pushNewScreen(
+          context,
+          screen: OrderCompletedScreen(detailCustomer: _bloc.detailCustomer),
+          withNavBar: false,
+        ),
+      ));
+    }
+    
+    if (Const.refundOrderSaleOut == true && state is !DetailCustomerLoading) {
+      actions.add(ActionButtonItem(
+        title: 'Trả lại Sale Out',
+        icon: MdiIcons.sendCheckOutline,
+        color: Colors.deepPurpleAccent,
+        onTap: () => PersistentNavBarNavigator.pushNewScreen(
+          context,
+          screen: SaleOutCompletedScreen(detailAgency: _bloc.detailCustomer),
+          withNavBar: false,
+        ),
+      ));
+    }
+
+    if (actions.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 0),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.withOpacity(0.2)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: actions.asMap().entries.map((entry) {
+          final index = entry.key;
+          final action = entry.value;
+          return Column(
+            children: [
+              _buildCompactActionItem(action),
+              if (index < actions.length - 1)
+                Divider(height: 1, color: Colors.grey.withOpacity(0.1)),
+            ],
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildCompactActionItem(ActionButtonItem action) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: action.onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              // Icon với background màu
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: action.color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  action.icon,
+                  color: action.color,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Title và badge
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            action.title,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ),
+                        if (action.badge != null) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.orange,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              action.badge!,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    if (action.subtitle != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        action.subtitle!,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: grey,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              // Arrow icon
+              Icon(
+                Icons.chevron_right,
+                color: Colors.grey.withOpacity(0.5),
+                size: 20,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+
   buildAppBar(){
     return Container(
-      height: 83,
-      width: double.infinity,
       decoration: BoxDecoration(
-          boxShadow: <BoxShadow>[
-            BoxShadow(
-                color: Colors.grey.shade200,
-                offset: const Offset(2, 4),
-                blurRadius: 5,
-                spreadRadius: 2)
-          ],
-          gradient: const LinearGradient(
-              begin: Alignment.centerLeft,
-              end: Alignment.centerRight,
-              colors: [subColor,Color.fromARGB(255, 150, 185, 229)])),
-      padding: const EdgeInsets.fromLTRB(5, 35, 12,0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          InkWell(
-            onTap: ()=> Navigator.pop(context),
-            child: const SizedBox(
-              width: 40,
-              height: 50,
-              child: Icon(
-                Icons.arrow_back_rounded,
-                size: 25,
-                color: Colors.white,
-              ),
-            ),
+        gradient: const LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [subColor, Color.fromARGB(255, 150, 185, 229)],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
           ),
-          const Expanded(
-            child: Center(
-              child: Text(
-                "Thông tin khách hàng",
-                style: TextStyle(fontWeight: FontWeight.bold,fontSize: 17,color: Colors.white,),
-                maxLines: 1,overflow: TextOverflow.fade,
-              ),
-            ),
-          ),
-          const SizedBox(width: 10,),
-          const SizedBox(
-            width: 40,
-            height: 50,
-            child: Icon(
-              Icons.event,
-              size: 25,
-              color: Colors.transparent,
-            ),
-          )
         ],
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Container(
+          height: 60,
+          padding: const EdgeInsets.fromLTRB(5, 10, 12, 10),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => Navigator.pop(context),
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Icon(
+                      Icons.arrow_back_rounded,
+                      size: 22,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+              const Expanded(
+                child: Center(
+                  child: Text(
+                    "Thông tin khách hàng",
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                      color: Colors.white,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 40),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -644,7 +959,7 @@ class _DetailInfoCustomerScreenState extends State<DetailInfoCustomerScreen> {
       builder: (BuildContext context) => AlertDialog(
         title: const Row(
           children: [
-            Icon(Icons.location_off, color: Colors.red),
+            Icon(Icons.location_off, color: Colors.red),  
             SizedBox(width: 8),
             Text('Khoảng cách vượt quá'),
           ],
@@ -781,67 +1096,4 @@ class _DetailInfoCustomerScreenState extends State<DetailInfoCustomerScreen> {
     });
   }
 
-  Widget listItem(BuildContext context){
-    return Expanded(
-      child: ListView.separated(
-        padding: const EdgeInsets.only(top: 0,left: 16,right: 16),
-          itemBuilder: (BuildContext context, int index){
-            return GestureDetector(
-              onTap: (){
-                if(index == 0){
-                 // Navigator.push(context, MaterialPageRoute(builder: (context)=> FilterOrderPage()));
-                }else if(index == 1){
-
-                }else if(index == 2){
-                  //Navigator.push(context, MaterialPageRoute(builder: (context)=> ManagerCustomerPage()));
-                }
-              },
-              child: Card(
-                elevation: 1,
-                shape: const RoundedRectangleBorder(
-                    borderRadius: BorderRadius.all(Radius.circular(8))
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(12.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            borderRadius: const BorderRadius.all(Radius.circular(8)),
-                            color: _bloc.listOtherData?[index].iconUrl?.isNotEmpty == true ? Colors.white : listColor[index],
-                          ),
-                          child: _bloc.listOtherData?[index].iconUrl?.isNotEmpty == true ?
-                          CachedNetworkImage(
-                            imageUrl: _bloc.listOtherData![index].iconUrl.toString(),
-                            fit: BoxFit.fitHeight,
-                            height: 40,
-                            width: 40,
-                            // width: MediaQuery.of(context).size.width,
-                          ) :
-                          const Center(
-                              child: Icon(Icons.library_books,size: 15,color: white,)
-                          )
-                      ),
-                      const SizedBox(width: 10,),
-                      Expanded(
-                        child: Text(
-                          _bloc.listOtherData?[index].text??'',
-                          textAlign: TextAlign.left,
-                          style: const TextStyle(fontWeight: FontWeight.normal),
-                        ),
-                      ),//_bloc.listOtherData[index]?.value.toString()??'0.0'
-                      Center(child: Text(NumberFormat(_bloc.listOtherData?[index].formatString).format(_bloc.listOtherData?[index].value).toString(),style: const TextStyle(fontWeight: FontWeight.normal,color: orange),)),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-          separatorBuilder: (BuildContext context, int index)=> Container(),
-          itemCount: _bloc.listOtherData!.length
-      ),
-    );
-  }
 }

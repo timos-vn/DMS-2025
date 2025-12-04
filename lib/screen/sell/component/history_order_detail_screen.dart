@@ -33,7 +33,7 @@ class HistoryOrderDetailScreen extends StatefulWidget {
   final String? title;
   final String? itemGroupCode;
   final bool status;
-  final bool? approveOrder;
+  final bool? approveOrder; 
   final String codeCustomer;
   final String nameCustomer;
   final String addressCustomer;
@@ -637,6 +637,9 @@ class _HistoryOrderDetailScreenState extends State<HistoryOrderDetailScreen> {
     final price = item.price ?? 0;
     final priceAfter = item.priceAfter ?? 0;
     final hasPriceChange = price > 0 && price != priceAfter;
+    final productCode = _getDisplayValue(item.maVt?.toString(), defaultValue: '');
+    final productName = _getDisplayValue(item.tenVt?.toString());
+    final displayName = productCode.isNotEmpty ? '[$productCode] $productName' : productName;
     
     // Determine avatar color
     Color avatarBgColor;
@@ -691,21 +694,21 @@ class _HistoryOrderDetailScreenState extends State<HistoryOrderDetailScreen> {
                     ),
               ),
               // Special Badge
-              if (item.ckNt != null && item.ckNt! > 0)
+              if (hasDiscount)
                 Positioned(
                   top: -4,
                   right: -4,
                   child: Container(
-                    width: 16,
-                    height: 16,
+                    width: 24,
+                    height: 24,
                     decoration: const BoxDecoration(
                       color: Colors.red,
                       shape: BoxShape.circle,
                     ),
-                    child: const Center(
+                    child: Center(
                       child: Text(
-                        'S',
-                        style: TextStyle(
+                        _formatDiscountPercent(item.tlCk),
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 9,
                           fontWeight: FontWeight.bold,
@@ -732,7 +735,7 @@ class _HistoryOrderDetailScreenState extends State<HistoryOrderDetailScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            _getDisplayValue(item.tenVt?.toString()),
+                            displayName,
                             style: const TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
@@ -742,25 +745,7 @@ class _HistoryOrderDetailScreenState extends State<HistoryOrderDetailScreen> {
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
-                          if (hasDiscount)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 4),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                                decoration: BoxDecoration(
-                                  color: Colors.red.shade50,
-                                  borderRadius: BorderRadius.circular(3),
-                                ),
-                                child: Text(
-                                  '-${item.tlCk}%',
-                                  style: TextStyle(
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.red.shade700,
-                                  ),
-                                ),
-                              ),
-                            ),
+
                         ],
                       ),
                     ),
@@ -802,28 +787,45 @@ class _HistoryOrderDetailScreenState extends State<HistoryOrderDetailScreen> {
                   ],
                 ),
                 const SizedBox(height: 6),
-                // Metadata: Code, Quantity, Store
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 4,
+                // Metadata: Store & Quantity aligned edges, Response below
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    if (_getDisplayValue(item.maVt?.toString(), defaultValue: '').isNotEmpty)
-                      _buildInfoChip(
-                        Icons.qr_code_rounded,
-                        _getDisplayValue(item.maVt?.toString()),
-                        Colors.grey.shade600,
-                      ),
-                    _buildInfoChip(
-                      isGift ? Icons.card_giftcard : Icons.inventory_2,
-                      '${item.soLuong?.toDouble() ?? 0} ${_sanitizeValue(item.dvt?.toString())}',
-                      isGift ? Colors.red.shade600 : Colors.blue.shade600,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: _getDisplayValue(item.nameStore?.toString(), defaultValue: '').isNotEmpty
+                                ? _buildInfoChip(
+                                    Icons.store,
+                                    'Kho: ${_getDisplayValue(item.nameStore?.toString())}',
+                                    Colors.grey.shade600,
+                                  )
+                                : const SizedBox.shrink(),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Align(
+                            alignment: Alignment.centerRight,
+                            child: _buildInfoChip(
+                              isGift ? Icons.card_giftcard : Icons.inventory_2,
+                              'Số lượng: ${_formatQuantity(item.soLuong?.toDouble(), unit: item.dvt)}',
+                              isGift ? Colors.red.shade600 : Colors.blue.shade600,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    if (_getDisplayValue(item.nameStore?.toString(), defaultValue: '').isNotEmpty)
+                    if ((item.soLuongDapUng ?? 0) > 0) ...[
+                      const SizedBox(height: 4),
                       _buildInfoChip(
-                        Icons.store,
-                        _getDisplayValue(item.nameStore?.toString()),
-                        Colors.grey.shade600,
+                        Icons.assignment_turned_in_outlined,
+                        'Đáp ứng: ${_formatQuantity(item.soLuongDapUng, unit: item.dvt)}',
+                        Colors.teal.shade700,
                       ),
+                    ],
                   ],
                 ),
               ],
@@ -859,6 +861,24 @@ class _HistoryOrderDetailScreenState extends State<HistoryOrderDetailScreen> {
         ],
       ),
     );
+  }
+
+  String _formatQuantity(double? value, {String? unit}) {
+    final qty = value ?? 0;
+    String numberStr;
+    if (qty % 1 == 0) {
+      numberStr = qty.toInt().toString();
+    } else {
+      numberStr = qty.toStringAsFixed(2).replaceFirst(RegExp(r'0+$'), '').replaceFirst(RegExp(r'\.$'), '');
+    }
+    final sanitizedUnit = _sanitizeValue(unit);
+    return sanitizedUnit.isNotEmpty ? '$numberStr $sanitizedUnit' : numberStr;
+  }
+
+  String _formatDiscountPercent(double? percent) {
+    if (percent == null) return '-0%';
+    final value = percent % 1 == 0 ? percent.toInt().toString() : percent.toString();
+    return '-$value%';
   }
 
   bool _canEditOrCancel() {
@@ -1258,19 +1278,26 @@ class _HistoryOrderDetailScreenState extends State<HistoryOrderDetailScreen> {
           final index = entry.key;
           final item = entry.value;
           final quantity = item.soLuong?.toDouble() ?? 0;
+          final respondQty = item.soLuongDapUng?.toDouble() ?? 0;
           final price = item.priceAfter ?? item.price ?? 0;
           final total = quantity * price;
           
           final productName = _sanitizeValue(item.tenVt?.toString());
           final productCode = _sanitizeValue(item.maVt?.toString());
           final unit = _sanitizeValue(item.dvt?.toString());
+          final quantityLabel = _formatQuantity(quantity, unit: unit);
+          final respondLabel = respondQty > 0 ? 'Đáp ứng: ${_formatQuantity(respondQty, unit: unit)}' : '';
           
           return pw.TableRow(
             children: [
               _buildPDFTableCell(baseFont, boldFont, '${index + 1}'),
               _buildPDFTableCell(baseFont, boldFont, productName.isEmpty ? 'N/A' : productName),
               _buildPDFTableCell(baseFont, boldFont, productCode.isEmpty ? '-' : productCode),
-              _buildPDFTableCell(baseFont, boldFont, '${quantity.toStringAsFixed(0)}${unit.isNotEmpty ? ' $unit' : ''}'),
+              _buildPDFTableCell(
+                baseFont,
+                boldFont,
+                respondLabel.isNotEmpty ? '$quantityLabel\n$respondLabel' : quantityLabel,
+              ),
               _buildPDFTableCell(baseFont, boldFont, '${Utils.formatMoneyStringToDouble(total)} ₫'),
             ],
           );
