@@ -598,19 +598,39 @@ class _DetailShippingScreenState extends State<DetailShippingScreen> {
                                       if(Const.isDeliveryPhotoRange == true) {
                                         if (idStatus != '4') {
                                           if(_bloc.listFileInvoice.isNotEmpty){
-                                          String? latLong = '';
-                                          latLong = _bloc.masterItem?.latLong
-                                              .toString().replaceAll(
-                                              'null', '');
-                                            if(latLong.toString().trim().isNotEmpty){
-                                              if((Utils.getDistance(double.parse(_bloc.masterItem!.latLong.toString().split(',')[0]), double.parse(_bloc.masterItem!.latLong.toString().split(',')[1]),current) < Const.deliveryPhotoRange)){
+                                            final String latLong = (_bloc.masterItem?.latLong ?? '').replaceAll('null', '').trim();
+                                            print('🚚 Debug latLong raw: ${_bloc.masterItem?.latLong} -> cleaned: $latLong');
+
+                                            // Hỗ trợ cả chuỗi "lat,lng" và URL Google Maps chứa "@lat,lng"
+                                            double? lat;
+                                            double? lng;
+
+                                            if (latLong.contains('@')) {
+                                              // Lấy phần sau '@' đến dấu '/' tiếp theo
+                                              final afterAt = latLong.split('@').last;
+                                              final coordChunk = afterAt.split('/').first;
+                                              final parts = coordChunk.split(',');
+                                              if (parts.length >= 2) {
+                                                lat = double.tryParse(parts[0].trim());
+                                                lng = double.tryParse(parts[1].trim());
+                                              }
+                                            } else {
+                                              final parts = latLong.split(',');
+                                              if (parts.length >= 2) {
+                                                lat = double.tryParse(parts[0].trim());
+                                                lng = double.tryParse(parts[1].trim());
+                                              }
+                                            }
+
+                                            if(lat != null && lng != null){
+                                              print('🚚 Parsed lat/lng: $lat , $lng');
+                                              if((Utils.getDistance(lat, lng, current) < Const.deliveryPhotoRange)){
                                                 Navigator.pop(context,['Accepted']);
                                               }else{
                                                 Utils.showCustomToast(context, Icons.warning_amber, 'Khoảng cách giao hàng quá xa so với vị trí Khách hàng');
                                               }
-                                            }
-                                            else{
-                                              Navigator.pop(context,['Accepted']);
+                                            }else{
+                                              Utils.showCustomToast(context, Icons.warning_amber, 'Toạ độ khách hàng không hợp lệ');
                                             }
                                           }
                                           else{
