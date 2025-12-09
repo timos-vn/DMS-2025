@@ -952,7 +952,7 @@ class _DetailStageStatisticScreenState extends State<DetailStageStatisticScreen>
                                   children: [
                                     const Icon(Icons.drive_file_rename_outline,color: Colors.grey,size: 12,),
                                     const SizedBox(width: 5,),
-                                    Flexible(child: Text('${_bloc.listDetailStage[index].tenVt.toString()}', style: const TextStyle(color: Colors.black,fontSize: 12),maxLines: 1,overflow: TextOverflow.visible,)),
+                                    Flexible(child: Text('${_bloc.listDetailStage[index].tenVt.toString()}', style: const TextStyle(color: Colors.black,fontSize: 12),maxLines: 4,overflow: TextOverflow.ellipsis,)),
                                   ],
                                 ),
                                 const SizedBox(height: 5,),

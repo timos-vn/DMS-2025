@@ -37,7 +37,7 @@ class Const {
   ///Migration db
   static const bool migrationDB = true;
   ///version app
-  static String versionApp = '1.0.79';
+  static String versionApp = '1.0.80';
 
   static const int MAX_COUNT_ITEM = 20;
   static const kDefaultPadding = 20.0;

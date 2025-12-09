@@ -302,7 +302,8 @@ class DiscountVoucherSelectionSheetState extends State<DiscountVoucherSelectionS
       if (ckgItem.tlCk != null && ckgItem.tlCk! > 0) {
         discountText = 'Giảm ${ckgItem.tlCk!.toStringAsFixed(1)}%';
       } else if (ckgItem.ck != null && ckgItem.ck! > 0) {
-        discountText = 'Giảm ${ckgItem.ck!.toStringAsFixed(0)}đ';
+        String formattedAmount = _formatMoneyWithSeparator(ckgItem.ck);
+        discountText = 'Giảm ${formattedAmount}đ';
       }
       
       widgets.add(

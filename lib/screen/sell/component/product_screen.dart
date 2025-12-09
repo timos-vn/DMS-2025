@@ -780,7 +780,7 @@ class _ProductScreenState extends State<ProductScreen> with TickerProviderStateM
                                                   '${_list[index].name}',
                                                   textAlign: TextAlign.left,
                                                   style:const TextStyle(fontWeight: FontWeight.bold,fontSize: 12),
-                                                  maxLines: 2,
+                                                  maxLines: 4,
                                                   overflow: TextOverflow.ellipsis,
                                                 ),
                                               ),

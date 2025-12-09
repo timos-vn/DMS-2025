@@ -113,7 +113,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>  with SingleT
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Expanded(child: Text(_bloc.listProductDetail[0].tenVt.toString().trim(),style: const TextStyle(color: black,fontWeight: FontWeight.bold),maxLines: 2,overflow: TextOverflow.ellipsis,)),
+                              Expanded(child: Text(_bloc.listProductDetail[0].tenVt.toString().trim(),style: const TextStyle(color: black,fontWeight: FontWeight.bold),maxLines: 4,overflow: TextOverflow.ellipsis,)),
                             ],
                           ),
                           const Divider(),

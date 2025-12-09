@@ -1605,6 +1605,8 @@ class _ConfirmScreenState extends State<ConfirmScreen>with TickerProviderStateMi
                                             ),
                                           ],
                                         ),
+                                        maxLines: 4,
+                                        overflow: TextOverflow.ellipsis,
                                       )
                                     ),
                                     const SizedBox(width: 10,),

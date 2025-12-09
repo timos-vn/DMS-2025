@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:dms/model/network/request/order_create_checkin_request.dart';
@@ -23,6 +24,7 @@ import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
+import 'package:get_storage/get_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import 'package:persistent_bottom_nav_bar/persistent_bottom_nav_bar.dart';
@@ -89,6 +91,7 @@ class CartScreen extends StatefulWidget {
 class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
   late CartBloc _bloc;
   late TabController tabController;
+  final _giftStorage = GetStorage();
   List<IconData> listIcons = [EneftyIcons.receipt_edit_outline,EneftyIcons.personalcard_outline,EneftyIcons.bill_outline];
   String? dateTransfer;String? timeTransfer; late int indexValuesTax;
   final nameCompanyController = TextEditingController();final noteCompanyController = TextEditingController();final mstController = TextEditingController();
@@ -118,6 +121,15 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
   
   // Loading dialog state
   bool _isLoadingGiftProducts = false;
+
+  void _persistGiftProducts() {
+    try{
+      final manualGifts = DataLocal.listProductGift.where((e)=> e.gifProductByHand == true).toList();
+      _giftStorage.write('listProductGift', jsonEncode(manualGifts.map((e)=>e.toJson()).toList()));
+    }catch(_){
+      // ignore write error
+    }
+  }
   
   void startTimer() {
     const oneSec = Duration(seconds: 1);
@@ -557,6 +569,8 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
           Const.numberProductInCart = 0;
           Const.listKeyGroupCheck = '';
           Const.listKeyGroup = '';
+          DataLocal.listProductGift.clear();
+          _persistGiftProducts();
           DataLocal.listObjectDiscount.clear();
           DataLocal.listOrderDiscount.clear();
           DataLocal.infoCustomer = ManagerCustomerResponseData();
@@ -594,6 +608,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
           DataLocal.listOrderProductIsChange = false;
           DataLocal.listOrderCalculatorDiscount.clear();
           DataLocal.listProductGift.clear();
+          _persistGiftProducts();
           Const.listKeyGroupCheck = '';
           Const.listKeyGroup = '';
           DataLocal.listObjectDiscount.clear();
@@ -632,6 +647,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
         else if(state is DeleteAllProductFromDBSuccess){
           DataLocal.listOrderCalculatorDiscount.clear();
           DataLocal.listProductGift.clear();
+          _persistGiftProducts();
           Const.listKeyGroupCheck = '';
           Const.listKeyGroup = '';
           DataLocal.listObjectDiscount.clear();
@@ -2264,21 +2280,49 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
               final tlCk = (ckgItem.tlCk ?? 0).toDouble();
               final ckValue = (ckgItem.ck ?? 0).toDouble();
               final ckNtValue = (ckgItem.ckNt ?? 0).toDouble();
+              final giaSauCk = (ckgItem.giaSauCk ?? 0).toDouble();
+              final giaGoc = (ckgItem.giaGoc ?? originalPrice).toDouble();
             double priceAfter = originalPrice;
             double discountPercent = 0;
 
               if (tlCk > 0) {
-              // Trường hợp có tỉ lệ chiết khấu (%)
+              // Case 1: Trường hợp có tỉ lệ chiết khấu (%)
                 discountPercent = tlCk;
               priceAfter = originalPrice - (originalPrice * discountPercent / 100);
-              } else if ((ckgItem.giaSauCk ?? 0) > 0) {
-              // Trường hợp có giá sau chiết khấu
-                priceAfter = (ckgItem.giaSauCk ?? 0).toDouble();
+              } else if (giaSauCk > 0 && giaSauCk != giaGoc && giaGoc > 0) {
+              // Ưu tiên: Trường hợp có giá sau chiết khấu và khác giá gốc (có chiết khấu thực sự)
+                priceAfter = giaSauCk;
               discountPercent = originalPrice > 0 ? ((originalPrice - priceAfter) / originalPrice) * 100 : 0;
               } else if (ckValue > 0) {
-              // Trường hợp có số tiền chiết khấu
-              priceAfter = originalPrice - ckValue;
-              discountPercent = originalPrice > 0 ? (ckValue / originalPrice) * 100 : 0;
+              // Case 2: Trường hợp có số tiền chiết khấu
+              double ckPerItem = ckValue;
+              
+              // Nếu ck > giaGoc, có thể là tổng chiết khấu cho nhiều sản phẩm
+              // Tìm số lượng sản phẩm trong giỏ hàng với cùng mã sản phẩm
+              if (ckValue > giaGoc && giaGoc > 0) {
+                double totalQuantity = 0;
+                for (var item in _bloc.listOrder) {
+                  if ((item.code ?? '').trim() == productCode.trim() && item.gifProduct != true) {
+                    totalQuantity += (item.count ?? 0);
+                  }
+                }
+                // Nếu tìm thấy số lượng, chia ck cho số lượng
+                if (totalQuantity > 0) {
+                  ckPerItem = ckValue / totalQuantity;
+                  print('💰 CKG: ck=$ckValue là tổng cho $totalQuantity sản phẩm, ckPerItem=$ckPerItem');
+                }
+              }
+              
+              // Áp dụng chiết khấu nếu hợp lý (ckPerItem <= originalPrice)
+              if (ckPerItem <= originalPrice && originalPrice > 0) {
+                priceAfter = originalPrice - ckPerItem;
+                discountPercent = (ckPerItem / originalPrice) * 100;
+              } else if (ckPerItem > originalPrice && originalPrice > 0) {
+                // Nếu ckPerItem vẫn > originalPrice, có thể là lỗi dữ liệu, nhưng vẫn tính để hiển thị
+                priceAfter = 0;
+                discountPercent = 100; // 100% discount
+                print('💰 ⚠️ WARNING: ckPerItem=$ckPerItem > originalPrice=$originalPrice, set priceAfter=0');
+              }
               }
             
               if (priceAfter < 0) {
@@ -3092,21 +3136,49 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
             final tlCk = (ckgItem.tlCk ?? 0).toDouble();
             final ckValue = (ckgItem.ck ?? 0).toDouble();
             final ckNtValue = (ckgItem.ckNt ?? 0).toDouble();
+            final giaSauCk = (ckgItem.giaSauCk ?? 0).toDouble();
+            final giaGoc = (ckgItem.giaGoc ?? originalPrice).toDouble();
             double priceAfter = originalPrice;
             double discountPercent = 0;
 
             if (tlCk > 0) {
-              // Trường hợp có tỉ lệ chiết khấu (%)
+              // Case 1: Trường hợp có tỉ lệ chiết khấu (%)
               discountPercent = tlCk;
               priceAfter = originalPrice - (originalPrice * discountPercent / 100);
-            } else if ((ckgItem.giaSauCk ?? 0) > 0) {
-              // Trường hợp có giá sau chiết khấu
-              priceAfter = (ckgItem.giaSauCk ?? 0).toDouble();
+            } else if (giaSauCk > 0 && giaSauCk != giaGoc && giaGoc > 0) {
+              // Ưu tiên: Trường hợp có giá sau chiết khấu và khác giá gốc (có chiết khấu thực sự)
+              priceAfter = giaSauCk;
               discountPercent = originalPrice > 0 ? ((originalPrice - priceAfter) / originalPrice) * 100 : 0;
             } else if (ckValue > 0) {
-              // Trường hợp có số tiền chiết khấu
-              priceAfter = originalPrice - ckValue;
-              discountPercent = originalPrice > 0 ? (ckValue / originalPrice) * 100 : 0;
+              // Case 2: Trường hợp có số tiền chiết khấu
+              double ckPerItem = ckValue;
+              
+              // Nếu ck > giaGoc, có thể là tổng chiết khấu cho nhiều sản phẩm
+              // Tìm số lượng sản phẩm trong giỏ hàng với cùng mã sản phẩm
+              if (ckValue > giaGoc && giaGoc > 0) {
+                double totalQuantity = 0;
+                for (var item in _bloc.listOrder) {
+                  if ((item.code ?? '').trim() == productCode.trim() && item.gifProduct != true) {
+                    totalQuantity += (item.count ?? 0);
+                  }
+                }
+                // Nếu tìm thấy số lượng, chia ck cho số lượng
+                if (totalQuantity > 0) {
+                  ckPerItem = ckValue / totalQuantity;
+                  print('💰 CKG: ck=$ckValue là tổng cho $totalQuantity sản phẩm, ckPerItem=$ckPerItem');
+                }
+              }
+              
+              // Áp dụng chiết khấu nếu hợp lý (ckPerItem <= originalPrice)
+              if (ckPerItem <= originalPrice && originalPrice > 0) {
+                priceAfter = originalPrice - ckPerItem;
+                discountPercent = (ckPerItem / originalPrice) * 100;
+              } else if (ckPerItem > originalPrice && originalPrice > 0) {
+                // Nếu ckPerItem vẫn > originalPrice, có thể là lỗi dữ liệu, nhưng vẫn tính để hiển thị
+                priceAfter = 0;
+                discountPercent = 100; // 100% discount
+                print('💰 ⚠️ WARNING: ckPerItem=$ckPerItem > originalPrice=$originalPrice, set priceAfter=0');
+              }
             }
             
             if (priceAfter < 0) {
@@ -3922,66 +3994,91 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
         itemBuilder: (context,index){
           return Slidable(
               key: const ValueKey(1),
-              startActionPane: Const.isVv == true
-                  ? ActionPane(
-                      motion: const ScrollMotion(),
-                      dragDismissible: false,
-                      children: [
-                        SlidableAction(
-                          onPressed:(_) {
-                            setState(() {
-                              if(_bloc.listOrder[index].chooseVuViec == true){
-                                _bloc.listOrder[index].chooseVuViec = false;
-                                _bloc.listOrder[index].idVv = '';
-                                _bloc.listOrder[index].idHd = '';
-                                _bloc.listOrder[index].nameVv = '';
-                                _bloc.listOrder[index].nameHd = '';
-                                _bloc.listOrder[index].idHdForVv = '';
-                                Utils.showCustomToast(context, Icons.check_circle_outline, 'Đã huỷ áp dụng CTBH cho mặt hàng này');
+              startActionPane: ActionPane(
+                motion: const ScrollMotion(),
+                dragDismissible: false,
+                children: [
+                  if (Const.isVv == true)
+                    SlidableAction(
+                      onPressed:(_) {
+                        setState(() {
+                          if(_bloc.listOrder[index].chooseVuViec == true){
+                            _bloc.listOrder[index].chooseVuViec = false;
+                            _bloc.listOrder[index].idVv = '';
+                            _bloc.listOrder[index].idHd = '';
+                            _bloc.listOrder[index].nameVv = '';
+                            _bloc.listOrder[index].nameHd = '';
+                            _bloc.listOrder[index].idHdForVv = '';
+                            Utils.showCustomToast(context, Icons.check_circle_outline, 'Đã huỷ áp dụng CTBH cho mặt hàng này');
+                          }
+                          else{
+                            showModalBottomSheet(
+                                context: context,
+                                isDismissible: true,
+                                isScrollControlled: true,
+                                shape: const RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.only(topLeft: Radius.circular(25.0), topRight: Radius.circular(25.0)),
+                                ),
+                                backgroundColor: Colors.white,
+                                builder: (builder){
+                                  return buildPopupVvHd();
+                                }
+                            ).then((value){
+                              if(value != null){
+                                if(value[0] == 'ReLoad' && value[1] != '' && value[1] !='null'){
+                                  _bloc.listOrder[index].chooseVuViec = true;
+                                  _bloc.listOrder[index].idVv = _bloc.idVv;
+                                  _bloc.listOrder[index].nameVv = _bloc.nameVv;
+                                  _bloc.listOrder[index].idHd = _bloc.idHd;
+                                  _bloc.listOrder[index].nameHd = _bloc.nameHd;
+                                  _bloc.listOrder[index].idHdForVv = _bloc.idHdForVv;
+                                  _bloc.add(CalculatorDiscountEvent(addOnProduct: true,product: _bloc.listOrder[index],reLoad: false, addTax: false));
+                                }else{
+                                  _bloc.listOrder[index].chooseVuViec = false;
+                                }
                               }
                               else{
-                                showModalBottomSheet(
-                                    context: context,
-                                    isDismissible: true,
-                                    isScrollControlled: true,
-                                    shape: const RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.only(topLeft: Radius.circular(25.0), topRight: Radius.circular(25.0)),
-                                    ),
-                                    backgroundColor: Colors.white,
-                                    builder: (builder){
-                                      return buildPopupVvHd();
-                                    }
-                                ).then((value){
-                                  if(value != null){
-                                    if(value[0] == 'ReLoad' && value[1] != '' && value[1] !='null'){
-                                      _bloc.listOrder[index].chooseVuViec = true;
-                                      _bloc.listOrder[index].idVv = _bloc.idVv;
-                                      _bloc.listOrder[index].nameVv = _bloc.nameVv;
-                                      _bloc.listOrder[index].idHd = _bloc.idHd;
-                                      _bloc.listOrder[index].nameHd = _bloc.nameHd;
-                                      _bloc.listOrder[index].idHdForVv = _bloc.idHdForVv;
-                                      _bloc.add(CalculatorDiscountEvent(addOnProduct: true,product: _bloc.listOrder[index],reLoad: false, addTax: false));
-                                    }else{
-                                      _bloc.listOrder[index].chooseVuViec = false;
-                                    }
-                                  }
-                                  else{
-                                    _bloc.listOrder[index].chooseVuViec = false;
-                                  }
-                                });
+                                _bloc.listOrder[index].chooseVuViec = false;
                               }
                             });
-                          },
-                          borderRadius:const BorderRadius.all(Radius.circular(8)),
-                          padding:const EdgeInsets.all(10),
-                          backgroundColor: _bloc.listOrder[index].chooseVuViec == false ? const Color(0xFFA8B1A6) : const Color(0xFF2DC703),
-                          foregroundColor: Colors.white,
-                          icon: Icons.description,
-                          label: 'CTBH', /// VV & HĐ
-                        ),
-                      ],
-                    )
-                  : null,
+                          }
+                        });
+                      },
+                      borderRadius:const BorderRadius.all(Radius.circular(8)),
+                      padding:const EdgeInsets.all(10),
+                      backgroundColor: _bloc.listOrder[index].chooseVuViec == false ? const Color(0xFFA8B1A6) : const Color(0xFF2DC703),
+                      foregroundColor: Colors.white,
+                      icon: Icons.description,
+                      label: 'CTBH', /// VV & HĐ
+                    ),
+                  if (Const.freeDiscount == true && _bloc.listOrder[index].gifProduct != true && _bloc.listOrder[index].gifProductByHand != true)
+                    SlidableAction(
+                      onPressed: (_) async {
+                        final percent = await showDialog(
+                            barrierDismissible: true,
+                            context: context,
+                            builder: (context) {
+                              return const InputDiscountPercent(
+                                title: 'Vui lòng nhập tỉ lệ chiết khấu',
+                                subTitle: 'Vui lòng nhập tỉ lệ chiết khấu',
+                                typeValues: '%',
+                                percent: 0,
+                              );
+                            });
+                        if (percent != null && percent is List && percent.isNotEmpty && percent[0] == 'BACK') {
+                          final value = double.tryParse(percent[1].toString()) ?? 0;
+                          _applyManualDiscountForItem(index, value);
+                        }
+                      },
+                      borderRadius: const BorderRadius.all(Radius.circular(8)),
+                      padding: const EdgeInsets.all(10),
+                      backgroundColor: Colors.orange,
+                      foregroundColor: Colors.white,
+                      icon: Icons.discount_outlined,
+                      label: 'Chiết khấu',
+                    ),
+                ],
+              ),
               endActionPane: ActionPane(
                 motion: const ScrollMotion(),
                 dragDismissible: false,
@@ -4198,7 +4295,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
                                 Text(
                                   '[${_bloc.listOrder[index].code.toString().trim()}] ${_bloc.listOrder[index].name.toString().toUpperCase()}',
                                   style:const TextStyle(color: subColor, fontSize: 14, fontWeight: FontWeight.w600,),
-                                  maxLines: 2,overflow: TextOverflow.ellipsis,
+                                  maxLines: 4,overflow: TextOverflow.ellipsis,
                                 ),
                                 const SizedBox(height: 5,),
                                 Visibility(
@@ -4429,8 +4526,13 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
                                                         final discountPercent = _bloc.listOrder[index].discountPercentByHand > 0 
                                                           ? _bloc.listOrder[index].discountPercentByHand 
                                                           : (_bloc.listOrder[index].discountPercent ?? 0);
-                                                        final hasDiscount = discountPercent > 0;
                                                         final originalPrice = _bloc.listOrder[index].giaSuaDoi ?? 0;
+                                                        final priceAfter = _bloc.listOrder[index].priceAfter ?? 0;
+                                                        
+                                                        // Hiển thị giá gốc với gạch ngang nếu:
+                                                        // - Có discountPercent > 0 HOẶC
+                                                        // - Có priceAfter > 0 và priceAfter != originalPrice
+                                                        final hasDiscount = discountPercent > 0 || (priceAfter > 0 && priceAfter != originalPrice);
                                                         
                                                         if (!hasDiscount || originalPrice == 0) {
                                                           return Container();
@@ -4454,17 +4556,18 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
                                                         final discountPercent = _bloc.listOrder[index].discountPercentByHand > 0 
                                                           ? _bloc.listOrder[index].discountPercentByHand 
                                                           : (_bloc.listOrder[index].discountPercent ?? 0);
-                                                        final hasDiscount = discountPercent > 0;
                                                         final originalPrice = _bloc.listOrder[index].giaSuaDoi ?? 0;
                                                         final priceAfter = _bloc.listOrder[index].priceAfter ?? 0;
                                                         
                                                         // ✅ Nếu có discount:
-                                                        //   - Nếu priceAfter > 0 → hiển thị priceAfter
+                                                        //   - Nếu priceAfter > 0 và priceAfter != originalPrice → hiển thị priceAfter
                                                         //   - Nếu priceAfter = 0 nhưng có discountPercent → tính lại từ originalPrice
                                                         //   - Nếu không có discount → hiển thị giá gốc
                                                         double displayPrice;
+                                                        final hasDiscount = discountPercent > 0 || (priceAfter > 0 && priceAfter != originalPrice);
+                                                        
                                                         if (hasDiscount) {
-                                                          if (priceAfter > 0) {
+                                                          if (priceAfter > 0 && priceAfter != originalPrice) {
                                                             displayPrice = priceAfter;
                                                           } else if (originalPrice > 0 && discountPercent > 0) {
                                                             // Tính lại priceAfter từ originalPrice và discountPercent
@@ -4610,6 +4713,44 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
           );
         }
     );
+  }
+
+  void _applyManualDiscountForItem(int index, double percent) {
+    if (percent <= 0) return;
+    if (index < 0 || index >= _bloc.listOrder.length) return;
+
+    final item = _bloc.listOrder[index];
+    if (item.gifProduct == true || item.gifProductByHand == true) return;
+
+    final double quantity = item.count ?? 0;
+    final double price = _bloc.allowTaxPercent == true
+        ? (item.priceAfterTax ?? item.priceAfter ?? 0)
+        : (item.giaSuaDoi != 0 ? item.giaSuaDoi : item.price ?? 0);
+
+    final double discountValue = (price * quantity * percent) / 100;
+
+    setState(() {
+      item.discountByHand = true;
+      item.discountPercentByHand = percent;
+      item.ckntByHand = discountValue;
+      item.priceAfter2 = price;
+      item.priceAfter = (item.giaSuaDoi - ((item.giaSuaDoi * percent) / 100));
+    });
+
+    // Persist to local cache so reload keeps manual discount
+    if (DataLocal.listOrderCalculatorDiscount.any(
+        (element) => element.code.toString().trim() == item.code.toString().trim())) {
+      DataLocal.listOrderCalculatorDiscount.removeAt(
+          DataLocal.listOrderCalculatorDiscount.indexWhere(
+              (element) => element.code.toString().trim() == item.code.toString().trim()));
+    }
+    DataLocal.listOrderCalculatorDiscount.add(item);
+
+    // Recalculate totals for this item
+    _bloc.add(CalculatorDiscountEvent(
+        addOnProduct: true, product: item, reLoad: false, addTax: false));
+
+    Utils.showCustomToast(context, Icons.check_circle_outline, 'Đã áp dụng chiết khấu tự do');
   }
 
   buildInfo(){

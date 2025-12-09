@@ -280,7 +280,7 @@ class _DeliveryPlanDetailScreenState extends State<DeliveryPlanDetailScreen> {
                                       children: [
                                         const Icon(Icons.drive_file_rename_outline,color: Colors.grey,size: 12,),
                                         const SizedBox(width: 5,),
-                                        Flexible(child: Text('(${_bloc.listDetailDeliveryPlan[index].maVt?.trim()??''}) ${_bloc.listDetailDeliveryPlan[index].tenVt.toString()}', style: const TextStyle(color: Colors.black,fontSize: 12),maxLines: 1,overflow: TextOverflow.fade,)),
+                                        Flexible(child: Text('(${_bloc.listDetailDeliveryPlan[index].maVt?.trim()??''}) ${_bloc.listDetailDeliveryPlan[index].tenVt.toString()}', style: const TextStyle(color: Colors.black,fontSize: 12),maxLines: 4,overflow: TextOverflow.ellipsis,)),
                                       ],
                                     ),
                                     const SizedBox(height: 5,),

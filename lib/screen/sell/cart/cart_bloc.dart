@@ -271,6 +271,20 @@ class CartBloc extends Bloc<CartEvent,CartState>{
     _accessToken = box.read(Const.ACCESS_TOKEN);
     _refreshToken = box.read(Const.ACCESS_TOKEN);
     idUser = box.read(Const.USER_ID);
+    // Khôi phục danh sách sản phẩm tặng (kể cả thêm tay) nếu có lưu trước đó
+    try{
+      final storedGifts = box.read('listProductGift');
+      if(storedGifts != null){
+        final List decoded = jsonDecode(storedGifts) as List;
+        // Chỉ khôi phục quà tặng thêm thủ công (gifProductByHand == true)
+        DataLocal.listProductGift = decoded
+            .map((e)=> SearchItemResponseData.fromJson(e as Map<String,dynamic>))
+            .where((e)=> e.gifProductByHand == true)
+            .toList();
+      }
+    }catch(_){
+      // nếu parse lỗi thì bỏ qua
+    }
     emitter(GetPrefsSuccess());
   }
   void _downloadFileSuccessEvent(DownloadFileSuccessEvent event, Emitter<CartState> emitter)async{
@@ -679,6 +693,13 @@ class CartBloc extends Bloc<CartEvent,CartState>{
             ((element.count.toString().isNotEmpty && element.count.toString() != 'null') ? element.count! : 0)
         );
       }
+    }
+    // Lưu lại chỉ các quà tặng thêm thủ công để mở app vẫn giữ được
+    try{
+      final manualGifts = DataLocal.listProductGift.where((e)=> e.gifProductByHand == true).toList();
+      box.write('listProductGift', jsonEncode(manualGifts.map((e)=>e.toJson()).toList()));
+    }catch(_){
+      // ignore write error
     }
     emitter(AddOrDeleteProductGiftSuccess());
   }
@@ -1928,7 +1949,10 @@ class CartBloc extends Bloc<CartEvent,CartState>{
         print('💰 Preserving listPromotion: $preservedListPromotion');
         print('💰 Preserving listCKVT: $preservedListCKVT');
       }
-      
+
+      // Backup quà nhập tay (giữ lại qua mọi lần load)
+      final List<SearchItemResponseData> preservedManualGiftsAlways = DataLocal.listProductGift.where((e)=> e.gifProductByHand == true).toList();
+
       if(keyLoad == 'First'){
         listPromotion = '';
         DataLocal.listCKVT = '';
@@ -1962,10 +1986,14 @@ class CartBloc extends Bloc<CartEvent,CartState>{
       }
       /// Salonzo có chiết khấu nhập tay : freeDiscount và chiết khấu hàng tự chọn : discountspecial
       /// Vậy khi xoá ds hàng tặng khi và chỉ khi freeDiscount được sử dụng
+      // ✅ Backup quà nhập tay (mọi trường hợp)
+      List<SearchItemResponseData> preservedManualGiftsFirst = DataLocal.listProductGift.where((e)=> e.gifProductByHand == true).toList();
+
       // ✅ CHỈ clear hàng tặng khi keyLoad == 'First' (lần đầu load)
       // Khi keyLoad == 'Second' (reload sau khi chọn thêm chiết khấu), PRESERVE các hàng tặng đã chọn (CKN, CKTDTH)
       if(Const.freeDiscount == false && keyLoad == 'First'){
         DataLocal.listProductGift.clear();
+        DataLocal.listProductGift.addAll(preservedManualGiftsFirst);
       }
       
       // ✅ PRESERVE CKN và CKTDTH gifts khi keyLoad == 'Second'
@@ -2297,14 +2325,40 @@ class CartBloc extends Bloc<CartEvent,CartState>{
               itemOrder.sctGoc = (itemOrder.listDiscount != null && itemOrder.listDiscount!.isNotEmpty) ? itemOrder.listDiscount![0].sttRecCk.toString() : "";
               itemOrder.maVtGoc = (itemOrder.listDiscount != null && itemOrder.listDiscount!.isNotEmpty) ? itemOrder.listDiscount![0].maVt.toString() : "";
               // itemOrder.giaSuaDoi = itemOrder.listDiscount![0].giaSauCk!;
+              double giaGoc = itemOrder.listDiscount![0].giaGoc ?? itemOrder.giaSuaDoi ?? 0;
+              double giaSauCk = itemOrder.listDiscount![0].giaSauCk ?? 0;
+              double ckValue = itemOrder.listDiscount![0].ck ?? 0;
+              
               if(itemOrder.listDiscount![0].tlCk! > 0){
+                // Case 1: Trường hợp có tỉ lệ chiết khấu (%)
                 // ✅ FIX: priceAfter là ĐƠN GIÁ, KHÔNG NHÂN count!
                 itemOrder.priceAfter = itemOrder.giaSuaDoi - (itemOrder.giaSuaDoi * itemOrder.listDiscount![0].tlCk! / 100);
-              }
-              double _ck = 0;
-              if(itemOrder.listDiscount![0].tlCk == 0 && itemOrder.listDiscount![0].giaSauCk! > 0 && itemOrder.listDiscount![0].ck! > 0){
-                _ck = (itemOrder.listDiscount![0].ck! / itemOrder.listDiscount![0].giaGoc!) * 100;
-                itemOrder.discountPercent = _ck;
+              } else if(giaSauCk > 0 && giaSauCk != giaGoc && giaGoc > 0){
+                // Ưu tiên: Trường hợp có giá sau chiết khấu và khác giá gốc (có chiết khấu thực sự)
+                itemOrder.priceAfter = giaSauCk;
+                itemOrder.discountPercent = ((giaGoc - giaSauCk) / giaGoc) * 100;
+              } else if(ckValue > 0){
+                // Case 2: Trường hợp có số tiền chiết khấu
+                double ckPerItem = ckValue;
+
+                // Nếu ck > giaGoc, có thể là tổng chiết khấu cho số lượng sản phẩm
+                // Chia ck cho số lượng sản phẩm
+                if (ckValue > giaGoc && giaGoc > 0 && itemOrder.count != null && itemOrder.count! > 0) {
+                  ckPerItem = ckValue / itemOrder.count!;
+                  print('💰 CKG (bloc): ck=$ckValue là tổng cho ${itemOrder.count} sản phẩm, ckPerItem=$ckPerItem');
+                }
+                
+                // Áp dụng chiết khấu nếu hợp lý (ckPerItem <= giaGoc)
+                if (ckPerItem <= giaGoc && giaGoc > 0) {
+                  itemOrder.priceAfter = itemOrder.giaSuaDoi - ckPerItem;
+                  if (itemOrder.priceAfter! < 0) itemOrder.priceAfter = 0;
+                  itemOrder.discountPercent = (ckPerItem / giaGoc) * 100;
+                } else if (ckPerItem > giaGoc && giaGoc > 0) {
+                  // Nếu ckPerItem vẫn > giaGoc, có thể là lỗi dữ liệu, nhưng vẫn tính để hiển thị
+                  itemOrder.priceAfter = 0;
+                  itemOrder.discountPercent = 100; // 100% discount
+                  print('💰 ⚠️ WARNING (bloc): ckPerItem=$ckPerItem > giaGoc=$giaGoc, set priceAfter=0');
+                }
               }
               /// add ck lần đầu để ghi nhận ck lần tiếp User chọn
               maHangTangOld = '';
@@ -2356,14 +2410,40 @@ class CartBloc extends Bloc<CartEvent,CartState>{
                 itemOrder.typeCK = 'CKG';
                 itemOrder.priceOk = x.giaSauCk;
                 // itemOrder.giaSuaDoi = x.giaSauCk!;
+                double giaGoc = x.giaGoc ?? itemOrder.giaSuaDoi ?? 0;
+                double giaSauCk = x.giaSauCk ?? 0;
+                double ckValue = x.ck ?? 0;
+                
                 if(x.tlCk! > 0){
+                  // Case 1: Trường hợp có tỉ lệ chiết khấu (%)
                   // ✅ FIX: priceAfter là ĐƠN GIÁ, KHÔNG NHÂN count!
                   itemOrder.priceAfter = itemOrder.giaSuaDoi - (itemOrder.giaSuaDoi * x.tlCk! / 100);
-                }
-                double _ck = 0;
-                if( x.tlCk == 0 && x.giaSauCk! > 0 && x.ck! > 0){
-                  _ck = (x.ck! / x.giaGoc!) * 100;
-                  itemOrder.discountPercent = _ck;
+                } else if(giaSauCk > 0 && giaSauCk != giaGoc && giaGoc > 0){
+                  // Ưu tiên: Trường hợp có giá sau chiết khấu và khác giá gốc (có chiết khấu thực sự)
+                  itemOrder.priceAfter = giaSauCk;
+                  itemOrder.discountPercent = ((giaGoc - giaSauCk) / giaGoc) * 100;
+                } else if(ckValue > 0){
+                  // Case 2: Trường hợp có số tiền chiết khấu
+                  double ckPerItem = ckValue;
+                  
+                  // Nếu ck > giaGoc, có thể là tổng chiết khấu cho số lượng sản phẩm
+                  // Chia ck cho số lượng sản phẩm
+                  if (ckValue > giaGoc && giaGoc > 0 && itemOrder.count != null && itemOrder.count! > 0) {
+                    ckPerItem = ckValue / itemOrder.count!;
+                    print('💰 CKG (bloc): ck=$ckValue là tổng cho ${itemOrder.count} sản phẩm, ckPerItem=$ckPerItem');
+                  }
+                  
+                  // Áp dụng chiết khấu nếu hợp lý (ckPerItem <= giaGoc)
+                  if (ckPerItem <= giaGoc && giaGoc > 0) {
+                    itemOrder.priceAfter = itemOrder.giaSuaDoi - ckPerItem;
+                    if (itemOrder.priceAfter! < 0) itemOrder.priceAfter = 0;
+                    itemOrder.discountPercent = (ckPerItem / giaGoc) * 100;
+                  } else if (ckPerItem > giaGoc && giaGoc > 0) {
+                    // Nếu ckPerItem vẫn > giaGoc, có thể là lỗi dữ liệu, nhưng vẫn tính để hiển thị
+                    itemOrder.priceAfter = 0;
+                    itemOrder.discountPercent = 100; // 100% discount
+                    print('💰 ⚠️ WARNING (bloc): ckPerItem=$ckPerItem > giaGoc=$giaGoc, set priceAfter=0');
+                  }
                 }
                 /// add ck lần đầu để ghi nhận ck lần tiếp User chọn
                 maHangTangOld = '';
@@ -2546,8 +2626,13 @@ class CartBloc extends Bloc<CartEvent,CartState>{
           }
         }
         
-        // Restore preserved manual gifts
-        for (var gift in preservedManualGifts) {
+        // Restore preserved manual gifts (từ cả First và Second)
+        final List<SearchItemResponseData> manualToRestore = [
+          ...preservedManualGiftsAlways, // luôn giữ quà nhập tay
+          ...preservedManualGiftsFirst,
+          ...preservedManualGifts,
+        ];
+        for (var gift in manualToRestore) {
           // Check if not already exists
           bool exists = DataLocal.listProductGift.any((g) => 
             g.code == gift.code && 
@@ -2587,6 +2672,25 @@ class CartBloc extends Bloc<CartEvent,CartState>{
         }
       }
       
+      // 🔄 Always restore manual gifts (applies to both First and Second)
+      final List<SearchItemResponseData> manualToRestoreAlways = [
+        ...preservedManualGiftsAlways, // backup từ đầu
+        ...preservedManualGiftsFirst,
+        ...preservedManualGifts,
+      ];
+      for (var gift in manualToRestoreAlways) {
+        bool exists = DataLocal.listProductGift.any((g) =>
+          g.code == gift.code &&
+          g.gifProductByHand == true
+        );
+        if (!exists) {
+          DataLocal.listProductGift.add(gift);
+          totalProductGift += gift.count ?? 0;
+          print('💰 Restored manual gift (always): ${gift.code} (qty: ${gift.count})');
+        }
+      }
+      print('💰 After restore ALL manual gifts: totalProductGift=$totalProductGift, listProductGift.length=${DataLocal.listProductGift.length}');
+
       print('check tax ${keyLoad} => ${ Const.useTax} ${DataLocal.indexValuesTax} ${allowed2 = true}');
       if(keyLoad == 'Second' && Const.useTax == true && DataLocal.indexValuesTax >= 0 && allowed2 == true){
         allowed2 = false;

@@ -632,7 +632,7 @@ class _SaleOutScreenState extends State<SaleOutScreen>with TickerProviderStateMi
                                         '${_bloc.listProductOrderAndUpdate[index].name}',
                                         textAlign: TextAlign.left,
                                         style: const TextStyle(fontWeight: FontWeight.bold,fontSize: 12),
-                                        maxLines: 2,
+                                        maxLines: 4,
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),

@@ -15,7 +15,7 @@ import '../entity/item_check_in.dart';
 import '../entity/product.dart';
 
 class DatabaseHelper {
- static const NEW_DB_VERSION = 20251030; // Thêm availableQuantity vào product table
+ static const NEW_DB_VERSION = 20251208; // Thêm availableQuantity vào product table
   static final DatabaseHelper _instance = DatabaseHelper._();
   Database? _database;
 

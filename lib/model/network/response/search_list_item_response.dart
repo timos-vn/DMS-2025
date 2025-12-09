@@ -172,6 +172,17 @@ class SearchItemResponseData {
     residualValue = json['gt_cl'];
     unit = json['loai_ct'];
     maCk = json['ma_ck'];
+    typeCK = json['type_ck'] ?? json['typeCK'];
+    sttRecCK = json['sttRecCK'];
+    gifProduct = json['gifProduct'] ?? json['gif_product'] ?? false;
+    gifProductByHand = json['gifProductByHand'] ?? json['gif_product_by_hand'] ?? false;
+    stockCode = json['stockCode'] ?? json['codeStock'] ?? json['stock_code'];
+    stockName = json['stockName'] ?? json['nameStock'] ?? json['stock_name'];
+    allowDvt = json['nhieu_dvt'];
+    contentDvt = json['ndvt'];
+    giaSuaDoi = _parseDouble(json['gia_sua_doi']) ?? giaSuaDoi;
+    giaGui = _parseDouble(json['gia_gui']) ?? giaGui;
+    priceMin = _parseDouble(json['gia_min']) ?? priceMin;
     budgetForProduct = json['ten_ns_product'];
     unitProduct = json['loai_ct_product'];
     allowDvt = json['nhieu_dvt'];
@@ -211,6 +222,17 @@ class SearchItemResponseData {
     data['gt_cl'] = residualValue;
     data['loai_ct'] = unit;
     data['ma_ck'] = maCk;
+    data['typeCK'] = typeCK;
+    data['sttRecCK'] = sttRecCK;
+    data['gifProduct'] = gifProduct;
+    data['gifProductByHand'] = gifProductByHand;
+    data['stockCode'] = stockCode;
+    data['stockName'] = stockName;
+    data['gia_sua_doi'] = giaSuaDoi;
+    data['gia_gui'] = giaGui;
+    data['gia_min'] = priceMin;
+    data['nhieu_dvt'] = allowDvt;
+    data['ndvt'] = contentDvt;
 
     data['ten_ns_product'] = budgetForProduct;
     data['loai_ct_product'] = unitProduct;

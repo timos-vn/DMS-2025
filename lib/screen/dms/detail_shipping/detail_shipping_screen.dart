@@ -348,7 +348,7 @@ class _DetailShippingScreenState extends State<DetailShippingScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('[${item.maVt.toString().replaceAll('null', '')}] ${item.tenVt.toString().replaceAll('null', '')}',style: const TextStyle(color: Colors.black,fontWeight: FontWeight.bold),maxLines: 2,overflow: TextOverflow.ellipsis,),
+                    Text('[${item.maVt.toString().replaceAll('null', '')}] ${item.tenVt.toString().replaceAll('null', '')}',style: const TextStyle(color: Colors.black,fontWeight: FontWeight.bold),maxLines: 4,overflow: TextOverflow.ellipsis,),
                     const SizedBox(height: 5,),
                     Text(item.tenKho.toString().replaceAll('null', ''),style: const TextStyle(color: Colors.black,fontWeight: FontWeight.normal),maxLines: 2,overflow: TextOverflow.ellipsis,),
                     const SizedBox(height: 5,),

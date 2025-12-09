@@ -742,7 +742,7 @@ class _HistoryOrderDetailScreenState extends State<HistoryOrderDetailScreen> {
                               color: Colors.black87,
                               height: 1.3,
                             ),
-                            maxLines: 2,
+                            maxLines: 4,
                             overflow: TextOverflow.ellipsis,
                           ),
 
@@ -979,38 +979,27 @@ class _HistoryOrderDetailScreenState extends State<HistoryOrderDetailScreen> {
         ),
         build: (pw.Context context) {
           return [
-            // Stack: Watermark first (background), then content on top
-            pw.Stack(
+            // Content without watermark on full page
+            pw.Column(
               children: [
-                // Watermark layer - placed first so it's behind content
-                if (logoImage != null) 
-                  pw.Positioned.fill(
-                    child: _buildWatermark(logoImage, pageFormat),
-                  ),
+                // Header
+                _buildPDFHeader(vietnameseFont, vietnameseFontBold),
+                pw.SizedBox(height: 20),
                 
-                // Content layer - placed after watermark so it's on top
-                pw.Column(
-                  children: [
-                    // Header
-                    _buildPDFHeader(vietnameseFont, vietnameseFontBold),
-                    pw.SizedBox(height: 20),
-                    
-                    // Customer Info
-                    _buildPDFCustomerInfo(vietnameseFont, vietnameseFontBold),
-                    pw.SizedBox(height: 20),
-                    
-                    // Order Info
-                    _buildPDFOrderInfo(vietnameseFont, vietnameseFontBold),
-                    pw.SizedBox(height: 20),
-                    
-                    // Products Table
-                    _buildPDFProductsTable(vietnameseFont, vietnameseFontBold, lineItems),
-                    pw.SizedBox(height: 20),
-                    
-                    // Summary
-                    _buildPDFSummary(vietnameseFont, vietnameseFontBold, orderInfo),
-                  ],
-                ),
+                // Customer Info
+                _buildPDFCustomerInfo(vietnameseFont, vietnameseFontBold),
+                pw.SizedBox(height: 20),
+                
+                // Order Info
+                _buildPDFOrderInfo(vietnameseFont, vietnameseFontBold),
+                pw.SizedBox(height: 20),
+                
+                // Products Table with watermark only in this section
+                _buildPDFProductsTableWithWatermark(vietnameseFont, vietnameseFontBold, lineItems, logoImage),
+                pw.SizedBox(height: 20),
+                
+                // Summary
+                _buildPDFSummary(vietnameseFont, vietnameseFontBold, orderInfo),
               ],
             ),
           ];
@@ -1034,14 +1023,17 @@ class _HistoryOrderDetailScreenState extends State<HistoryOrderDetailScreen> {
   }
 
   pw.Widget _buildWatermark(pw.MemoryImage logoImage, PdfPageFormat pageFormat) {
-    // Center the watermark
+    // Watermark nằm chéo (45 độ) và ở giữa
     return pw.Center(
-      child: pw.Opacity(
-        opacity: 0.08, // Very light watermark
-        child: pw.Container(
-          width: 200, // Logo size
-          height: 200,
-          child: pw.Image(logoImage, fit: pw.BoxFit.contain),
+      child: pw.Transform.rotate(
+        angle: 0.785398, // 45 degrees in radians (π/4)
+        child: pw.Opacity(
+          opacity: 0.15, // Đậm hơn một chút
+          child: pw.Container(
+            width: 350, // Logo size - to hơn
+            height: 350,
+            child: pw.Image(logoImage, fit: pw.BoxFit.contain),
+          ),
         ),
       ),
     );
@@ -1251,15 +1243,32 @@ class _HistoryOrderDetailScreenState extends State<HistoryOrderDetailScreen> {
     );
   }
 
+  pw.Widget _buildPDFProductsTableWithWatermark(pw.Font baseFont, pw.Font boldFont, List lineItems, pw.MemoryImage? logoImage) {
+    // Stack: Watermark behind, table on top
+    return pw.Stack(
+      children: [
+        // Watermark layer - chỉ hiển thị ở vùng bảng sản phẩm
+        if (logoImage != null)
+          pw.Positioned.fill(
+            child: _buildWatermark(logoImage, PdfPageFormat.a4),
+          ),
+        
+        // Products Table on top
+        _buildPDFProductsTable(baseFont, boldFont, lineItems),
+      ],
+    );
+  }
+
   pw.Widget _buildPDFProductsTable(pw.Font baseFont, pw.Font boldFont, List lineItems) {
     return pw.Table(
       border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
       columnWidths: {
-        0: const pw.FlexColumnWidth(1),
+        0: const pw.FlexColumnWidth(0.8),
         1: const pw.FlexColumnWidth(1.5),
         2: const pw.FlexColumnWidth(1),
         3: const pw.FlexColumnWidth(1),
-        4: const pw.FlexColumnWidth(1.2),
+        4: const pw.FlexColumnWidth(1),
+        5: const pw.FlexColumnWidth(1.2),
       },
       children: [
         // Header
@@ -1270,6 +1279,7 @@ class _HistoryOrderDetailScreenState extends State<HistoryOrderDetailScreen> {
             _buildPDFTableCell(baseFont, boldFont, 'Tên sản phẩm', isHeader: true),
             _buildPDFTableCell(baseFont, boldFont, 'Mã SP', isHeader: true),
             _buildPDFTableCell(baseFont, boldFont, 'Số lượng', isHeader: true),
+            _buildPDFTableCell(baseFont, boldFont, 'Chiết khấu', isHeader: true),
             _buildPDFTableCell(baseFont, boldFont, 'Thành tiền', isHeader: true),
           ],
         ),
@@ -1279,8 +1289,15 @@ class _HistoryOrderDetailScreenState extends State<HistoryOrderDetailScreen> {
           final item = entry.value;
           final quantity = item.soLuong?.toDouble() ?? 0;
           final respondQty = item.soLuongDapUng?.toDouble() ?? 0;
-          final price = item.priceAfter ?? item.price ?? 0;
-          final total = quantity * price;
+          final originalPrice = item.price ?? 0;
+          final priceAfter = item.priceAfter ?? originalPrice;
+          final total = quantity * priceAfter;
+          
+          // Tính chiết khấu: (giá gốc - giá sau chiết khấu) * số lượng
+          final discountAmount = (originalPrice - priceAfter) * quantity;
+          final discountText = discountAmount > 0 
+              ? '-${Utils.formatMoneyStringToDouble(discountAmount)} ₫'
+              : 'N/A';
           
           final productName = _sanitizeValue(item.tenVt?.toString());
           final productCode = _sanitizeValue(item.maVt?.toString());
@@ -1298,6 +1315,7 @@ class _HistoryOrderDetailScreenState extends State<HistoryOrderDetailScreen> {
                 boldFont,
                 respondLabel.isNotEmpty ? '$quantityLabel\n$respondLabel' : quantityLabel,
               ),
+              _buildPDFTableCell(baseFont, boldFont, discountText),
               _buildPDFTableCell(baseFont, boldFont, '${Utils.formatMoneyStringToDouble(total)} ₫'),
             ],
           );

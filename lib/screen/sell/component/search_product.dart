@@ -14,6 +14,7 @@ import '../../../model/database/data_local.dart';
 import '../../../model/entity/product.dart';
 import '../../../model/network/response/get_item_holder_detail_response.dart';
 import '../../../model/network/response/search_list_item_response.dart';
+import '../../../model/network/response/list_stock_response.dart';
 import '../../../themes/colors.dart';
 import '../../../utils/const.dart';
 import '../../../utils/debouncer.dart';
@@ -113,7 +114,7 @@ class SearchProductScreenState extends State<SearchProductScreen> {
         },
         child: BlocListener<CartBloc,CartState>(
             bloc: _bloc,
-            listener: (context, state) {
+            listener: (context, state) async {
               if(state is GetPrefsSuccess){
                 if(widget.addProductFromCheckIn == true){
                   _bloc.add(SearchProduct('',widget.listIdGroupProduct!, widget.itemGroupCode.toString(),widget.idCustomer.toString(),widget.isCheckStock));
@@ -171,6 +172,29 @@ class SearchProductScreenState extends State<SearchProductScreen> {
                 DataLocal.listOrderProductIsChange = true;
               }
               else if(state is GetListStockEventSuccess){
+                // Kiểm tra nếu đang trong chế độ multi-select (chọn nhiều sản phẩm)
+                if (selectedProductCodes.isNotEmpty && selectedProductCodes.length >= 1) {
+                  // Hiện dialog chọn kho + số lượng cho nhiều sản phẩm
+                  final result = await showDialog<Map<String, dynamic>>(
+                    context: context,
+                    builder: (context) => _MultiSelectQuantityDialog(
+                      selectedProducts: selectedProducts.values.toList(),
+                      listStock: _bloc.listStockResponse,
+                    ),
+                  );
+                  
+                  if (result != null && result['quantity'] != null && result['quantity'] > 0) {
+                    // Lưu kho đã chọn vào DataLocal để dùng cho các sản phẩm tiếp theo
+                    if (result['stockCode'] != null && result['stockCode'].toString().isNotEmpty) {
+                      DataLocal.codeStockMater = result['stockCode'].toString();
+                      DataLocal.nameStockMater = result['stockName']?.toString() ?? '';
+                    }
+                    // Add all selected products to cart with the same quantity
+                    _addMultipleProductsToCart(result['quantity']);
+                  }
+                  return;
+                }
+                
                 if(widget.inventoryControl == true){
                   showDialog(
                       barrierDismissible: true,
@@ -1252,17 +1276,18 @@ class SearchProductScreenState extends State<SearchProductScreen> {
       return;
     }
 
-    final result = await showDialog<double>(
-      context: context,
-      builder: (context) => _MultiSelectQuantityDialog(
-        selectedProducts: selectedProducts.values.toList(),
-      ),
-    );
-
-    if (result == null || result <= 0) return;
-
-    // Add all selected products to cart with the same quantity
-    _addMultipleProductsToCart(result);
+    // Lấy danh sách kho từ sản phẩm đầu tiên được chọn
+    final firstProduct = selectedProducts.values.first;
+    if (firstProduct.code != null) {
+      _bloc.add(GetListStockEvent(
+        itemCode: firstProduct.code.toString(),
+        getListGroup: false,
+        lockInputToCart: widget.lockInputToCart,
+        checkStockEmployee: widget.checkStockEmployee ?? false,
+      ));
+    } else {
+      Utils.showCustomToast(context, Icons.warning, 'Không thể lấy thông tin sản phẩm');
+    }
   }
 
   String _resolveStockCodeForProduct(SearchItemResponseData product) {
@@ -1443,8 +1468,12 @@ class SearchProductScreenState extends State<SearchProductScreen> {
 // Dialog để nhập số lượng chung cho nhiều sản phẩm
 class _MultiSelectQuantityDialog extends StatefulWidget {
   final List<SearchItemResponseData> selectedProducts;
+  final List<ListStore>? listStock;
 
-  const _MultiSelectQuantityDialog({required this.selectedProducts});
+  const _MultiSelectQuantityDialog({
+    required this.selectedProducts,
+    this.listStock,
+  });
 
   @override
   State<_MultiSelectQuantityDialog> createState() => _MultiSelectQuantityDialogState();
@@ -1453,6 +1482,7 @@ class _MultiSelectQuantityDialog extends StatefulWidget {
 class _MultiSelectQuantityDialogState extends State<_MultiSelectQuantityDialog> {
   final TextEditingController _quantityController = TextEditingController(text: '1');
   double quantity = 1;
+  ListStore? selectedStock;
 
   @override
   void dispose() {
@@ -1558,6 +1588,47 @@ class _MultiSelectQuantityDialogState extends State<_MultiSelectQuantityDialog> 
             ),
           ),
           const SizedBox(height: 20),
+          // Stock selection
+          if (widget.listStock != null && widget.listStock!.isNotEmpty) ...[
+            const Text(
+              'Chọn kho:',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.shade300),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<ListStore>(
+                  isExpanded: true,
+                  value: selectedStock,
+                  hint: const Text('Chọn kho', style: TextStyle(color: Colors.grey)),
+                  items: widget.listStock!.map((stock) {
+                    return DropdownMenuItem<ListStore>(
+                      value: stock,
+                      child: Text(
+                        stock.tenKho ?? stock.maKho ?? '',
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      selectedStock = value;
+                    });
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+          ],
           // Quantity input
           const Text(
             'Số lượng cho tất cả sản phẩm:',
@@ -1662,11 +1733,19 @@ class _MultiSelectQuantityDialogState extends State<_MultiSelectQuantityDialog> 
         ),
         ElevatedButton(
           onPressed: () {
-            if (quantity > 0) {
-              Navigator.pop(context, quantity);
-            } else {
+            if (quantity <= 0) {
               Utils.showCustomToast(context, Icons.warning, 'Số lượng phải lớn hơn 0');
+              return;
             }
+            if (widget.listStock != null && widget.listStock!.isNotEmpty && selectedStock == null) {
+              Utils.showCustomToast(context, Icons.warning, 'Vui lòng chọn kho');
+              return;
+            }
+            Navigator.pop(context, {
+              'quantity': quantity,
+              'stockCode': selectedStock?.maKho ?? '',
+              'stockName': selectedStock?.tenKho ?? '',
+            });
           },
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.green,
