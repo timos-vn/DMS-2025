@@ -18,6 +18,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:cross_file/cross_file.dart';
 import '../../../model/database/data_local.dart';
 import '../../../model/network/response/manager_customer_response.dart';
+import '../../../model/network/response/search_list_item_response.dart';
 import '../../../model/network/response/setting_options_response.dart';
 import '../../../themes/colors.dart';
 import '../../../utils/const.dart';
@@ -84,9 +85,42 @@ class _HistoryOrderDetailScreenState extends State<HistoryOrderDetailScreen> {
             Navigator.pop(context,Const.REFRESH);
           }
           else if(state is AddProductToCartSuccess){
+            // Luôn copy danh sách khuyến mại vào DataLocal để hiển thị khi sửa đơn
+            // Không chỉ phụ thuộc vào Const.discountSpecial
+            
+            // ✅ PRESERVE gifts từ chi tiết đơn hàng trước khi clear
+            // (gifProductByHand == false và không có typeCK)
+            List<SearchItemResponseData> preservedGiftsFromOrderDetail = DataLocal.listProductGift.where((gift) => 
+              gift.gifProduct == true && 
+              gift.gifProductByHand == false && 
+              (gift.typeCK == null || gift.typeCK == '')
+            ).toList();
+            print('💰 AddProductToCartSuccess: Preserving ${preservedGiftsFromOrderDetail.length} gifts from order detail before clear');
+            
+            print('AddProductToCartSuccess - _bloc.listProductGift.length = ${_bloc.listProductGift.length}');
+            DataLocal.listProductGift.clear();
+            DataLocal.listProductGift.addAll(_bloc.listProductGift);
+            
+            // ✅ RESTORE gifts từ chi tiết đơn hàng sau khi add gifts mới
+            for (var gift in preservedGiftsFromOrderDetail) {
+              bool exists = DataLocal.listProductGift.any((g) => 
+                g.code == gift.code &&
+                g.gifProductByHand == false &&
+                (g.typeCK == null || g.typeCK == '')
+              );
+              if (!exists) {
+                DataLocal.listProductGift.add(gift);
+                print('💰 AddProductToCartSuccess: Restored gift from order detail: ${gift.code} (qty: ${gift.count})');
+              }
+            }
+            
+            print('AddProductToCartSuccess - DataLocal.listProductGift.length = ${DataLocal.listProductGift.length} (after restore)');
+            for (var element in DataLocal.listProductGift) {
+              print('AddProductToCartSuccess - Gift: ${element.code} - ${element.name}, count: ${element.count}, typeCK: ${element.typeCK}, gifProductByHand: ${element.gifProductByHand}');
+            }
+            
             if(Const.discountSpecial == true){
-              DataLocal.listProductGift.clear();
-              DataLocal.listProductGift.addAll(_bloc.listProductGift);
+              // Giữ lại logic cũ cho discountSpecial nếu cần
             }
             Const.currencyCode = !Utils.isEmpty(widget.currencyCode.toString()) ? widget.currencyCode.toString() : Const.currencyList[0].currencyCode.toString();
             Const.itemGroupCode = widget.currencyCode.toString();
@@ -128,6 +162,8 @@ class _HistoryOrderDetailScreenState extends State<HistoryOrderDetailScreen> {
               });
             }
             else{
+
+              print('check dl: ${DataLocal.listProductGift.length}');
               PersistentNavBarNavigator.pushNewScreen(context, screen: ConfirmScreen(
                 viewUpdateOrder: true,
                 viewDetail: false,

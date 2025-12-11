@@ -176,12 +176,24 @@ class _ConfirmScreenState extends State<ConfirmScreen>with TickerProviderStateMi
     if(DataLocal.indexValuesTax.toString().replaceAll('null', '').isNotEmpty && DataLocal.taxPercent.toString().replaceAll('null', '').isNotEmpty && DataLocal.taxPercent > 0 ){
       _bloc.add(PickTaxAfter(DataLocal.indexValuesTax,DataLocal.taxPercent));
     }
+    _bloc.allowed = true;
+    _bloc.add(GetPrefs());
     // _bloc.firstLoadUpdateOrder = 1;
     if(widget.viewUpdateOrder == true){
       _bloc.showWarning = false;
+      // Khởi tạo totalProductGift từ danh sách khuyến mại khi sửa đơn
+      _bloc.totalProductGift = 0;
+      print('ConfirmScreen initState - viewUpdateOrder=true, DataLocal.listProductGift.length = ${DataLocal.listProductGift.length}');
+      if(DataLocal.listProductGift.isNotEmpty){
+        for (var element in DataLocal.listProductGift) {
+          _bloc.totalProductGift += element.count ?? 0;
+          print('ConfirmScreen initState - Gift product: ${element.code} - ${element.name}, count: ${element.count}');
+        }
+        print('ConfirmScreen initState - totalProductGift = ${_bloc.totalProductGift}');
+      } else {
+        print('ConfirmScreen initState - DataLocal.listProductGift is EMPTY!');
+      }
     }
-    _bloc.allowed = true;
-    _bloc.add(GetPrefs());
     if(Const.listTransactionsOrder.isNotEmpty){
       DataLocal.transactionCode = Const.listTransactionsOrder[0].maGd.toString();
       if(Const.woPrice == true){
@@ -259,14 +271,25 @@ class _ConfirmScreenState extends State<ConfirmScreen>with TickerProviderStateMi
           _bloc.chooseTax = true;
           _bloc.add(UpdateListOrder());
         } else if(state is CalculatorDiscountSuccess){
+          // ✅ Tính lại totalProductGift từ DataLocal.listProductGift sau khi tính chiết khấu
+          _bloc.totalProductGift = 0;
+          print('💰 ConfirmScreen: After CalculatorDiscountSuccess, DataLocal.listProductGift.length=${DataLocal.listProductGift.length}');
+          for (var gift in DataLocal.listProductGift) {
+            _bloc.totalProductGift += gift.count ?? 0;
+            print('  - Gift: ${gift.code} - ${gift.name}, count: ${gift.count}, typeCK: ${gift.typeCK}, gifProductByHand: ${gift.gifProductByHand}');
+          }
+          print('💰 ConfirmScreen: After CalculatorDiscountSuccess, totalProductGift=${_bloc.totalProductGift}');
           _bloc.add(UpdateListOrder());
         }
         else if(state is ApplyDiscountSuccess){
           if(widget.viewUpdateOrder == true){
             _bloc.totalProductGift = 0;
+            print('💰 ConfirmScreen: After ApplyDiscountSuccess, DataLocal.listProductGift.length=${DataLocal.listProductGift.length}');
             for (var element in DataLocal.listProductGift) {
-              _bloc.totalProductGift += element.count!;
+              _bloc.totalProductGift += element.count ?? 0;
+              print('  - Gift: ${element.code} - ${element.name}, count: ${element.count}, typeCK: ${element.typeCK}, gifProductByHand: ${element.gifProductByHand}');
             }
+            print('💰 ConfirmScreen: After ApplyDiscountSuccess, totalProductGift=${_bloc.totalProductGift}');
           }
           if(state.keyLoad == 'First'){
             setState(() {});
@@ -1303,19 +1326,19 @@ class _ConfirmScreenState extends State<ConfirmScreen>with TickerProviderStateMi
           ),
           Visibility(
             visible: _bloc.listOrder.isEmpty,
-            child: SizedBox(
+            child: const SizedBox(
                 height: 100,
                 width: double.infinity,
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    const Text('Úi, Không có gì ở đây cả.',style: TextStyle(color: Colors.black,fontSize: 11.5)),
-                    const SizedBox(height: 5,),
+                    Text('Úi, Không có gì ở đây cả.',style: TextStyle(color: Colors.black,fontSize: 11.5)),
+                    SizedBox(height: 5,),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.center,
-                      children: const [
+                      children: [
                         Text('Gợi ý: Bấm nút ',style: TextStyle(color: Colors.blueGrey,fontSize: 10.5)),
                         Icon(Icons.search_outlined,color: Colors.blueGrey,size: 18,),
                         Text(' để thêm sản phẩm của bạn',style: TextStyle(color: Colors.blueGrey,fontSize: 10.5)),
@@ -1912,19 +1935,19 @@ class _ConfirmScreenState extends State<ConfirmScreen>with TickerProviderStateMi
           ),
           Visibility(
             visible: DataLocal.listProductGift.isEmpty,
-            child: SizedBox(
+            child: const SizedBox(
                 height: 100,
                 width: double.infinity,
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    const Text('Úi, Không có gì ở đây cả.',style: TextStyle(color: Colors.black,fontSize: 11.5)),
-                    const SizedBox(height: 5,),
+                    Text('Úi, Không có gì ở đây cả.',style: TextStyle(color: Colors.black,fontSize: 11.5)),
+                    SizedBox(height: 5,),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.center,
-                      children: const [
+                      children: [
                         Text('Gợi ý: Bấm nút ',style: TextStyle(color: Colors.blueGrey,fontSize: 10.5)),
                         Icon(Icons.addchart_outlined,color: Colors.blueGrey,size: 16,),
                         Text(' để thêm sản phẩm tặng của bạn',style: TextStyle(color: Colors.blueGrey,fontSize: 10.5)),
@@ -3146,7 +3169,7 @@ class _ConfirmScreenState extends State<ConfirmScreen>with TickerProviderStateMi
            GestureDetector(
              onTap:(){
                if(widget.orderFromCheckIn == false && widget.addInfoCheckIn != true){
-                 PersistentNavBarNavigator.pushNewScreen(context, screen: SearchCustomerScreen(selected: true,allowCustomerSearch: true, inputQuantity: false,),withNavBar: false).then((value){
+                 PersistentNavBarNavigator.pushNewScreen(context, screen: const SearchCustomerScreen(selected: true,allowCustomerSearch: true, inputQuantity: false,),withNavBar: false).then((value){
                    if(value != null){
                      DataLocal.infoCustomer = value;
                      _bloc.add(PickInfoCustomer(customerName: DataLocal.infoCustomer.customerName,phone: DataLocal.infoCustomer.phone,address: DataLocal.infoCustomer.address,codeCustomer: DataLocal.infoCustomer.customerCode));
@@ -3214,9 +3237,9 @@ class _ConfirmScreenState extends State<ConfirmScreen>with TickerProviderStateMi
                 height: 40,
                 width: double.infinity,
                 color: Colors.amber.withOpacity(0.4),
-                child: Row(
+                child: const Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: const [
+                  children: [
                     Text('Ảnh của bạn',style: TextStyle(color: Colors.black,fontSize: 13),),
                     Icon(Icons.add_a_photo_outlined,size: 20,),
                   ],

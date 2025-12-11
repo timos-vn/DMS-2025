@@ -271,20 +271,58 @@ class CartBloc extends Bloc<CartEvent,CartState>{
     _accessToken = box.read(Const.ACCESS_TOKEN);
     _refreshToken = box.read(Const.ACCESS_TOKEN);
     idUser = box.read(Const.USER_ID);
-    // Khôi phục danh sách sản phẩm tặng (kể cả thêm tay) nếu có lưu trước đó
+    
+    // ✅ PRESERVE gifts từ chi tiết đơn hàng trước khi restore từ cache
+    // (gifProductByHand == false và không có typeCK)
+    List<SearchItemResponseData> preservedGiftsFromOrderDetail = DataLocal.listProductGift.where((gift) => 
+      gift.gifProduct == true && 
+      gift.gifProductByHand == false && 
+      (gift.typeCK == null || gift.typeCK == '')
+    ).toList();
+    print('💰 _getPrefs: Preserving ${preservedGiftsFromOrderDetail.length} gifts from order detail before restore from cache');
+    
+    // ✅ PRESERVE gifts từ API tính chiết khấu (có typeCK)
+    List<SearchItemResponseData> preservedGiftsFromAPI = DataLocal.listProductGift.where((gift) => 
+      gift.gifProduct == true && 
+      gift.gifProductByHand == false && 
+      gift.typeCK != null && gift.typeCK!.isNotEmpty
+    ).toList();
+    print('💰 _getPrefs: Preserving ${preservedGiftsFromAPI.length} gifts from discount API before restore from cache');
+    
+    // Khôi phục danh sách sản phẩm tặng từ cache (chỉ gifts thêm bằng tay)
+    List<SearchItemResponseData> restoredGiftsFromCache = [];
     try{
       final storedGifts = box.read('listProductGift');
       if(storedGifts != null){
         final List decoded = jsonDecode(storedGifts) as List;
         // Chỉ khôi phục quà tặng thêm thủ công (gifProductByHand == true)
-        DataLocal.listProductGift = decoded
+        restoredGiftsFromCache = decoded
             .map((e)=> SearchItemResponseData.fromJson(e as Map<String,dynamic>))
             .where((e)=> e.gifProductByHand == true)
             .toList();
+        print('💰 _getPrefs: Restored ${restoredGiftsFromCache.length} gifts from cache (manual gifts)');
       }
     }catch(_){
       // nếu parse lỗi thì bỏ qua
     }
+    
+    // ✅ MERGE: Gifts từ chi tiết đơn hàng + Gifts từ API + Gifts từ cache (thêm bằng tay)
+    DataLocal.listProductGift.clear();
+    DataLocal.listProductGift.addAll(preservedGiftsFromOrderDetail); // 1. Từ chi tiết đơn hàng
+    DataLocal.listProductGift.addAll(preservedGiftsFromAPI); // 2. Từ API tính chiết khấu
+    DataLocal.listProductGift.addAll(restoredGiftsFromCache); // 3. Từ cache (thêm bằng tay)
+    
+    // Tính lại totalProductGift
+    totalProductGift = 0;
+    for (var gift in DataLocal.listProductGift) {
+      totalProductGift += gift.count ?? 0;
+    }
+    
+    print('💰 _getPrefs: After merge - totalProductGift=$totalProductGift, listProductGift.length=${DataLocal.listProductGift.length}');
+    print('  - From order detail: ${preservedGiftsFromOrderDetail.length}');
+    print('  - From discount API: ${preservedGiftsFromAPI.length}');
+    print('  - From cache (manual): ${restoredGiftsFromCache.length}');
+    
     emitter(GetPrefsSuccess());
   }
   void _downloadFileSuccessEvent(DownloadFileSuccessEvent event, Emitter<CartState> emitter)async{
@@ -1732,6 +1770,80 @@ class CartBloc extends Bloc<CartEvent,CartState>{
 
   void _checkDisCountWhenUpdateEvent(CheckDisCountWhenUpdateEvent event, Emitter<CartState> emitter)async{
     emitter(CartLoading());
+    
+    // ✅ PRESERVE gifts từ chi tiết đơn hàng từ 2 nguồn:
+    // 1. Từ DataLocal.listProductGift (nếu đã có)
+    // 2. Từ lineItem (nếu chưa có trong DataLocal)
+    List<SearchItemResponseData> preservedGiftsFromOrderDetail = DataLocal.listProductGift.where((gift) => 
+      gift.gifProduct == true && 
+      gift.gifProductByHand == false && 
+      (gift.typeCK == null || gift.typeCK == '')
+    ).toList();
+    
+    // ✅ Nếu chưa có gifts trong DataLocal, lấy từ lineItem (từ _handleGetDetailOrder)
+    if(preservedGiftsFromOrderDetail.isEmpty && lineItem.isNotEmpty){
+      print('💰 No gifts in DataLocal, extracting from lineItem...');
+      for (var element in lineItem) {
+        bool isGiftProduct = element.kmYn != null && element.kmYn != 0;
+        if(isGiftProduct){
+          SearchItemResponseData giftItem = SearchItemResponseData(
+            code: element.maVt,
+            name: element.tenVt,
+            name2: element.name2,
+            dvt: element.dvt,
+            descript: "",
+            price: element.price,
+            giaSuaDoi: element.price ?? 0,
+            applyPriceAfterTax: false,
+            totalMoneyDiscount: 0,
+            totalMoneyProduct: 0,
+            valuesTax: 0,
+            priceAfter: element.priceAfter,
+            discountPercent: 0,
+            stockAmount: element.stockAmount,
+            taxPercent: 0,
+            priceOk: 0,
+            imageUrl: element.imageUrl ?? '',
+            count: element.soLuong,
+            isMark: 0,
+            discountMoney: '0',
+            discountProduct: '0',
+            budgetForItem: '',
+            budgetForProduct: '',
+            residualValueProduct: 0,
+            residualValue: 0,
+            unit: element.dvt ?? '',
+            priceAfter2: 0,
+            maCk: '',
+            maCkOld: '',
+            kColorFormatAlphaB: element.kColorFormatAlphaB,
+            maVtGoc: '', ck: 0, cknt: 0, sttRecCK: '', typeCK: '', 
+            gifProduct: true, 
+            gifProductByHand: false,
+            discountByHand: false, 
+            discountPercentByHand: 0,
+            unitProduct: '',
+            contentDvt: '',
+            woPrice: 0,
+            woPriceAfter: 0,
+            stockCode: element.codeStore,
+            stockName: element.nameStore,
+            idVv: element.maVV,
+            idHd: element.maHD,
+            nameVv: element.tenVV,
+            nameHd: element.tenHD,
+          );
+          preservedGiftsFromOrderDetail.add(giftItem);
+          print('  - Extracted gift from lineItem: ${giftItem.code} - ${giftItem.name}, count: ${giftItem.count}');
+        }
+      }
+    }
+    
+    print('💰 Preserving gifts from order detail: ${preservedGiftsFromOrderDetail.length}');
+    for (var gift in preservedGiftsFromOrderDetail) {
+      print('  - Gift from order: ${gift.code} - ${gift.name}, count: ${gift.count}');
+    }
+    
     List<SearchItemResponseData> draft = [];
     for (var element in listProductOrderAndUpdate) {
       SearchItemResponseData item = SearchItemResponseData(
@@ -1776,7 +1888,14 @@ class CartBloc extends Bloc<CartEvent,CartState>{
         maKho: event.codeStore,
         lineItem: draft
     );
-    CartState state = _handleCalculator(await _networkFactory!.getDiscountWhenUpdate(requestBody,_accessToken!),event.viewUpdateOrder,event.addNewItem,true);
+    // ✅ Truyền preservedGiftsFromOrderDetail vào _handleCalculator để restore sau
+    CartState state = _handleCalculator(
+      await _networkFactory!.getDiscountWhenUpdate(requestBody,_accessToken!),
+      event.viewUpdateOrder,
+      event.addNewItem,
+      true,
+      preservedGiftsFromOrderDetail: preservedGiftsFromOrderDetail, // Truyền gifts đã preserve
+    );
     emitter(state);
   }
   List<Product> listProduct = <Product>[];
@@ -1785,47 +1904,55 @@ class CartBloc extends Bloc<CartEvent,CartState>{
   void _addProductToCartEvent(AddProductToCartEvent event, Emitter<CartState> emitter)async{
     emitter(CartLoading());
     db.deleteAllProduct().then((value) => print('delete success'));
+    // Clear listProductGift trước khi thêm mới
+    listProductGift.clear();
     for (var element in lineItem) {
-      Product production = Product(
-          code: element.maVt,
-          name: element.tenVt,
-          name2:element.name2,
-          dvt: element.dvt,
-          description: "",
-          price: /*element.giaNet ?? */element.price,
-          priceAfter:element.priceAfter,
-          discountPercent:element.discountPercent,
-          stockAmount:element.stockAmount,
-          taxPercent: 0,
-          imageUrl: element.imageUrl ?? '',
-          count: element.soLuong,
-          countMax: element.soLuongKD,
-          so_luong_kd: element.soLuongKD ?? 0,
-          isMark:1,
-          discountMoney: '0',
-          discountProduct: '0',
-          budgetForItem:'',
-          budgetForProduct: '',
-          residualValueProduct:0,
-          residualValue: 0,
-          unit: element.dvt ?? '',
-          unitProduct: '',
-          dsCKLineItem:'',
-          codeStock: element.codeStore,
-          nameStock: element.nameStore,
-          idVv:element.maVV,
-          idHd : element.maHD,
-          nameVv: element.tenVV,
-          nameHd : element.tenHD,
-          giaSuaDoi: element.price??0,
-          priceMin: element.giaMin??0,
+      // Kiểm tra kmYn: null hoặc 0 = sản phẩm thường, != 0 = sản phẩm khuyến mại
+      bool isGiftProduct = element.kmYn != null && element.kmYn != 0;
+      
+      if(!isGiftProduct){
+        // Sản phẩm thường
+        Product production = Product(
+            code: element.maVt,
+            name: element.tenVt,
+            name2:element.name2,
+            dvt: element.dvt,
+            description: "",
+            price: /*element.giaNet ?? */element.price,
+            priceAfter:element.priceAfter,
+            discountPercent:element.discountPercent,
+            stockAmount:element.stockAmount,
+            taxPercent: 0,
+            imageUrl: element.imageUrl ?? '',
+            count: element.soLuong,
+            countMax: element.soLuongKD,
+            so_luong_kd: element.soLuongKD ?? 0,
+            isMark:1,
+            discountMoney: '0',
+            discountProduct: '0',
+            budgetForItem:'',
+            budgetForProduct: '',
+            residualValueProduct:0,
+            residualValue: 0,
+            unit: element.dvt ?? '',
+            unitProduct: '',
+            dsCKLineItem:'',
+            codeStock: element.codeStore,
+            nameStock: element.nameStore,
+            idVv:element.maVV,
+            idHd : element.maHD,
+            nameVv: element.tenVV,
+            nameHd : element.tenHD,
+            giaSuaDoi: element.price??0,
+            priceMin: element.giaMin??0,
 
-      );
-      if(element.kmYn == 0){
+        );
         listProduct.add(production);
         await db.addProduct(production);
       }
       else {
+        // Sản phẩm khuyến mại từ chi tiết đơn hàng
+        // Đánh dấu gifProductByHand = false để phân biệt với hàng thêm bằng tay
         SearchItemResponseData item = SearchItemResponseData(
           code: element.maVt,
           name: element.tenVt,
@@ -1857,7 +1984,7 @@ class CartBloc extends Bloc<CartEvent,CartState>{
           maCk: '',
           maCkOld: '',
           kColorFormatAlphaB: element.kColorFormatAlphaB,
-          maVtGoc: '',ck: 0,cknt: 0,sttRecCK: '',typeCK: '',gifProduct: true,gifProductByHand: true,discountByHand: false,discountPercentByHand: 0,
+          maVtGoc: '',ck: 0,cknt: 0,sttRecCK: '',typeCK: '',gifProduct: true,gifProductByHand: false,discountByHand: false,discountPercentByHand: 0,
           unitProduct: '',
           contentDvt:  '',
           woPrice: 0,
@@ -1872,6 +1999,35 @@ class CartBloc extends Bloc<CartEvent,CartState>{
         listProductGift.add(item);
       }
     }
+    
+    // ✅ PRESERVE gifts từ chi tiết đơn hàng trước khi clear
+    // (gifProductByHand == false và không có typeCK)
+    List<SearchItemResponseData> preservedGiftsFromOrderDetail = DataLocal.listProductGift.where((gift) => 
+      gift.gifProduct == true && 
+      gift.gifProductByHand == false && 
+      (gift.typeCK == null || gift.typeCK == '')
+    ).toList();
+    print('💰 _addProductToCartEvent: Preserving ${preservedGiftsFromOrderDetail.length} gifts from order detail before clear');
+    
+    // Copy danh sách khuyến mại vào DataLocal ngay sau khi xử lý xong
+    DataLocal.listProductGift.clear();
+    DataLocal.listProductGift.addAll(listProductGift);
+    
+    // ✅ RESTORE gifts từ chi tiết đơn hàng sau khi add gifts mới
+    for (var gift in preservedGiftsFromOrderDetail) {
+      bool exists = DataLocal.listProductGift.any((g) => 
+        g.code == gift.code &&
+        g.gifProductByHand == false &&
+        (g.typeCK == null || g.typeCK == '')
+      );
+      if (!exists) {
+        DataLocal.listProductGift.add(gift);
+        print('💰 _addProductToCartEvent: Restored gift from order detail: ${gift.code} (qty: ${gift.count})');
+      }
+    }
+    
+    print('AddProductToCartEvent: listProductGift.length = ${listProductGift.length}');
+    print('AddProductToCartEvent: DataLocal.listProductGift.length = ${DataLocal.listProductGift.length} (after restore)');
     emitter(AddProductToCartSuccess());
   }
 
@@ -1952,6 +2108,14 @@ class CartBloc extends Bloc<CartEvent,CartState>{
 
       // Backup quà nhập tay (giữ lại qua mọi lần load)
       final List<SearchItemResponseData> preservedManualGiftsAlways = DataLocal.listProductGift.where((e)=> e.gifProductByHand == true).toList();
+      
+      // ✅ PRESERVE gifts từ chi tiết đơn hàng (gifProductByHand == false và không có typeCK)
+      final List<SearchItemResponseData> preservedGiftsFromOrderDetail = DataLocal.listProductGift.where((gift) => 
+        gift.gifProduct == true && 
+        gift.gifProductByHand == false && 
+        (gift.typeCK == null || gift.typeCK == '')
+      ).toList();
+      print('💰 _handleCalculator: Preserving ${preservedGiftsFromOrderDetail.length} gifts from order detail');
 
       if(keyLoad == 'First'){
         listPromotion = '';
@@ -1961,6 +2125,20 @@ class CartBloc extends Bloc<CartEvent,CartState>{
         selectedCkgIds.clear();
         selectedHHIds.clear();
         selectedCknGroups.clear();
+        
+        // ✅ RESTORE gifts từ chi tiết đơn hàng ngay sau khi clear
+        for (var gift in preservedGiftsFromOrderDetail) {
+          DataLocal.listProductGift.add(gift);
+          totalProductGift += gift.count ?? 0;
+          print('💰 Restored gift from order detail (First): ${gift.code} (qty: ${gift.count})');
+        }
+        
+        // ✅ Tính lại totalProductGift từ DataLocal.listProductGift để đảm bảo chính xác
+        totalProductGift = 0;
+        for (var gift in DataLocal.listProductGift) {
+          totalProductGift += gift.count ?? 0;
+        }
+        print('💰 After restore (First): totalProductGift=$totalProductGift, listProductGift.length=${DataLocal.listProductGift.length}');
       }
       
       // Clear CKN data when recalculating
@@ -1992,8 +2170,18 @@ class CartBloc extends Bloc<CartEvent,CartState>{
       // ✅ CHỈ clear hàng tặng khi keyLoad == 'First' (lần đầu load)
       // Khi keyLoad == 'Second' (reload sau khi chọn thêm chiết khấu), PRESERVE các hàng tặng đã chọn (CKN, CKTDTH)
       if(Const.freeDiscount == false && keyLoad == 'First'){
+        // ✅ Preserve gifts từ chi tiết đơn hàng trước khi clear
+        List<SearchItemResponseData> preservedGiftsFromOrderDetailBeforeClear = DataLocal.listProductGift.where((gift) => 
+          gift.gifProduct == true && 
+          gift.gifProductByHand == false && 
+          (gift.typeCK == null || gift.typeCK == '')
+        ).toList();
+        
         DataLocal.listProductGift.clear();
         DataLocal.listProductGift.addAll(preservedManualGiftsFirst);
+        // ✅ Restore gifts từ chi tiết đơn hàng sau khi restore manual gifts
+        DataLocal.listProductGift.addAll(preservedGiftsFromOrderDetailBeforeClear);
+        print('💰 After clear (freeDiscount=false): Restored ${preservedManualGiftsFirst.length} manual gifts and ${preservedGiftsFromOrderDetailBeforeClear.length} gifts from order detail');
       }
       
       // ✅ PRESERVE CKN và CKTDTH gifts khi keyLoad == 'Second'
@@ -2270,6 +2458,8 @@ class CartBloc extends Bloc<CartEvent,CartState>{
                   sctGoc: (itemOrder.listDiscountProduct != null && itemOrder.listDiscountProduct!.isNotEmpty) ? itemOrder.listDiscountProduct![0].sttRecCk.toString().trim() : "",
                   sttRecCK: (itemOrder.listDiscountProduct != null && itemOrder.listDiscountProduct!.isNotEmpty) ? itemOrder.listDiscountProduct![0].sttRecCk.toString().trim() : "",
                   typeCK: 'HH',
+                  gifProduct: true,
+                  gifProductByHand: false,
                   heSo: element.heSo,
                   idNVKD: element.idNVKD,
                   nameNVKD: element.nameNVKD,
@@ -2289,6 +2479,19 @@ class CartBloc extends Bloc<CartEvent,CartState>{
               maHangTangOld = (itemOrder.listDiscountProduct != null && itemOrder.listDiscountProduct!.isNotEmpty) ? itemOrder.listDiscountProduct![0].maHangTang.toString() : "";
               codeDiscountOld = itemOrder.listDiscount![0].maCk.toString();
               listOrder.add(itemValues);
+              
+              // ✅ ADD gifts từ API tính chiết khấu (HH) vào DataLocal.listProductGift
+              // Kiểm tra xem gift này đã có chưa (tránh duplicate)
+              bool exists = DataLocal.listProductGift.any((g) => 
+                g.code == itemValues.code &&
+                g.typeCK == 'HH' &&
+                g.sttRecCK == itemValues.sttRecCK
+              );
+              if (!exists && itemValues.code != null && itemValues.code!.isNotEmpty) {
+                DataLocal.listProductGift.add(itemValues);
+                totalProductGift += itemValues.count ?? 0;
+                print('💰 Added HH gift from discount API: ${itemValues.code} - ${itemValues.name}, count: ${itemValues.count}');
+              }
             }
             else if(itemOrder.listDiscount![0].kieuCk == 'VND'){
               itemOrder.maCk = itemOrder.listDiscount![0].maCk.toString().trim();
@@ -2500,9 +2703,23 @@ class CartBloc extends Bloc<CartEvent,CartState>{
                     sttRecCK: elementProduct.sttRecCk.toString().trim(),
                     typeCK: 'HH',
                     gifProduct: true,
+                    gifProductByHand: false,
                     // priceOk:  elementProduct
                 );
                 listOrder.add(itemValues);
+                
+                // ✅ ADD gifts từ API tính chiết khấu (HH) vào DataLocal.listProductGift khi keyLoad != 'First'
+                // Kiểm tra xem gift này đã có chưa (tránh duplicate)
+                bool exists = DataLocal.listProductGift.any((g) => 
+                  g.code == itemValues.code &&
+                  g.typeCK == 'HH' &&
+                  g.sttRecCK == itemValues.sttRecCK
+                );
+                if (!exists && itemValues.code != null && itemValues.code!.isNotEmpty) {
+                  DataLocal.listProductGift.add(itemValues);
+                  totalProductGift += itemValues.count ?? 0;
+                  print('💰 Added HH gift from discount API (keyLoad != First): ${itemValues.code} - ${itemValues.name}, count: ${itemValues.count}');
+                }
               }
             }
           }
@@ -2645,7 +2862,26 @@ class CartBloc extends Bloc<CartEvent,CartState>{
           }
         }
         
-        print('💰 After restore: totalProductGift=$totalProductGift, listProductGift.length=${DataLocal.listProductGift.length}');
+        // ✅ RESTORE gifts từ chi tiết đơn hàng (khi keyLoad == 'Second')
+        for (var gift in preservedGiftsFromOrderDetail) {
+          bool exists = DataLocal.listProductGift.any((g) => 
+            g.code == gift.code && 
+            g.gifProductByHand == false &&
+            (g.typeCK == null || g.typeCK == '')
+          );
+          if (!exists) {
+            DataLocal.listProductGift.add(gift);
+            totalProductGift += gift.count ?? 0;
+            print('💰 Restored gift from order detail (Second): ${gift.code} (qty: ${gift.count})');
+          }
+        }
+        
+        // ✅ Tính lại totalProductGift từ DataLocal.listProductGift để đảm bảo chính xác
+        totalProductGift = 0;
+        for (var gift in DataLocal.listProductGift) {
+          totalProductGift += gift.count ?? 0;
+        }
+        print('💰 After restore (Second): totalProductGift=$totalProductGift, listProductGift.length=${DataLocal.listProductGift.length}');
         
         // ✅ RESTORE listPromotion và DataLocal.listCKVT để không mất các chiết khấu đã chọn trước đó
         // Merge với các giá trị từ response (nếu có)
@@ -2689,7 +2925,26 @@ class CartBloc extends Bloc<CartEvent,CartState>{
           print('💰 Restored manual gift (always): ${gift.code} (qty: ${gift.count})');
         }
       }
-      print('💰 After restore ALL manual gifts: totalProductGift=$totalProductGift, listProductGift.length=${DataLocal.listProductGift.length}');
+      
+      // ✅ Always restore gifts từ chi tiết đơn hàng (applies to both First and Second)
+      for (var gift in preservedGiftsFromOrderDetail) {
+        bool exists = DataLocal.listProductGift.any((g) =>
+          g.code == gift.code &&
+          g.gifProductByHand == false &&
+          (g.typeCK == null || g.typeCK == '')
+        );
+        if (!exists) {
+          DataLocal.listProductGift.add(gift);
+          totalProductGift += gift.count ?? 0;
+          print('💰 Restored gift from order detail (Always): ${gift.code} (qty: ${gift.count})');
+        }
+      }
+      // ✅ Tính lại totalProductGift từ DataLocal.listProductGift để đảm bảo chính xác
+      totalProductGift = 0;
+      for (var gift in DataLocal.listProductGift) {
+        totalProductGift += gift.count ?? 0;
+      }
+      print('💰 After restore ALL gifts: totalProductGift=$totalProductGift, listProductGift.length=${DataLocal.listProductGift.length}');
 
       print('check tax ${keyLoad} => ${ Const.useTax} ${DataLocal.indexValuesTax} ${allowed2 = true}');
       if(keyLoad == 'Second' && Const.useTax == true && DataLocal.indexValuesTax >= 0 && allowed2 == true){
@@ -2703,9 +2958,23 @@ class CartBloc extends Bloc<CartEvent,CartState>{
     }
   }
 
-  CartState _handleCalculator(Object data, bool viewUpdateOrder,bool addNewItem,bool reCalculator){
+  CartState _handleCalculator(Object data, bool viewUpdateOrder,bool addNewItem,bool reCalculator, {List<SearchItemResponseData>? preservedGiftsFromOrderDetail}){
     if (data is String) return CartFailure('Úi,${data.toString()}');
     try{
+      // ✅ PRESERVE gifts từ chi tiết đơn hàng trước khi xử lý response
+      // Nếu không được truyền vào từ _checkDisCountWhenUpdateEvent, lấy từ DataLocal
+      List<SearchItemResponseData> giftsToPreserve = preservedGiftsFromOrderDetail ?? 
+        DataLocal.listProductGift.where((gift) => 
+          gift.gifProduct == true && 
+          gift.gifProductByHand == false && 
+          (gift.typeCK == null || gift.typeCK == '')
+        ).toList();
+      
+      print('💰 _handleCalculator: Preserving ${giftsToPreserve.length} gifts from order detail');
+      for (var gift in giftsToPreserve) {
+        print('  - Gift to preserve: ${gift.code} - ${gift.name}, count: ${gift.count}');
+      }
+      
       if(listCodeDisCount?.isNotEmpty == true){
         listCodeDisCount?.clear();
       }
@@ -2807,6 +3076,30 @@ class CartBloc extends Bloc<CartEvent,CartState>{
       totalMNProduct = response.data?.order?.tTien;
       totalMNDiscount = response.data?.order?.ck;
       totalMNPayment = response.data?.order?.tTt;
+      
+      // ✅ RESTORE gifts từ chi tiết đơn hàng sau khi xử lý response
+      if(viewUpdateOrder == true){
+        for (var gift in giftsToPreserve) {
+          bool exists = DataLocal.listProductGift.any((g) =>
+            g.code == gift.code &&
+            g.gifProductByHand == false &&
+            (g.typeCK == null || g.typeCK == '')
+          );
+          if (!exists) {
+            DataLocal.listProductGift.add(gift);
+            totalProductGift += gift.count ?? 0;
+            print('💰 _handleCalculator: Restored gift from order detail: ${gift.code} (qty: ${gift.count})');
+          }
+        }
+        
+        // ✅ Tính lại totalProductGift từ DataLocal.listProductGift để đảm bảo chính xác
+        totalProductGift = 0;
+        for (var gift in DataLocal.listProductGift) {
+          totalProductGift += gift.count ?? 0;
+        }
+        print('💰 _handleCalculator: After restore, totalProductGift=$totalProductGift, listProductGift.length=${DataLocal.listProductGift.length}');
+      }
+      
       if(viewUpdateOrder == false && addNewItem == false){
         return CartInitial();
       }else {
@@ -2846,6 +3139,10 @@ class CartBloc extends Bloc<CartEvent,CartState>{
       DataLocal.tenDL = response.data!.master!.tenDL.toString().trim();
       DataLocal.maDL = response.data!.master!.maDL.toString().trim();
 
+      // ✅ PRESERVE gifts từ chi tiết đơn hàng (kmYn = 1) trước khi xử lý
+      // Chỉ preserve gifts chưa có trong DataLocal (tránh duplicate)
+      List<SearchItemResponseData> giftsFromOrderDetail = [];
+      
       if(lineItem.isNotEmpty){
         for (var element in lineItem) {
           if(element.maVV != null){
@@ -2863,8 +3160,82 @@ class CartBloc extends Bloc<CartEvent,CartState>{
             DataLocal.nameStockMater = element.tenKho.toString().trim();
             DataLocal.codeStockMater = element.maKho.toString().trim();
           }
+          
+          // ✅ Xử lý gifts từ chi tiết đơn hàng (kmYn = 1)
+          bool isGiftProduct = element.kmYn != null && element.kmYn != 0;
+          if(isGiftProduct){
+            // Kiểm tra xem gift này đã có trong DataLocal chưa
+            bool exists = DataLocal.listProductGift.any((g) => 
+              g.code == element.maVt &&
+              g.gifProductByHand == false &&
+              (g.typeCK == null || g.typeCK == '')
+            );
+            
+            if(!exists){
+              SearchItemResponseData giftItem = SearchItemResponseData(
+                code: element.maVt,
+                name: element.tenVt,
+                name2: element.name2,
+                dvt: element.dvt,
+                descript: "",
+                price: element.price,
+                giaSuaDoi: element.price ?? 0,
+                applyPriceAfterTax: false,
+                totalMoneyDiscount: 0,
+                totalMoneyProduct: 0,
+                valuesTax: 0,
+                priceAfter: element.priceAfter,
+                discountPercent: 0,
+                stockAmount: element.stockAmount,
+                taxPercent: 0,
+                priceOk: 0,
+                imageUrl: element.imageUrl ?? '',
+                count: element.soLuong,
+                isMark: 0,
+                discountMoney: '0',
+                discountProduct: '0',
+                budgetForItem: '',
+                budgetForProduct: '',
+                residualValueProduct: 0,
+                residualValue: 0,
+                unit: element.dvt ?? '',
+                priceAfter2: 0,
+                maCk: '',
+                maCkOld: '',
+                kColorFormatAlphaB: element.kColorFormatAlphaB,
+                maVtGoc: '', ck: 0, cknt: 0, sttRecCK: '', typeCK: '', 
+                gifProduct: true, 
+                gifProductByHand: false, // Đánh dấu là gift từ chi tiết đơn, không phải thêm bằng tay
+                discountByHand: false, 
+                discountPercentByHand: 0,
+                unitProduct: '',
+                contentDvt: '',
+                woPrice: 0,
+                woPriceAfter: 0,
+                stockCode: element.codeStore,
+                stockName: element.nameStore,
+                idVv: element.maVV,
+                idHd: element.maHD,
+                nameVv: element.tenVV,
+                nameHd: element.tenHD,
+              );
+              giftsFromOrderDetail.add(giftItem);
+            }
+          }
         }
       }
+      
+      // ✅ Thêm gifts từ chi tiết đơn vào DataLocal (nếu chưa có)
+      for (var gift in giftsFromOrderDetail) {
+        DataLocal.listProductGift.add(gift);
+        totalProductGift += gift.count ?? 0;
+        print('💰 _handleGetDetailOrder: Added gift from order detail: ${gift.code} - ${gift.name}, count: ${gift.count}');
+      }
+      
+      if(giftsFromOrderDetail.isNotEmpty){
+        print('💰 _handleGetDetailOrder: Total gifts from order detail: ${giftsFromOrderDetail.length}, totalProductGift: $totalProductGift');
+      }
+      
       return GetListItemUpdateOrderSuccess();
     } catch (e) {
       return CartFailure('Úi, ${e.toString()}');
