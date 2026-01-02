@@ -46,6 +46,7 @@ import '../component/search_product.dart';
 import 'cart_bloc.dart';
 import 'cart_state.dart';
 import 'cart_event.dart';
+import 'widgets/tax_selection_sheet.dart';
 
 
 class ConfirmScreen extends StatefulWidget {
@@ -565,7 +566,8 @@ class _ConfirmScreenState extends State<ConfirmScreen>with TickerProviderStateMi
           }
         }
         else if(state is CheckIsMarkProductSuccess){
-          _bloc.totalPayment = (_bloc.totalMoney - _bloc.totalDiscount) + _bloc.totalTax;
+          double totalDiscountForOder = _bloc.totalDiscountForOder ?? 0;
+          _bloc.totalPayment = (_bloc.totalMoney - _bloc.totalDiscount - totalDiscountForOder) + _bloc.totalTax;
         }
         else if(state is CheckAllIsMarkProductSuccess){
           if(state.isMarkAll == true){
@@ -739,6 +741,24 @@ class _ConfirmScreenState extends State<ConfirmScreen>with TickerProviderStateMi
       _bloc.checkAllProduct = false;
     }
     if(listItem.isNotEmpty){
+      // ✅ Đảm bảo warehouseId không rỗng
+      // Ưu tiên: _bloc.storeCode > codeStore > widget.codeStore > Const.stockList[0].stockCode
+      final finalWarehouseId = (!Utils.isEmpty(_bloc.storeCode.toString()) && _bloc.storeCode.toString().trim().isNotEmpty)
+          ? _bloc.storeCode.toString()
+          : ((!Utils.isEmpty(codeStore) && codeStore.trim().isNotEmpty)
+              ? codeStore
+              : ((widget.codeStore != null && !Utils.isEmpty(widget.codeStore.toString()) && widget.codeStore.toString().trim().isNotEmpty && widget.codeStore.toString().trim() != 'null')
+                  ? widget.codeStore.toString()
+                  : (Const.stockList.isNotEmpty ? Const.stockList[0].stockCode.toString() : '')));
+      
+      if (finalWarehouseId.isEmpty) {
+        print('⚠️ Warning: warehouseId is empty in ConfirmScreen, API may fail!');
+        print('   - _bloc.storeCode = ${_bloc.storeCode}');
+        print('   - codeStore = $codeStore');
+        print('   - widget.codeStore = ${widget.codeStore}');
+        print('   - Const.stockList.length = ${Const.stockList.length}');
+      }
+      
       _bloc.add(GetListItemApplyDiscountEvent(
         listCKVT: DataLocal.listCKVT,
         listPromotion: _bloc.listPromotion,
@@ -746,7 +766,7 @@ class _ConfirmScreenState extends State<ConfirmScreen>with TickerProviderStateMi
         listQty: listQty,
         listPrice: listPrice,
         listMoney: listMoney,
-        warehouseId: codeStore,
+        warehouseId: finalWarehouseId,
         customerId: _bloc.codeCustomer.toString(),
         keyLoad: (key == '' && key.isEmpty) ? 'First' : key,
       ));
@@ -974,6 +994,7 @@ class _ConfirmScreenState extends State<ConfirmScreen>with TickerProviderStateMi
                       iconData: MdiIcons.shopping,
                       title: 'Xác nhận đơn hàng',
                       content: 'Chọn trạng thái đơn trước khi tạo mới',
+                      ck_dac_biet: _bloc.ck_dac_biet,
                     ),
                   );
                 }).then((value)async{
@@ -1035,6 +1056,7 @@ class _ConfirmScreenState extends State<ConfirmScreen>with TickerProviderStateMi
                       iconData: MdiIcons.shopping,
                       title: 'Xác nhận đơn hàng',
                       content: 'Chọn trạng thái đơn trước khi tạo mới',
+                      ck_dac_biet: _bloc.ck_dac_biet,
                     ),
                   );
                 }).then((value)async{
@@ -1448,8 +1470,10 @@ class _ConfirmScreenState extends State<ConfirmScreen>with TickerProviderStateMi
                       if(DataLocal.listCKVT.isNotEmpty && DataLocal.listCKVT.contains('${itemSelect.sttRecCK.toString().trim()}-${itemSelect.code.toString().trim()}') == true){
                         DataLocal.listCKVT = DataLocal.listCKVT.replaceAll('${itemSelect.sctGoc.toString().trim()}-${itemSelect.code.toString().trim()}', '');
                       }
+                      // ✅ FIX: Chỉ gọi DeleteProductFromDB, không cần gọi GetListProductFromDB
+                      // Vì _deleteProductFromDB trong cart_bloc đã tự động gọi GetListProductFromDB rồi (dòng 1681)
                       _bloc.add(DeleteProductFromDB(false,index,_bloc.listOrder[index].code.toString(),_bloc.listOrder[index].stockCode.toString()));
-                      _bloc.add(GetListProductFromDB(addOrderFromCheckIn: false, getValuesTax: false,key: ''));
+                      // _bloc.add(GetListProductFromDB(addOrderFromCheckIn: false, getValuesTax: false,key: '')); // ❌ REMOVED: Bị gọi 2 lần
                     },
                     borderRadius:const BorderRadius.all(Radius.circular(8)),
                     padding:const EdgeInsets.all(10),
@@ -2979,6 +3003,24 @@ class _ConfirmScreenState extends State<ConfirmScreen>with TickerProviderStateMi
                       _bloc.codeDiscountTD = value[2];
                       _bloc.sttRecCKOld = value[7];
                       _bloc.listCkMatHang.clear();
+                      // ✅ Đảm bảo warehouseId không rỗng
+                      // Ưu tiên: _bloc.storeCode > codeStore > widget.codeStore > Const.stockList[0].stockCode
+                      final finalWarehouseId = (!Utils.isEmpty(_bloc.storeCode.toString()) && _bloc.storeCode.toString().trim().isNotEmpty)
+                          ? _bloc.storeCode.toString()
+                          : ((!Utils.isEmpty(codeStore) && codeStore.trim().isNotEmpty)
+                              ? codeStore
+                              : ((widget.codeStore != null && !Utils.isEmpty(widget.codeStore.toString()) && widget.codeStore.toString().trim().isNotEmpty && widget.codeStore.toString().trim() != 'null')
+                                  ? widget.codeStore.toString()
+                                  : (Const.stockList.isNotEmpty ? Const.stockList[0].stockCode.toString() : '')));
+                      
+                      if (finalWarehouseId.isEmpty) {
+                        print('⚠️ Warning: warehouseId is empty in ConfirmScreen (voucher), API may fail!');
+                        print('   - _bloc.storeCode = ${_bloc.storeCode}');
+                        print('   - codeStore = $codeStore');
+                        print('   - widget.codeStore = ${widget.codeStore}');
+                        print('   - Const.stockList.length = ${Const.stockList.length}');
+                      }
+                      
                       _bloc.add(GetListItemApplyDiscountEvent(
                           listCKVT: DataLocal.listCKVT,
                           listPromotion: _bloc.listPromotion,
@@ -2986,7 +3028,7 @@ class _ConfirmScreenState extends State<ConfirmScreen>with TickerProviderStateMi
                           listQty: listQty,
                           listPrice: listPrice,
                           listMoney: listMoney,
-                          warehouseId: codeStore,
+                          warehouseId: finalWarehouseId,
                           customerId: _bloc.codeCustomer.toString(),
                           keyLoad: 'Second'
                       ));
@@ -3443,47 +3485,121 @@ class _ConfirmScreenState extends State<ConfirmScreen>with TickerProviderStateMi
   late int indexValuesTax;
 
   Widget genderTaxWidget() {
-    return
-      Utils.isEmpty(DataLocal.listTax)
-        ?
-      const Padding(
-      padding: EdgeInsets.only(top: 6),
-      child:  Text('Không có dữ liệu',style: TextStyle(color: Colors.blueGrey,fontSize: 12)),
-    )
-        :
-      DropdownButtonHideUnderline(
-        child: DropdownButton<GetListTaxResponseData>(
-            isDense: true,
-            isExpanded: true,
-            style: const TextStyle(
-              color: black,
-              fontSize: 12.0,
-            ),
-            value: DataLocal.listTax[_bloc.taxIndex],
-            items: DataLocal.listTax.map((value) => DropdownMenuItem<GetListTaxResponseData>(
-              value: value,
-              child: Text(
-                value.tenThue.toString(), style:  const TextStyle(fontSize: 12.0, color: black),maxLines: 1,overflow: TextOverflow.ellipsis,),
-            )).toList(),
-            onChanged: (value) {
-              GetListTaxResponseData tax = value!;
-              if(tax.maThue.toString().trim() == '#000'){
+    // Lấy tax hiện tại
+    GetListTaxResponseData? currentTax;
+    if (DataLocal.listTax.isNotEmpty && _bloc.taxIndex < DataLocal.listTax.length) {
+      currentTax = DataLocal.listTax[_bloc.taxIndex];
+    }
+
+    return InkWell(
+      onTap: () {
+        // Show bottom sheet để chọn thuế
+        showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          builder: (context) => TaxSelectionSheet(
+            selectedTax: currentTax,
+            onTaxSelected: (tax) {
+              // Xử lý khi chọn thuế
+              if (tax.maThue.toString().trim() == '#000') {
                 _bloc.allowTaxPercent = false;
-              }else{
+              } else {
                 _bloc.allowTaxPercent = true;
               }
-              indexValuesTax = DataLocal.listTax.indexOf(value);
+
+              // Tìm index của tax trong DataLocal.listTax
+              int indexValuesTax = 0;
+              if (DataLocal.listTax.isNotEmpty) {
+                int foundIndex = DataLocal.listTax.indexWhere(
+                  (t) => t.maThue == tax.maThue,
+                );
+                if (foundIndex >= 0) {
+                  indexValuesTax = foundIndex;
+                }
+              }
+
+              indexValuesTax = DataLocal.listTax.indexOf(tax);
               DataLocal.indexValuesTax = indexValuesTax;
               DataLocal.taxPercent = tax.thueSuat!.toDouble();
               DataLocal.taxCode = tax.maThue.toString().trim();
-              if(Const.afterTax == true){
-                _bloc.add(PickTaxAfter(DataLocal.indexValuesTax,DataLocal.taxPercent));
-              }else{
-                _bloc.add(PickTaxBefore(DataLocal.indexValuesTax,DataLocal.taxPercent));
+              
+              if (Const.afterTax == true) {
+                _bloc.add(PickTaxAfter(DataLocal.indexValuesTax, DataLocal.taxPercent));
+              } else {
+                _bloc.add(PickTaxBefore(DataLocal.indexValuesTax, DataLocal.taxPercent));
               }
-
-            }),
-      );
+            },
+            onLoadTaxList: () async {
+              try {
+                // Call API để lấy danh sách thuế
+                final response = await _bloc.getListTaxFromAPI();
+                
+                // Parse response
+                if (response != null && response is Map<String, dynamic>) {
+                  final taxResponse = GetListTaxResponse.fromJson(response);
+                  DataLocal.listTax = taxResponse.data ?? [];
+                  
+                  // ✅ Tự động thêm option "Không áp dụng thuế" vào đầu danh sách
+                  if (DataLocal.listTax.isNotEmpty) {
+                    GetListTaxResponseData element = GetListTaxResponseData(
+                      maThue: '#000',
+                      tenThue: 'Không áp dụng thuế cho đơn hàng này',
+                      thueSuat: 0.0,
+                    );
+                    
+                    // Chỉ thêm nếu chưa có
+                    bool hasNoTaxOption = DataLocal.listTax.any((tax) => tax.maThue?.trim() == '#000');
+                    if (!hasNoTaxOption) {
+                      DataLocal.listTax.insert(0, element);
+                    }
+                  }
+                  
+                  return DataLocal.listTax;
+                }
+                
+                // Fallback: return DataLocal.listTax nếu đã có
+                return DataLocal.listTax;
+              } catch (e) {
+                print('❌ Error loading tax list: $e');
+                // Fallback: return DataLocal.listTax nếu có lỗi
+                return DataLocal.listTax;
+              }
+            },
+          ),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey.shade300),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                currentTax?.tenThue?.toString() ?? 'Chọn thuế',
+                style: TextStyle(
+                  fontSize: 12.0,
+                  color: currentTax != null ? black : Colors.grey.shade600,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              Icons.arrow_drop_down,
+              color: Colors.grey.shade600,
+              size: 20,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget transactionWidget() {

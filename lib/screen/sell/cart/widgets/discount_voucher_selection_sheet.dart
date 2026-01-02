@@ -70,22 +70,42 @@ class DiscountVoucherSelectionSheetState extends State<DiscountVoucherSelectionS
     return '${sttRecCk}_$productCode';
   }
 
-  String _normalizeCkgId(String id) {
-    if (id.contains('_')) return id;
-    for (final ckg in widget.listCkg) {
-      final sttRecCk = (ckg.sttRecCk ?? '').trim();
-      if (sttRecCk == id.trim()) {
-        return _buildCkgId(ckg);
+  // Convert ckgId (old format: sttRecCk_productCode) hoặc maCk sang maCk
+  String _convertToMaCk(String id) {
+    // Nếu đã là maCk (không chứa "_"), return trực tiếp
+    if (!id.contains('_')) {
+      // Kiểm tra xem có phải là maCk không
+      for (final ckg in widget.listCkg) {
+        if ((ckg.maCk ?? '').trim() == id.trim()) {
+          return id.trim();
+        }
+      }
+      return id.trim();
+    }
+    
+    // Nếu là format cũ (sttRecCk_productCode), tìm CKG item và lấy maCk
+    List<String> parts = id.split('_');
+    if (parts.length >= 2) {
+      String sttRecCk = parts[0].trim();
+      String productCode = parts[1].trim();
+      
+      // Tìm CKG item matching
+      for (final ckg in widget.listCkg) {
+        if ((ckg.sttRecCk ?? '').trim() == sttRecCk && 
+            (ckg.maVt ?? '').trim() == productCode) {
+          return (ckg.maCk ?? '').trim();
+        }
       }
     }
-    return id.trim();
+    
+    return id.trim(); // Fallback
   }
   
   @override
   void initState() {
     super.initState();
-    // Initialize with current selections
-    _selectedCkgIds = widget.selectedCkgIds.map(_normalizeCkgId).toSet();
+    // Initialize with current selections - convert old ckgId format to maCk
+    _selectedCkgIds = widget.selectedCkgIds.map(_convertToMaCk).where((id) => id.isNotEmpty).toSet();
     _selectedHHIds = Set.from(widget.selectedHHIds);
     _selectedCknGroups = Set.from(widget.selectedCknGroups);
     _selectedCktdttIds = Set.from(widget.selectedCktdttIds);
@@ -282,55 +302,82 @@ class DiscountVoucherSelectionSheetState extends State<DiscountVoucherSelectionS
     );
   }
 
-  // CKG Vouchers - Cho phép chọn nhiều (checkbox)
+  // CKG Vouchers - Group theo ma_ck, chỉ hiển thị 1 dòng cho mỗi ma_ck
   List<Widget> _buildCkgVouchers() {
     List<Widget> widgets = [];
     
+    // Group CKG items theo ma_ck
+    Map<String, List<ListCk>> groupedByMaCk = {};
     for (var ckgItem in widget.listCkg) {
-      String ckgId = _buildCkgId(ckgItem);
-      bool isSelected = _selectedCkgIds.contains(ckgId);
+      String maCk = (ckgItem.maCk ?? '').trim();
+      if (maCk.isEmpty) continue; // Skip items without maCk
       
-      // Tìm sản phẩm trong giỏ
-      String productCode = ckgItem.maVt?.trim() ?? '';
-      var product = widget.currentCart.firstWhere(
-        (item) => item.code == productCode && item.gifProduct != true,
-        orElse: () => SearchItemResponseData(code: productCode, name: productCode),
-      );
+      if (!groupedByMaCk.containsKey(maCk)) {
+        groupedByMaCk[maCk] = [];
+      }
+      groupedByMaCk[maCk]!.add(ckgItem);
+    }
+    
+    // Hiển thị 1 dòng cho mỗi ma_ck
+    groupedByMaCk.forEach((maCk, ckgItems) {
+      // Lấy item đầu tiên để lấy thông tin chung (tenCk, discount info)
+      var firstItem = ckgItems.first;
       
-      // Tính % hoặc số tiền giảm
+      // Dùng maCk làm ID thay vì ckgId
+      bool isSelected = _selectedCkgIds.contains(maCk);
+      
+      // Tính % hoặc số tiền giảm (lấy từ item đầu tiên)
       String discountText = '';
-      if (ckgItem.tlCk != null && ckgItem.tlCk! > 0) {
-        discountText = 'Giảm ${ckgItem.tlCk!.toStringAsFixed(1)}%';
-      } else if (ckgItem.ck != null && ckgItem.ck! > 0) {
-        String formattedAmount = _formatMoneyWithSeparator(ckgItem.ck);
+      if (firstItem.tlCk != null && firstItem.tlCk! > 0) {
+        discountText = 'Giảm ${firstItem.tlCk!.toStringAsFixed(1)}%';
+      } else if (firstItem.ck != null && firstItem.ck! > 0) {
+        String formattedAmount = _formatMoneyWithSeparator(firstItem.ck);
         discountText = 'Giảm ${formattedAmount}đ';
       }
       
+      // Đếm số sản phẩm có cùng ma_ck
+      int productCount = ckgItems.length;
+      String subtitle = productCount == 1 
+          ? 'Cho: ${[ckgItems.first.tenVt, ckgItems.first.maVt]
+          .firstWhere(
+            (e) => e != null && e.trim().isNotEmpty && e.toLowerCase() != 'null',
+        orElse: () => '',
+      )}'
+          : 'Áp dụng cho $productCount sản phẩm trong giỏ hàng';
+      final text = ([firstItem.tenCk, firstItem.maCk?.toString()]
+          .firstWhere(
+            (e) => e != null && e.trim().isNotEmpty && e.toLowerCase() != 'null',
+        orElse: () => null,
+      )) ?? '';
+
+
+
       widgets.add(
         _buildVoucherCheckboxCard(
-          id: ckgId,
+          id: maCk,
           type: 'CKG',
           icon: Icons.discount,
           iconColor: Colors.green,
-          title: ckgItem.tenCk ?? discountText,
-          subtitle: 'Cho: ${product.name ?? productCode}',
+          title: text,
+          subtitle: subtitle,
           description: discountText,
           isSelected: isSelected,
           onChanged: (bool? value) {
             setState(() {
               if (value == true) {
-                _selectedCkgIds.add(ckgId);
-                widget.onSelectCkg?.call(ckgId, ckgItem);
+                _selectedCkgIds.add(maCk);
+                // Gọi callback với maCk và tất cả items cùng ma_ck
+                widget.onSelectCkg?.call(maCk, firstItem);
               } else {
-                _selectedCkgIds.remove(ckgId);
-                widget.onRemoveCkg?.call(ckgId, ckgItem);
+                _selectedCkgIds.remove(maCk);
+                widget.onRemoveCkg?.call(maCk, firstItem);
               }
             });
           },
         ),
       );
       widgets.add(const SizedBox(height: 8));
-    }
+    });
 
     return widgets;
   }

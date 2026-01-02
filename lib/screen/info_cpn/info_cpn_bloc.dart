@@ -395,10 +395,17 @@ class InfoCPNBloc extends Bloc<InfoCPNEvent,InfoCPNState>{
       }
       GetPermissionUserResponse response = GetPermissionUserResponse.fromJson(data as Map<String,dynamic>);
       listUserPermission = response.userPermission!;
-      List<UserPermissionAccount> userPermissionAccount = response.userPermissionAccount!;
-      for (var element in userPermissionAccount) {
-        box.write(Const.ACCESS_CODE, element.value.toString().trim());
-        box.write(Const.ACCESS_NAME, element.name.toString().trim());
+      List<UserPermissionAccount>? userPermissionAccount = response.userPermissionAccount;
+
+      if (userPermissionAccount != null && userPermissionAccount.isNotEmpty) {
+        // Có dữ liệu, ghi vào box
+        for (var element in userPermissionAccount) {
+          box.write(Const.ACCESS_CODE, element.value.toString().trim());
+          box.write(Const.ACCESS_NAME, element.name.toString().trim());
+        }
+      } else {
+        box.write(Const.ACCESS_CODE, '0');
+        box.write(Const.ACCESS_NAME, '');
       }
       /// No check menu
       /// 27.8.2022

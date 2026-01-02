@@ -1,6 +1,5 @@
 // ignore_for_file: library_private_types_in_public_api
 
-import 'package:dms/screen/dms/component/requset_open_store_detail.dart';
 import 'package:dms/utils/utils.dart';
 import 'package:dms/widget/pending_action.dart';
 import 'package:flutter/material.dart';
@@ -168,7 +167,11 @@ class _RequestOpenStoreScreenState extends State<RequestOpenStoreScreen> {
                             )
                                 :
                             GestureDetector(
-                              onTap: ()=> PersistentNavBarNavigator.pushNewScreen(context, screen: RequestOpenStoreDetailScreen( idRequestOpenStore: _bloc.listDataRequest[index].master!.keyValue.toString(),),withNavBar: false).then((value){
+                              onTap: ()=> PersistentNavBarNavigator.pushNewScreen(context, screen: AddNewRequestOpenStoreScreen(
+                                idRequestOpenStore: _bloc.listDataRequest[index].master!.keyValue.toString(),
+                                isEdit: true,
+                                existingImageUrls: _bloc.listDataRequest[index].imageListRequestOpenStore?.map((e) => e.pathL ?? '').where((e) => e.isNotEmpty).toList(),
+                              ),withNavBar: false).then((value){
                                 if(value == 'RELOAD'){
                                   if(_bloc.listDataRequest.isNotEmpty){
                                     _bloc.listDataRequest.clear();

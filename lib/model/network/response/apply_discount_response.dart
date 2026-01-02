@@ -83,6 +83,7 @@ class ListCkTongDon {
   int? capCk;
   String? kieuCK;
   int? isMark = 0;
+  dynamic ck_dac_biet;
 
   ListCkTongDon(
       {this.sttRecCk,
@@ -103,7 +104,7 @@ class ListCkTongDon {
         this.gtVip2,
         this.gtVipNt2,
         this.capCk,
-        this.kieuCK,this.isMark});
+        this.kieuCK,this.isMark,this.ck_dac_biet});
 
   ListCkTongDon.fromJson(Map<String, dynamic> json) {
     sttRecCk = json['stt_rec_ck'];
@@ -125,6 +126,7 @@ class ListCkTongDon {
     gtVipNt2 = json['gt_vip_nt2'];
     capCk = json['cap_ck'];
     kieuCK = json['kieu_ck'];
+    ck_dac_biet = json['ck_dac_biet'];
   }
 
   Map<String, dynamic> toJson() {
@@ -148,6 +150,7 @@ class ListCkTongDon {
     data['gt_vip_nt2'] = gtVipNt2;
     data['cap_ck'] = capCk;
     data['kieu_ck'] = kieuCK;
+    data['ck_dac_biet'] = ck_dac_biet;
     return data;
   }
 }
@@ -180,6 +183,7 @@ class ListCk {
   String? kieuCk;
   int? capCk;
   int? isMark = 0;
+  dynamic ck_dac_biet;
 
   ListCk(
       {this.sttRecCk,
@@ -206,7 +210,7 @@ class ListCk {
         this.giaNt2,
         this.ton13,
         this.kieuCk,
-        this.capCk,this.isMark});
+        this.capCk,this.isMark,this.ck_dac_biet});
 
   ListCk.fromJson(Map<String, dynamic> json) {
     sttRecCk = json['stt_rec_ck'];
@@ -235,6 +239,7 @@ class ListCk {
     ton13 = json['ton13'];
     kieuCk = json['kieu_ck'];
     capCk = json['cap_ck'];
+    ck_dac_biet = json['ck_dac_biet'];
   }
 
   Map<String, dynamic> toJson() {
@@ -265,6 +270,7 @@ class ListCk {
     data['ton13'] = ton13;
     data['kieu_ck'] = kieuCk;
     data['cap_ck'] = capCk;
+    data['ck_dac_biet'] = ck_dac_biet;
     return data;
   }
 }

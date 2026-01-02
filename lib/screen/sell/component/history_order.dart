@@ -35,6 +35,7 @@ class _HistoryOrderScreenState extends State<HistoryOrderScreen>  with TickerPro
   late PageController _pageController;
   late TabController tabController;
   bool show = false;
+  int _previousTabIndex = -1;
 
   @override
   void initState() {
@@ -48,6 +49,26 @@ class _HistoryOrderScreenState extends State<HistoryOrderScreen>  with TickerPro
     show = true;
     _scrollController = ScrollController();
     _pageController = PageController();
+
+    // Listener để gọi API khi chuyển tab
+    tabController.addListener(_onTabChanged);
+
+    // Gọi API cho tab đầu tiên khi khởi tạo
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (DataLocal.listStatusToOrder.isNotEmpty) {
+        _previousTabIndex = 0;
+        final initialStatus = int.parse(DataLocal.listStatusToOrder[0].status.toString());
+        _bloc.statusOrderList = initialStatus;
+        _bloc.list.clear();
+        _bloc.add(GetListHistoryOrder(
+          status: initialStatus,
+          dateFrom: Const.dateFrom,
+          dateTo: Const.dateTo,
+          userId: widget.userId,
+          typeLetterId: 'ORDERLIST',
+        ));
+      }
+    });
 
     _scrollController.addListener(() {
       final maxScroll = _scrollController.position.maxScrollExtent;
@@ -64,10 +85,33 @@ class _HistoryOrderScreenState extends State<HistoryOrderScreen>  with TickerPro
     });
   }
 
+  void _onTabChanged() {
+    if (!tabController.indexIsChanging) {
+      // Chỉ gọi API khi đã chuyển tab xong và index thực sự thay đổi
+      final newIndex = tabController.index;
+      if (_previousTabIndex != newIndex) {
+        _previousTabIndex = newIndex;
+        final status = int.parse(DataLocal.listStatusToOrder[newIndex].status.toString());
+        _bloc.statusOrderList = status;
+        _bloc.list.clear();
+        _bloc.add(GetListHistoryOrder(
+          status: status,
+          dateFrom: Const.dateFrom,
+          dateTo: Const.dateTo,
+          userId: widget.userId,
+          typeLetterId: 'ORDERLIST',
+        ));
+      }
+    }
+  }
+
   @override
   void dispose() {
-    super.dispose();
+    tabController.removeListener(_onTabChanged);
+    tabController.dispose();
+    _scrollController.dispose();
     _pageController.dispose();
+    super.dispose();
   }
 
   @override

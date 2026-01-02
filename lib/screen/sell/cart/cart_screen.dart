@@ -54,6 +54,23 @@ import 'cart_event.dart';
 import 'cart_state.dart';
 import 'component/custom_order.dart';
 import 'component/quantity_info_box.dart';
+import 'widgets/cart_app_bar.dart';
+import 'widgets/cart_bottom_total.dart';
+import 'widgets/cart_product_list.dart';
+import 'widgets/cart_customer_info.dart';
+import 'widgets/cart_bill_info.dart';
+import 'widgets/cart_gift_item.dart';
+import 'widgets/cart_product_item.dart';
+import 'widgets/cart_order_handler.dart';
+import 'widgets/cart_popup_vvhd.dart';
+import 'widgets/cart_helper_widgets.dart';
+import 'widgets/cart_method_receive.dart';
+import 'widgets/cart_invoice_widgets.dart';
+import 'widgets/tabs/cart_product_tab.dart';
+import 'widgets/tabs/cart_customer_tab.dart';
+import 'widgets/tabs/cart_bill_tab.dart';
+import 'helpers/cart_discount_helper.dart';
+import 'helpers/cart_draft_storage.dart';
 
 class CartScreen extends StatefulWidget {
   final String? sttRec;
@@ -212,6 +229,23 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
       _bloc.checkAllProduct = false;
     }
     if(listItem.isNotEmpty){
+      // ✅ Đảm bảo warehouseId không rỗng
+      // Ưu tiên: _bloc.storeCode > codeStore > Const.stockList[0].stockCode
+      final finalWarehouseId = (!Utils.isEmpty(_bloc.storeCode.toString()) && _bloc.storeCode.toString().trim().isNotEmpty)
+          ? _bloc.storeCode.toString()
+          : ((!Utils.isEmpty(codeStore) && codeStore.trim().isNotEmpty)
+              ? codeStore
+              : (Const.stockList.isNotEmpty ? Const.stockList[0].stockCode.toString() : ''));
+      
+      if (finalWarehouseId.isEmpty) {
+        print('⚠️ Warning: warehouseId is empty, API may fail!');
+        print('   - _bloc.storeCode = ${_bloc.storeCode}');
+        print('   - codeStore = $codeStore');
+        print('   - Const.stockList.length = ${Const.stockList.length}');
+      }
+      
+      print('💰 getDiscountProduct: warehouseId = $finalWarehouseId');
+      
       _bloc.add(GetListItemApplyDiscountEvent(
         listCKVT: DataLocal.listCKVT,
         listPromotion: _bloc.listPromotion,
@@ -219,7 +253,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
         listQty: listQty,
         listPrice: listPrice,
         listMoney: listMoney,
-        warehouseId: codeStore,
+        warehouseId: finalWarehouseId,
         customerId: _bloc.codeCustomer.toString(),
         keyLoad: (key == '' && key.isEmpty) ? 'First' : key,
       ));
@@ -255,12 +289,17 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
         _bloc.listProductOrder.clear();
       }
       _bloc.listProductOrder = widget.listOrder!;
+      print('💾 Loading existing order: widget.listOrder.length=${widget.listOrder?.length ?? 0}');
+      print('💾   - _bloc.listProductOrder.length=${_bloc.listProductOrder.length}');
+      print('💾   - _bloc.listOrder.length=${_bloc.listOrder.length} (before GetListProductFromDB)');
+      
       if(Const.stockList.isNotEmpty){
         _bloc.storeCode = Const.stockList[_bloc.storeIndex].stockCode;
       }
       _bloc.add(GetListProductFromDB(addOrderFromCheckIn: widget.orderFromCheckIn, getValuesTax: false,key: ''));
     }
     if(widget.viewUpdateOrder == true){
+      print('💾 Setting up edit order mode...');
       int indexTransaction = 0;
       if(Const.listTransactionsOrder.isNotEmpty && DataLocal.nameTransition.isNotEmpty){
         indexTransaction = Const.listTransactionsOrder.indexWhere((element) => element.tenGd.toString().contains(DataLocal.nameTransition));
@@ -318,6 +357,58 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
     }
   }
 
+  /// Khởi tạo draft storage: restore draft khi quay lại tạo mới
+  /// Khi vào sửa đơn, KHÔNG làm gì với draft (draft đã được lưu khi back ra)
+  Future<void> _initDraftStorage() async {
+    print('💾 _initDraftStorage called: viewUpdateOrder=${widget.viewUpdateOrder}, sttRec=${widget.sttRec}');
+    print('💾 Current state: listOrder.length=${_bloc.listOrder.length}, listProductGift.length=${DataLocal.listProductGift.length}');
+    
+    // ✅ Chỉ restore draft khi quay lại tạo mới (KHÔNG vào sửa đơn)
+    if (widget.viewUpdateOrder != true) {
+      final isNewOrder = widget.sttRec == null || widget.sttRec!.trim().isEmpty;
+      print('💾 isNewOrder=$isNewOrder, listOrder.isEmpty=${_bloc.listOrder.isEmpty}, listProductGift.isEmpty=${DataLocal.listProductGift.isEmpty}');
+      
+      if (isNewOrder && _bloc.listOrder.isEmpty && DataLocal.listProductGift.isEmpty) {
+        print('💾 Attempting to restore draft...');
+        final restored = await CartDraftStorage.restoreDraft(_bloc);
+        if (restored) {
+          print('💾 ✅ Draft restored successfully!');
+          print('💾 After restore:');
+          print('💾   - bloc.listOrder.length = ${_bloc.listOrder.length}');
+          print('💾   - DataLocal.listProductGift.length = ${DataLocal.listProductGift.length}');
+          print('💾   - bloc.totalMoney = ${_bloc.totalMoney}');
+          print('💾   - bloc.totalPayment = ${_bloc.totalPayment}');
+          print('💾   - bloc.customerName = ${_bloc.customerName}');
+          print('💾   - bloc.codeCustomer = ${_bloc.codeCustomer}');
+          
+          // Print chi tiết từng sản phẩm
+          for (int i = 0; i < _bloc.listOrder.length; i++) {
+            final item = _bloc.listOrder[i];
+            print('💾   Product[$i]: code=${item.code}, name=${item.name}, count=${item.count}, price=${item.price}');
+          }
+          
+          // Print chi tiết từng sản phẩm tặng
+          for (int i = 0; i < DataLocal.listProductGift.length; i++) {
+            final gift = DataLocal.listProductGift[i];
+            print('💾   Gift[$i]: code=${gift.code}, name=${gift.name}, count=${gift.count}');
+          }
+          
+          // Refresh UI sau khi restore
+          if (mounted) {
+            setState(() {});
+          }
+        } else {
+          print('💾 ❌ No draft to restore or restore failed');
+        }
+      } else {
+        print('💾 Skip restore: isNewOrder=$isNewOrder, listOrder.isEmpty=${_bloc.listOrder.isEmpty}, listProductGift.isEmpty=${DataLocal.listProductGift.isEmpty}');
+      }
+    } else {
+      print('💾 Skip restore: viewUpdateOrder=true (editing order)');
+    }
+    // ✅ Khi vào sửa đơn, KHÔNG làm gì - draft đã được lưu khi back ra, không cần save lại
+  }
+
   @override
   void initState() {
     // TODO: implement initState
@@ -332,10 +423,35 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
     });
     DataLocal.dateEstDelivery = Utils.parseDateToString(DateTime.now(), Const.DATE_FORMAT_2);
     if(widget.viewUpdateOrder == true){
+      print('💾 ========== ENTERING EDIT ORDER MODE ==========');
+      print('💾 viewUpdateOrder=true, sttRec=${widget.sttRec}');
+      print('💾 widget.listOrder.length=${widget.listOrder?.length ?? 0}');
+      print('💾 Current draft state BEFORE loading order:');
+      print('💾   - _bloc.listOrder.length=${_bloc.listOrder.length}');
+      print('💾   - DataLocal.listProductGift.length=${DataLocal.listProductGift.length}');
+      
+      // ✅ Kiểm tra draft hiện tại trong database
+      CartDraftStorage.checkDraftExists().then((exists) {
+        if (exists) {
+          print('💾 ⚠️ Draft exists in database (will NOT be affected by edit order)');
+          CartDraftStorage.getDraftInfo().then((info) {
+            print('💾 Draft info: $info');
+          });
+        } else {
+          print('💾 No draft in database');
+        }
+      });
+      
       _bloc.showWarning = false;
     }
     _bloc.allowed = true;
-    _bloc.add(GetPrefs());
+    
+    // ✅ Restore draft TRƯỚC KHI gọi GetPrefs() (chỉ khi tạo đơn mới)
+    // Khi vào sửa đơn, KHÔNG làm gì với draft (draft đã được lưu khi back ra)
+    _initDraftStorage().then((_) {
+      // Sau khi restore draft xong, mới gọi GetPrefs()
+      _bloc.add(GetPrefs());
+    });
     if(Const.listTransactionsOrder.isNotEmpty){
       DataLocal.transactionCode = Const.listTransactionsOrder[0].maGd.toString();
       if(Const.woPrice == true){
@@ -348,14 +464,22 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
     }
     noteController.text = (widget.description.toString().isNotEmpty && widget.description.toString() != '' && widget.description.toString() != 'null') ? widget.description.toString() : '';
     DataLocal.noteSell = noteController.text;
-    if(widget.codeCustomer.toString().trim().replaceAll('null', '').isNotEmpty){
-      nameCustomerController.text = widget.nameCustomer.toString();
-      phoneCustomerController.text = widget.phoneCustomer.toString();
-      addressCustomerController.text = widget.addressCustomer.toString();
+    if(widget.codeCustomer != null && 
+       widget.codeCustomer.toString().trim().replaceAll('null', '').isNotEmpty){
+      print('💾 initState: Setting customer info from widget');
+      print('💾   - widget.codeCustomer = ${widget.codeCustomer}');
+      print('💾   - widget.nameCustomer = ${widget.nameCustomer}');
+      nameCustomerController.text = widget.nameCustomer?.toString() ?? '';
+      phoneCustomerController.text = widget.phoneCustomer?.toString() ?? '';
+      addressCustomerController.text = widget.addressCustomer?.toString() ?? '';
       _bloc.customerName = widget.nameCustomer;
       _bloc.codeCustomer = widget.codeCustomer;
       _bloc.addressCustomer = widget.addressCustomer;
       _bloc.phoneCustomer = widget.phoneCustomer;
+      print('💾   - _bloc.codeCustomer set to = ${_bloc.codeCustomer}');
+    } else {
+      print('💾 initState: widget.codeCustomer is null or empty');
+      print('💾   - widget.codeCustomer = ${widget.codeCustomer}');
     }
     if(Const.isDefaultCongNo && Const.chooseTypePayment){
       _bloc.showDatePayment = true;
@@ -365,10 +489,154 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
   }
 
   @override
+  @override
   void dispose() {
+    // ✅ Lưu draft khi user back ra khỏi màn hình tạo đơn mới (nếu có dữ liệu)
+    // Lưu ý: Không show dialog trong dispose vì context đã không còn available
+    if (widget.viewUpdateOrder != true) {
+      final isNewOrder = widget.sttRec == null || widget.sttRec!.trim().isEmpty;
+      if (isNewOrder && (_bloc.listOrder.isNotEmpty || DataLocal.listProductGift.isNotEmpty)) {
+        // Lưu draft bất đồng bộ (không await để không block dispose)
+        CartDraftStorage.saveDraft(_bloc).then((_) {
+          print('💾 Draft auto-saved on dispose (user back from new order)');
+        }).catchError((e) {
+          print('💾 Error auto-saving draft on dispose: $e');
+        });
+      }
+    }
+    
     _timer.cancel();
     tabController.dispose();
     super.dispose();
+  }
+
+  /// Lưu draft tự động (không show dialog) - gọi khi có thay đổi
+  Future<void> _autoSaveDraft() async {
+    // Chỉ lưu khi đang tạo đơn mới
+    if (widget.viewUpdateOrder == true) {
+      return; // Không lưu khi sửa đơn
+    }
+    
+    final isNewOrder = widget.sttRec == null || widget.sttRec!.trim().isEmpty;
+    if (!isNewOrder) {
+      return; // Không lưu khi không phải đơn mới
+    }
+    
+    // Chỉ lưu nếu có dữ liệu
+    if (_bloc.listOrder.isEmpty && DataLocal.listProductGift.isEmpty) {
+      return;
+    }
+    
+    try {
+      await CartDraftStorage.saveDraft(_bloc);
+      print('💾 Draft auto-saved after change');
+    } catch (e) {
+      print('💾 Error auto-saving draft: $e');
+    }
+  }
+
+  /// Lưu draft với dialog loading và thông báo thành công
+  Future<void> _saveDraftWithDialog() async {
+    print('💾 _saveDraftWithDialog called: viewUpdateOrder=${widget.viewUpdateOrder}, listOrder.length=${_bloc.listOrder.length}, listProductGift.length=${DataLocal.listProductGift.length}');
+    
+    // Kiểm tra điều kiện
+    if (widget.viewUpdateOrder == true) {
+      print('💾 ✅ Đang sửa đơn, KHÔNG save draft (draft không bị ảnh hưởng)');
+      print('💾   - Draft vẫn còn trong database');
+      print('💾   - Cho phép pop ngay');
+      // Nếu đang sửa đơn, cho phép pop ngay (KHÔNG save draft)
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+      return;
+    }
+    
+    final isNewOrder = widget.sttRec == null || widget.sttRec!.trim().isEmpty;
+    if (!isNewOrder) {
+      print('💾 Không phải đơn mới, cho phép pop ngay');
+      // Nếu không phải đơn mới, cho phép pop ngay
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+      return;
+    }
+    
+    if (_bloc.listOrder.isEmpty && DataLocal.listProductGift.isEmpty) {
+      print('💾 Không có dữ liệu để lưu, cho phép pop ngay');
+      // Không có gì để lưu, cho phép pop ngay
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+      return;
+    }
+    
+    print('💾 Có dữ liệu để lưu, sẽ show dialog');
+    
+    // Kiểm tra mounted trước khi show dialog
+    if (!mounted) {
+      // Nếu không mounted, vẫn lưu draft nhưng không show dialog
+      try {
+        await CartDraftStorage.saveDraft(_bloc);
+        print('💾 Draft saved silently (context not available)');
+      } catch (e) {
+        print('💾 Error saving draft: $e');
+      }
+      return;
+    }
+    
+    // Show loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black.withOpacity(0.5),
+      builder: (BuildContext dialogContext) {
+        return WillPopScope(
+          onWillPop: () async => false,
+          child: const AlertDialog(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text(
+                  'Đang lưu đơn hàng tạm...',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 14),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    
+    try {
+      // Lưu draft
+      await CartDraftStorage.saveDraft(_bloc);
+      
+      // Đóng loading dialog
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      
+      // ✅ Bỏ dialog thông báo thành công, pop màn hình luôn
+      if (mounted) {
+        Navigator.of(context).pop(widget.currencyCode);
+      }
+      
+      print('💾 Draft saved successfully (no success dialog)');
+    } catch (e) {
+      // Đóng loading dialog nếu có lỗi và vẫn cho phép pop
+      if (mounted) {
+        if (Navigator.of(context).canPop()) {
+          Navigator.of(context).pop(); // Đóng loading dialog
+        }
+        // Vẫn cho phép pop màn hình dù có lỗi (với giá trị trả về)
+        if (Navigator.of(context).canPop()) {
+          Navigator.of(context).pop(widget.currencyCode);
+        }
+      }
+      print('💾 Error saving draft: $e');
+    }
   }
 
   @override
@@ -376,17 +644,115 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
     return BlocListener<CartBloc,CartState>(
       listener: (context,state){
         if(state is GetPrefsSuccess){
+          print('💾 GetPrefsSuccess triggered');
+          print('💾 Current state: listOrder.length=${_bloc.listOrder.length}, listProductGift.length=${DataLocal.listProductGift.length}');
+          
+          // ✅ Ưu tiên restore từ preservedListOrderFromDraft (từ AddProductToCartEvent) TRƯỚC KHI preserve
+          final isNewOrder = widget.sttRec == null || widget.sttRec!.trim().isEmpty;
+          if (isNewOrder && (widget.listOrder == null || widget.listOrder!.isEmpty)) {
+            if (_bloc.preservedListOrderFromDraft != null && _bloc.preservedListOrderFromDraft!.isNotEmpty) {
+              print('💾 Found preservedListOrderFromDraft in GetPrefsSuccess (from AddProductToCartEvent):');
+              print('💾   - preservedListOrderFromDraft.length = ${_bloc.preservedListOrderFromDraft!.length}');
+              
+              if (_bloc.listOrder.isEmpty) {
+                _bloc.listOrder.clear();
+                _bloc.listOrder.addAll(_bloc.preservedListOrderFromDraft!);
+                print('💾 ✅ Restored listOrder from preservedListOrderFromDraft in GetPrefsSuccess - listOrder.length=${_bloc.listOrder.length}');
+                // Clear biến tạm sau khi restore
+                _bloc.preservedListOrderFromDraft = null;
+                if (mounted) {
+                  setState(() {});
+                }
+              } else {
+                print('💾 listOrder not empty, skip restore from preservedListOrderFromDraft');
+                _bloc.preservedListOrderFromDraft = null; // Clear biến tạm
+              }
+            }
+          }
+          
+          // ✅ Preserve listOrder đã restore từ draft trước khi gọi calculationDiscount
+          // Vì calculationDiscount có thể gọi GetListProductFromDB với widget.listOrder (có thể null/empty)
+          final preservedListOrder = isNewOrder ? List<SearchItemResponseData>.from(_bloc.listOrder) : null;
+          
+          print('💾 isNewOrder=$isNewOrder, preservedListOrder.length=${preservedListOrder?.length ?? 0}');
+          
           if((Const.isVvHd == true || Const.isVv == true || Const.isHd == true)){ // && (DataLocal.listVv.isEmpty || DataLocal.listHd.isEmpty)
+            print('💾 Calling GetListVVHD()');
             _bloc.add(GetListVVHD());
           }
           else{
+            print('💾 Calling calculationDiscount()');
             calculationDiscount();
           }
+          
+          // ✅ Restore lại listOrder từ draft nếu bị mất (sau calculationDiscount)
+          if (isNewOrder && preservedListOrder != null && preservedListOrder.isNotEmpty) {
+            // Delay một chút để đảm bảo calculationDiscount đã chạy xong
+            Future.microtask(() {
+              print('💾 Checking if listOrder was lost after calculationDiscount...');
+              print('💾   - _bloc.listOrder.length = ${_bloc.listOrder.length}');
+              print('💾   - widget.listOrder = ${widget.listOrder?.length ?? 0}');
+              if (mounted && _bloc.listOrder.isEmpty && (widget.listOrder == null || widget.listOrder!.isEmpty)) {
+                _bloc.listOrder.clear();
+                _bloc.listOrder.addAll(preservedListOrder);
+                print('💾 ✅ Restored listOrder from draft after calculationDiscount - listOrder.length=${_bloc.listOrder.length}');
+                setState(() {});
+              } else {
+                print('💾 No need to restore: listOrder not empty or widget.listOrder exists');
+              }
+            });
+          }
+          
+          // ✅ Ưu tiên sử dụng widget.codeCustomer (từ DetailCustomerScreen) nếu có
+          // Nếu không có, mới dùng DataLocal.infoCustomer hoặc _bloc.codeCustomer
+          final finalCodeCustomer = (widget.codeCustomer != null && 
+                                      widget.codeCustomer.toString().trim().isNotEmpty && 
+                                      widget.codeCustomer.toString().trim() != 'null')
+              ? widget.codeCustomer
+              : ((DataLocal.infoCustomer.customerCode.toString().isNotEmpty && 
+                  DataLocal.infoCustomer.customerCode.toString() != 'null')
+                  ? DataLocal.infoCustomer.customerCode
+                  : _bloc.codeCustomer);
+          
+          final finalCustomerName = (widget.nameCustomer != null && 
+                                      widget.nameCustomer.toString().trim().isNotEmpty && 
+                                      widget.nameCustomer.toString().trim() != 'null')
+              ? widget.nameCustomer
+              : ((DataLocal.infoCustomer.customerName.toString().isNotEmpty && 
+                  DataLocal.infoCustomer.customerName.toString() != 'null')
+                  ? DataLocal.infoCustomer.customerName
+                  : _bloc.customerName);
+          
+          final finalPhone = (widget.phoneCustomer != null && 
+                              widget.phoneCustomer.toString().trim().isNotEmpty && 
+                              widget.phoneCustomer.toString().trim() != 'null')
+              ? widget.phoneCustomer
+              : ((DataLocal.infoCustomer.phone.toString().isNotEmpty && 
+                  DataLocal.infoCustomer.phone.toString() != 'null')
+                  ? DataLocal.infoCustomer.phone
+                  : _bloc.phoneCustomer);
+          
+          final finalAddress = (widget.addressCustomer != null && 
+                                widget.addressCustomer.toString().trim().isNotEmpty && 
+                                widget.addressCustomer.toString().trim() != 'null')
+              ? widget.addressCustomer
+              : ((DataLocal.infoCustomer.address.toString().isNotEmpty && 
+                  DataLocal.infoCustomer.address.toString() != "null")
+                  ? DataLocal.infoCustomer.address
+                  : _bloc.addressCustomer);
+          
+          print('💾 PickInfoCustomer - Final values:');
+          print('💾   - finalCodeCustomer = $finalCodeCustomer');
+          print('💾   - finalCustomerName = $finalCustomerName');
+          print('💾   - widget.codeCustomer = ${widget.codeCustomer}');
+          print('💾   - DataLocal.infoCustomer.customerCode = ${DataLocal.infoCustomer.customerCode}');
+          print('💾   - _bloc.codeCustomer = ${_bloc.codeCustomer}');
+          
           _bloc.add(PickInfoCustomer(
-            customerName: (DataLocal.infoCustomer.customerName.toString().isNotEmpty && DataLocal.infoCustomer.customerName.toString() != 'null') ? DataLocal.infoCustomer.customerName : _bloc.customerName,
-            phone: (DataLocal.infoCustomer.phone.toString().isNotEmpty && DataLocal.infoCustomer.phone.toString() != 'null') ? DataLocal.infoCustomer.phone : _bloc.phoneCustomer,
-            address: (DataLocal.infoCustomer.address.toString().isNotEmpty && DataLocal.infoCustomer.address.toString() != "null") ? DataLocal.infoCustomer.address : _bloc.addressCustomer,
-            codeCustomer: (DataLocal.infoCustomer.customerCode.toString().isNotEmpty && DataLocal.infoCustomer.customerCode.toString() != 'null') ? DataLocal.infoCustomer.customerCode : _bloc.codeCustomer,
+            customerName: finalCustomerName,
+            phone: finalPhone,
+            address: finalAddress,
+            codeCustomer: finalCodeCustomer,
           ));
         }
         else if(state is GetListVvHdSuccess){
@@ -417,28 +783,129 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
           }
         }
         else if(state is GetListProductFromDBSuccess){
+          print('💾 GetListProductFromDBSuccess triggered');
+          print('💾 Current state: listOrder.length=${_bloc.listOrder.length}, listProductOrderAndUpdate.length=${_bloc.listProductOrderAndUpdate.length}');
+          
+          // ✅ Tự động lưu draft sau khi có thay đổi sản phẩm (xóa, cập nhật số lượng, v.v.)
+          // Chỉ lưu khi key != 'First' (không phải lần load đầu tiên)
+          if (state.key != 'First') {
+            _autoSaveDraft();
+          }
+          
+          // ✅ Restore listOrder từ draft nếu GetListProductFromDB làm mất listOrder (khi tạo đơn mới)
+          final isNewOrder = widget.sttRec == null || widget.sttRec!.trim().isEmpty;
+          print('💾 isNewOrder=$isNewOrder, widget.listOrder=${widget.listOrder?.length ?? 0}');
+          
+          // ✅ Ưu tiên restore từ preservedListOrderFromDraft (từ AddProductToCartEvent)
+          // Nếu không có, mới restore từ database
+          if (isNewOrder && (widget.listOrder == null || widget.listOrder!.isEmpty)) {
+            // Kiểm tra preservedListOrderFromDraft trước
+            if (_bloc.preservedListOrderFromDraft != null && _bloc.preservedListOrderFromDraft!.isNotEmpty) {
+              print('💾 Found preservedListOrderFromDraft (from AddProductToCartEvent):');
+              print('💾   - preservedListOrderFromDraft.length = ${_bloc.preservedListOrderFromDraft!.length}');
+              
+              // Nếu listOrder bị empty sau khi load đơn cũ, restore từ draft
+              if (_bloc.listOrder.isEmpty) {
+                _bloc.listOrder.clear();
+                _bloc.listOrder.addAll(_bloc.preservedListOrderFromDraft!);
+                print('💾 ✅ Restored listOrder from preservedListOrderFromDraft - listOrder.length=${_bloc.listOrder.length}');
+                // Clear biến tạm sau khi restore
+                _bloc.preservedListOrderFromDraft = null;
+                if (mounted) {
+                  setState(() {});
+                }
+              } else {
+                print('💾 listOrder not empty, skip restore from preservedListOrderFromDraft');
+                _bloc.preservedListOrderFromDraft = null; // Clear biến tạm
+              }
+            }
+            // Nếu không có preservedListOrderFromDraft, thử restore từ database
+            // ✅ CHỈ restore nếu listProductOrderAndUpdate rỗng (chưa có sản phẩm từ database)
+            // Nếu đã có sản phẩm từ database, không restore draft để tránh mất sản phẩm vừa thêm
+            else if (_bloc.listOrder.isEmpty && _bloc.listProductOrderAndUpdate.isEmpty) {
+              print('💾 No preservedListOrderFromDraft, attempting to restore draft from database...');
+              print('💾   - listOrder.isEmpty = ${_bloc.listOrder.isEmpty}');
+              print('💾   - listProductOrderAndUpdate.isEmpty = ${_bloc.listProductOrderAndUpdate.isEmpty}');
+              CartDraftStorage.restoreDraft(_bloc).then((restored) {
+                if (restored && mounted) {
+                  print('💾 ✅ Restored listOrder from draft in GetListProductFromDBSuccess - listOrder.length=${_bloc.listOrder.length}');
+                  setState(() {});
+                } else {
+                  print('💾 ❌ Failed to restore draft in GetListProductFromDBSuccess');
+                }
+              });
+            } else {
+              print('💾 Skip restore: listOrder or listProductOrderAndUpdate not empty');
+              print('💾   - listOrder.length = ${_bloc.listOrder.length}');
+              print('💾   - listProductOrderAndUpdate.length = ${_bloc.listProductOrderAndUpdate.length}');
+            }
+          } else {
+            print('💾 Skip restore: not new order or widget.listOrder exists');
+            // Clear biến tạm nếu không phải đơn mới
+            _bloc.preservedListOrderFromDraft = null;
+          }
+          
           if(_bloc.listProductOrderAndUpdate.isNotEmpty){
+            print('💾 listProductOrderAndUpdate is not empty, calling getDiscountProduct');
+            print('💾   - listProductOrderAndUpdate.length = ${_bloc.listProductOrderAndUpdate.length}');
             getDiscountProduct(state.key);
           }
           else {
-            _bloc.listItemOrder.clear();
-            _bloc.listOrder.clear();
-            _bloc.listCkTongDon.clear();
-            _bloc.listCkMatHang.clear();
-            _bloc.totalMoney = 0;
-            _bloc.totalDiscount = 0;
-            _bloc.totalPayment = 0;
-            Const.listKeyGroupCheck = '';
-            Const.listKeyGroup = '';
+            print('💾 ⚠️ listProductOrderAndUpdate is empty');
+            print('💾   - listOrder.length = ${_bloc.listOrder.length}');
+            print('💾   - state.key = ${state.key}');
+            
+            // ✅ CHỈ clear listOrder nếu key == 'First' (lần load đầu tiên)
+            // Nếu key != 'First' và listOrder không rỗng, có thể đang có sản phẩm từ draft hoặc vừa thêm
+            // Không clear để tránh mất sản phẩm vừa thêm
+            if (state.key == 'First' || state.key == '') {
+              print('💾 Clearing listOrder (key is First or empty)');
+              print('💾   Before clear: listOrder.length=${_bloc.listOrder.length}');
+              _bloc.listItemOrder.clear();
+              _bloc.listOrder.clear();
+              _bloc.listCkTongDon.clear();
+              _bloc.listCkMatHang.clear();
+              _bloc.totalMoney = 0;
+              _bloc.totalDiscount = 0;
+              _bloc.totalPayment = 0;
+              Const.listKeyGroupCheck = '';
+              Const.listKeyGroup = '';
+              print('💾   After clear: listOrder.length=${_bloc.listOrder.length}');
+              
+              // ✅ Nếu đang tạo đơn mới và listOrder bị clear, restore từ draft
+              final isNewOrder = widget.sttRec == null || widget.sttRec!.trim().isEmpty;
+              if (isNewOrder && (widget.listOrder == null || widget.listOrder!.isEmpty)) {
+                print('💾 Attempting to restore draft after listOrder was cleared...');
+                CartDraftStorage.restoreDraft(_bloc).then((restored) {
+                  if (restored && mounted) {
+                    print('💾 ✅ Restored draft after listOrder was cleared - listOrder.length=${_bloc.listOrder.length}');
+                    setState(() {});
+                  } else {
+                    print('💾 ❌ Failed to restore draft after listOrder was cleared');
+                  }
+                });
+              }
+            } else {
+              print('💾 Skip clear listOrder - key is not First (key=${state.key}), may have products from draft or just added');
+              print('💾   - Keeping listOrder.length = ${_bloc.listOrder.length}');
+            }
           }
 
         }
         else if(state is PickTaxAfterSuccess  || state is PickTaxBeforeSuccess){
           _bloc.chooseTax = true;
           _bloc.add(UpdateListOrder());
+          // ✅ Tự động lưu draft sau khi thay đổi thuế (delay để UpdateListOrder hoàn thành)
+          Future.delayed(const Duration(milliseconds: 100), () {
+            _autoSaveDraft();
+          });
         }
         else if(state is CalculatorDiscountSuccess){
           _bloc.add(UpdateListOrder());
+          // ✅ Tự động lưu draft sau khi tính toán lại chiết khấu (delay để UpdateListOrder hoàn thành)
+          Future.delayed(const Duration(milliseconds: 100), () {
+            _autoSaveDraft();
+          });
         }
         else if(state is PickTaxBeforeSuccess){
           _bloc.chooseTax = true;
@@ -493,6 +960,12 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
           }
           
           if(widget.viewUpdateOrder == true){
+            print('💾 GetListProductFromDBSuccess in edit mode:');
+            print('💾   - _bloc.listOrder.length=${_bloc.listOrder.length}');
+            print('💾   - _bloc.listProductOrderAndUpdate.length=${_bloc.listProductOrderAndUpdate.length}');
+            print('💾   - DataLocal.listProductGift.length=${DataLocal.listProductGift.length}');
+            print('💾   - Draft should NOT be affected (still in database)');
+            
             _bloc.totalProductGift = 0;
             for (var element in DataLocal.listProductGift) {
               _bloc.totalProductGift += element.count!;
@@ -555,6 +1028,8 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
           _bloc.add(CheckDisCountWhenUpdateEvent(widget.sttRec.toString(),true,codeCustomer: widget.codeCustomer.toString(),codeStore: widget.codeStore.toString()));
         }
         else if(state is PickInfoCustomerSuccess){
+          // ✅ Tự động lưu draft sau khi thay đổi thông tin khách hàng
+          _autoSaveDraft();
           if(_bloc.customerName.toString().trim() != 'null' && _bloc.customerName.toString().trim().isNotEmpty){
             nameCustomerController.text = _bloc.customerName.toString();
             phoneCustomerController.text = _bloc.phoneCustomer.toString();
@@ -841,7 +1316,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
                     tenThue:  _bloc.listOrder[indexSelectGift].tenThue,thueSuat:  _bloc.listOrder[indexSelectGift].thueSuat,
                   );
                 }).then((value){
-              if(double.parse(value[0].toString()) > 0){
+              if(value != null && value.isNotEmpty && double.parse(value[0].toString()) > 0){
                 setState(() {
                   _bloc.totalProductGift = _bloc.totalProductGift - DataLocal.listProductGift[indexSelectGift].count!;
                   DataLocal.listProductGift[indexSelectGift].count = double.parse(value[0].toString());
@@ -858,7 +1333,8 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
           }
         }
         else if(state is CheckIsMarkProductSuccess){
-          _bloc.totalPayment = (_bloc.totalMoney - _bloc.totalDiscount) + _bloc.totalTax;
+          double totalDiscountForOder = _bloc.totalDiscountForOder ?? 0;
+          _bloc.totalPayment = (_bloc.totalMoney - _bloc.totalDiscount - totalDiscountForOder) + _bloc.totalTax;
         }
         else if(state is CheckAllIsMarkProductSuccess){
           if(state.isMarkAll == true){
@@ -884,6 +1360,13 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
         else if(state is AddOrDeleteProductGiftSuccess){
           // Refresh UI when gift products are added/removed
           setState(() {});
+          // ✅ Tự động lưu draft sau khi thêm/xóa sản phẩm tặng
+          // Delay một chút để đảm bảo DataLocal.listProductGift đã được cập nhật
+          Future.microtask(() {
+            print('💾 AddOrDeleteProductGiftSuccess: Auto-saving draft');
+            print('💾   - DataLocal.listProductGift.length = ${DataLocal.listProductGift.length}');
+            _autoSaveDraft();
+          });
         }
         else if(state is GetGiftProductListSuccess){
           // ✅ Ẩn loading dialog
@@ -941,14 +1424,32 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
       child: BlocBuilder<CartBloc,CartState>(
         bloc: _bloc,
         builder: (BuildContext context,CartState state){
-          return Stack(
-            children: [
-              buildScreen(context, state),
+          return PopScope(
+            canPop: false, // Ngăn pop tự động, sẽ pop thủ công sau khi lưu xong
+            onPopInvoked: (didPop) {
+              print('🔙 PopScope onPopInvoked: didPop=$didPop, viewUpdateOrder=${widget.viewUpdateOrder}');
+              if (!didPop) {
+                // ✅ Lưu draft khi user back ra khỏi màn hình tạo đơn mới (nếu có dữ liệu)
+                // Sử dụng WidgetsBinding để đảm bảo context còn available
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  print('🔙 addPostFrameCallback called, mounted=$mounted');
+                  if (mounted) {
+                    _saveDraftWithDialog();
+                  } else {
+                    print('🔙 Context not mounted, cannot show dialog');
+                  }
+                });
+              }
+            },
+            child: Stack(
+              children: [
+                buildScreen(context, state),
               Visibility(
                 visible: state is CartLoading,
                 child: const PendingAction(),
               ),
             ],
+          ),
           );
         },
       ),
@@ -962,7 +1463,23 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
         crossAxisAlignment: CrossAxisAlignment.center,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          buildAppBar(),
+          CartAppBar(
+            bloc: _bloc,
+            viewUpdateOrder: widget.viewUpdateOrder,
+            nameCustomer: widget.nameCustomer,
+            isContractCreateOrder: widget.isContractCreateOrder,
+            contractMaster: widget.contractMaster,
+            viewDetail: widget.viewDetail,
+            orderFromCheckIn: widget.orderFromCheckIn,
+            codeCustomer: widget.codeCustomer,
+            currencyCode: widget.currencyCode,
+            listIdGroupProduct: widget.listIdGroupProduct,
+            itemGroupCode: widget.itemGroupCode,
+            onBackPressed: () {
+              // ✅ Gọi _saveDraftWithDialog() khi user nhấn nút back
+              _saveDraftWithDialog();
+            },
+          ),
           Expanded(
               child: Column(
                 children: [
@@ -1014,47 +1531,262 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
                           color: grey_100,
                           child: TabBarView(
                               controller: tabController,
-                              children: List<Widget>.generate(listIcons.length, (int index) {
-                                for (int i = 0; i <= listIcons.length; i++) {
-                                  if(index == 0){
-                                  return buildListProduction();
-                                  }else if(index == 1){
-                                  return buildInfo();
-                                  }else{
-                                return buildBill();
+                            children: [
+                              CartProductTab(
+                                bloc: _bloc,
+                                onShowDiscountFlow: () => _showDiscountFlow(),
+                                onAddAllHDVV: () {
+                                  showModalBottomSheet(
+                                    context: context,
+                                    isDismissible: true,
+                                    isScrollControlled: true,
+                                    shape: const RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.only(
+                                        topLeft: Radius.circular(25.0),
+                                        topRight: Radius.circular(25.0),
+                                      ),
+                                    ),
+                                    backgroundColor: Colors.white,
+                                    builder: (builder) => buildPopupVvHd(),
+                                  ).then((value) {
+                                    if (value != null) {
+                                      if (value[0] == 'ReLoad' &&
+                                          value[1] != '' &&
+                                          value[1] != 'null') {
+                                        _bloc.add(AddAllHDVVProductEvent(
+                                          idVv: _bloc.idVv,
+                                          idHd: _bloc.idHd,
+                                          nameVv: _bloc.nameVv,
+                                          nameHd: _bloc.nameHd,
+                                          idHdForVv: _bloc.idHdForVv,
+                                        ));
+                                      }
+                                    }
+                                  });
+                                },
+                                onAddDiscountForAll: () {
+                                  _bloc.add(AddDiscountForProductEvent(discountValues: 0));
+                                },
+                                onDeleteAll: () {
+                                  _bloc.listItemOrder.clear();
+                                  _bloc.listCkMatHang.clear();
+                                  _bloc.listCkTongDon.clear();
+                                  _bloc.listPromotion = '';
+                                  _bloc.totalMoney = 0;
+                                  _bloc.totalDiscount = 0;
+                                  _bloc.totalPayment = 0;
+                                  _bloc.totalProductBuy = 0;
+                                  _bloc.totalProductView = 0;
+                                  DataLocal.listObjectDiscount.clear();
+                                  DataLocal.listOrderDiscount.clear();
+                                  DataLocal.infoCustomer = ManagerCustomerResponseData();
+                                  DataLocal.transactionCode = "";
+                                  DataLocal.transaction = ListTransaction();
+                                  DataLocal.indexValuesTax = -1;
+                                  DataLocal.taxPercent = 0;
+                                  DataLocal.taxCode = '';
+                                  DataLocal.valuesTypePayment = '';
+                                  DataLocal.datePayment = '';
+                                  DataLocal.noteSell = '';
+                                  DataLocal.listCKVT = '';
+                                  _bloc.selectedCknProductCode = null;
+                                  _bloc.selectedCknSttRecCk = null;
+                                  _bloc.listCkn.clear();
+                                  _bloc.hasCknDiscount = false;
+                                  _bloc.add(DeleteAllProductEvent());
+                                },
+                                onEditProduct: (index) {
+                                  if (widget.isContractCreateOrder == true) {
+                                    // Contract logic placeholder
+                                  } else {
+                                    gift = false;
+                                    indexSelect = index;
+                                    itemSelect = _bloc.listOrder[index];
+                                    _bloc.add(GetListStockEvent(
+                                      itemCode: _bloc.listOrder[index].code.toString(),
+                                      getListGroup: false,
+                                      lockInputToCart: false,
+                                      checkStockEmployee: Const.checkStockEmployee == true ? true : false,
+                                    ));
                                   }
-                                }
-                                return const Text('');
-                              })),
+                                },
+                                onDeleteProduct: (index) {
+                                  itemSelect = _bloc.listOrder[index];
+                                  if (DataLocal.listCKVT.isNotEmpty) {
+                                    String productCode = itemSelect.code.toString().trim();
+                                    List<String> ckList = DataLocal.listCKVT
+                                        .split(',')
+                                        .where((s) => s.isNotEmpty)
+                                        .toList();
+                                    ckList.removeWhere((item) => item.endsWith('-$productCode'));
+                                    DataLocal.listCKVT = ckList.join(',');
+                                    // ✅ CHANGED: Remove maCk nếu không còn product nào trong cart có CKG với maCk đó
+                                    // Tìm maCk của CKG items có productCode bị xóa
+                                    Set<String> maCksToRemove = {};
+                                    for (var ckg in _bloc.listCkg) {
+                                      if ((ckg.maVt ?? '').trim() == productCode) {
+                                        String maCk = (ckg.maCk ?? '').trim();
+                                        if (maCk.isNotEmpty) {
+                                          // Check xem còn product nào khác trong cart có CKG với maCk này không
+                                          // (không tính product đang bị xóa)
+                                          bool hasOtherProduct = false;
+                                          for (var cartItem in _bloc.listOrder) {
+                                            // Skip product đang bị xóa (itemSelect)
+                                            if (cartItem.sttRec0 == itemSelect.sttRec0) continue;
+                                            if (cartItem.gifProduct == true) continue;
+                                            
+                                            String cartItemCode = (cartItem.code ?? '').trim();
+                                            // Check xem có CKG item nào với maCk này và product này không
+                                            for (var otherCkg in _bloc.listCkg) {
+                                              if ((otherCkg.maCk ?? '').trim() == maCk && 
+                                                  (otherCkg.maVt ?? '').trim() == cartItemCode) {
+                                                hasOtherProduct = true;
+                                                break;
+                                              }
+                                            }
+                                            if (hasOtherProduct) break;
+                                          }
+                                          if (!hasOtherProduct) {
+                                            maCksToRemove.add(maCk);
+                                          }
+                                        }
+                                      }
+                                    }
+                                    _bloc.selectedCkgIds.removeAll(maCksToRemove);
+                                  }
+                                  // ✅ FIX: Chỉ gọi DeleteProductFromDB, không cần gọi GetListProductFromDB
+                                  // Vì _deleteProductFromDB trong cart_bloc đã tự động gọi GetListProductFromDB rồi (dòng 1681)
+                                  _bloc.add(DeleteProductFromDB(
+                                    false,
+                                    index,
+                                    _bloc.listOrder[index].code.toString(),
+                                    _bloc.listOrder[index].stockCode.toString(),
+                                  ));
+                                  // _bloc.add(GetListProductFromDB(addOrderFromCheckIn: false, getValuesTax: false, key: '')); // ❌ REMOVED: Bị gọi 2 lần
+                                },
+                                onApplyVVHD: (index) {
+                                  showModalBottomSheet(
+                                    context: context,
+                                    isDismissible: true,
+                                    isScrollControlled: true,
+                                    shape: const RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.only(
+                                        topLeft: Radius.circular(25.0),
+                                        topRight: Radius.circular(25.0),
+                                      ),
+                                    ),
+                                    backgroundColor: Colors.white,
+                                    builder: (builder) => buildPopupVvHd(),
+                                  ).then((value) {
+                                    if (value != null) {
+                                      if (value[0] == 'ReLoad' &&
+                                          value[1] != '' &&
+                                          value[1] != 'null') {
+                                        _bloc.listOrder[index].chooseVuViec = true;
+                                        _bloc.listOrder[index].idVv = _bloc.idVv;
+                                        _bloc.listOrder[index].nameVv = _bloc.nameVv;
+                                        _bloc.listOrder[index].idHd = _bloc.idHd;
+                                        _bloc.listOrder[index].nameHd = _bloc.nameHd;
+                                        _bloc.listOrder[index].idHdForVv = _bloc.idHdForVv;
+                                        _bloc.add(CalculatorDiscountEvent(
+                                            addOnProduct: true,
+                                            product: _bloc.listOrder[index],
+                                            reLoad: false,
+                                            addTax: false));
+                                      } else {
+                                        _bloc.listOrder[index].chooseVuViec = false;
+                                      }
+                                    } else {
+                                      _bloc.listOrder[index].chooseVuViec = false;
+                                    }
+                                  });
+                                },
+                                onApplyManualDiscount: (index, value) {
+                                  CartDiscountHelper.applyManualDiscountForItem(
+                                    bloc: _bloc,
+                                    index: index,
+                                    percent: value,
+                                    context: context,
+                                    setState: (fn) => setState(fn),
+                                  );
+                                },
+                                buildProductItem: (context, index) => _buildSingleProductItem(index),
+                                buildGiftItem: (context, index) => _buildSingleGiftItem(index),
+                                onAddGiftProduct: () {
+                                  PersistentNavBarNavigator.pushNewScreen(
+                                    context,
+                                    screen: SearchProductScreen(
+                                      idCustomer: widget.codeCustomer.toString(),
+                                      currency: widget.currencyCode,
+                                      viewUpdateOrder: false,
+                                      listIdGroupProduct: widget.listIdGroupProduct,
+                                      itemGroupCode: '', // Salonzo bỏ tìm theo nhóm mặt hàng khi thêm hàng tặng, cho phép tìm được tất cả sản phẩm
+                                      inventoryControl: false,
+                                      addProductFromCheckIn: false,
+                                      addProductFromSaleOut: false,
+                                      giftProductRe: true,
+                                      lockInputToCart: true,
+                                      checkStockEmployee: Const.checkStockEmployee,
+                                      listOrder: _bloc.listProductOrderAndUpdate,
+                                      backValues: false,
+                                      isCheckStock: false,
+                                    ),
+                                    withNavBar: false,
+                                  ).then((value) {
+                                    if (value != null && value.isNotEmpty && value[0] == 'Yeah') {
+                                      SearchItemResponseData item = value[1] as SearchItemResponseData;
+                                      item.gifProductByHand = true;
+                                      if (Const.enableViewPriceAndTotalPriceProductGift != true) {
+                                        item.price = 0;
+                                        item.priceAfter = 0;
+                                      }
+                                      _bloc.totalProductGift += item.count!;
+                                      _bloc.add(AddOrDeleteProductGiftEvent(true, item));
+                                    }
+                                  });
+                                },
+                              ),
+                              CartCustomerTab(
+                                bloc: _bloc,
+                                buildInfoCallOtherPeople: () => buildInfoCallOtherPeople(),
+                                transactionWidget: () => transactionWidget(),
+                                typeOrderWidget: () => typeOrderWidget(),
+                                genderWidget: () => genderWidget(),
+                                genderTaxWidget: () => genderTaxWidget(),
+                                typePaymentWidget: () => typePaymentWidget(),
+                                typeDeliveryWidget: () => typeDeliveryWidget(),
+                                buildPopupVvHd: () => buildPopupVvHd(),
+                                maGD: maGD,
+                                onStateChanged: () => setState(() {}),
+                              ),
+                              CartBillTab(
+                                bloc: _bloc,
+                                listItem: listItem,
+                                listQty: listQty,
+                                listPrice: listPrice,
+                                listMoney: listMoney,
+                                codeStore: codeStore,
+                                onVoucherTap: () {},
+                                buildOtherRequest: () => buildOtherRequest(),
+                                customWidgetPayment: (title, subtitle, discount, codeDiscount) =>
+                                    customWidgetPayment(title, subtitle, discount, codeDiscount),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
                   ),
-                  Container(
-                    height: 70,width: double.infinity,
-                    padding: const EdgeInsets.only(left: 16,right: 16,bottom: 20,top: 8),
-                    decoration: const BoxDecoration(
-                      color: Colors.yellow,
-                      borderRadius: BorderRadius.only(topRight: Radius.circular(16),topLeft: Radius.circular(16))
-                    ),
-                    child: Row(
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Total price',style: TextStyle(color: grey,fontSize: 12.5),),
-                            const SizedBox(height: 4,),
-                            Text('\$${Utils.formatMoneyStringToDouble(_bloc.totalPayment)}',style: const TextStyle(color: Colors.black,fontWeight: FontWeight.bold,fontSize: 18),),
-                          ],
-                        ),
-                        const SizedBox(width: 20,),
-                        Expanded(
-                            child: GestureDetector(
-                            onTap: (){
+                  CartBottomTotal(
+                    bloc: _bloc,
+                    tabController: tabController,
+                    onNextPressed: () {
                               if(tabController.index == 0 || tabController.index == 1){
                                 Future.delayed(const Duration(milliseconds: 200)).then((value)=>tabController.animateTo((tabController.index + 1) % 10));
                                 tabIndex = tabController.index + 1;
-                              }else{
+                      }
+                    },
+                    onCreateOrderPressed: () {
                                 if(Const.chooseStockBeforeOrder == true){
                                   if(_bloc.listOrder.isNotEmpty) {
                                     for (var element in _bloc.listOrder) {
@@ -1090,31 +1822,9 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
                                 }
                                 else {
                                   logic();
-                                }
-                              }
-                            },
-                                child: Container(
-                                  // margin: EdgeInsets.only(bottom: 10),
-                                  height: double.infinity,
-                                  width: double.infinity,
-                                  decoration: BoxDecoration(
-                                      color: Colors.black,
-                                      borderRadius: BorderRadius.circular(24)
-                                  ),
-                                  child: Row(
-                                    crossAxisAlignment: CrossAxisAlignment.center,
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text((tabIndex != 2) ? 'Tiếp tục' : 'Đặt hàng',style: const TextStyle(color: Colors.white),),
-                                      const SizedBox(width: 8,),
-                                      Icon((tabIndex != 2) ? Icons.arrow_right_alt_outlined : FluentIcons.cart_16_filled,color: Colors.white,)
-                                    ],
-                          ),
-                        )
-                            )
-                        )
-                      ],
-                    ),
+                      }
+                    },
+                    isProcessing: _isProcessing,
                   ),
                 ],
               )
@@ -1172,6 +1882,29 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
   }
 
   void createOrder(){
+    final handler = CartOrderHandler(
+      context: context,
+      bloc: _bloc,
+      viewUpdateOrder: widget.viewUpdateOrder,
+      sttRec: widget.sttRec,
+      currencyCode: widget.currencyCode,
+      dateOrder: widget.dateOrder,
+      isContractCreateOrder: widget.isContractCreateOrder,
+      sttRectHD: widget.sttRectHD,
+      nameCompanyController: nameCompanyController,
+      mstController: mstController,
+      addressCompanyController: addressCompanyController,
+      noteCompanyController: noteCompanyController,
+      noteController: noteController,
+    );
+    handler.createOrder();
+    // Sau khi tạo đơn mới thành công, nên clear draft để tránh restore nhầm
+    CartDraftStorage.clearDraft();
+    _isProcessing = false; // Reset flag after order creation
+  }
+
+  // Old createOrder method - kept for reference, can be removed later
+  void _createOrderOld(){
     if(!Utils.isEmpty(_bloc.listProductOrderAndUpdate)){
       if(_bloc.codeCustomer != null && _bloc.codeCustomer != ''){
         // Kiểm tra sttRectHD khi isContractCreateOrder = true
@@ -1210,6 +1943,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
                       content: Const.chooseStatusToCreateOrder == true
                           ?
                       'Chọn trạng thái đơn trước khi tạo mới' : 'Kiểm tra kỹ thông tin trước khi đặt hàng nhé',
+                      ck_dac_biet: _bloc.ck_dac_biet,
                     ),
                   );
                 }).then((value)async{
@@ -1273,6 +2007,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
                       iconData: MdiIcons.shopping,
                       title: 'Xác nhận đơn hàng',
                       content: 'Chọn trạng thái đơn trước khi tạo mới',
+                      ck_dac_biet: _bloc.ck_dac_biet,
                     ),
                   );
                 }).then((value)async{
@@ -1329,655 +2064,50 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
 
   int tabIndex = 0;
 
-  buildListProduction(){
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16,vertical: 6),
-            child: Text('Hãy kiểm tra lại danh sách sản phẩm trước khi lên đơn hàng nhé bạn.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12.5,color: Colors.grey),),
-          ),
-          buildListCart(), 
-          Utils.buildLine(),
-          Visibility(
-              visible: Const.discountSpecial == true,
-              child: buildListProductGiftCart()),
-        ],
+  // Helper methods to build single items for CartProductList
+  Widget _buildSingleProductItem(int index) {
+    return CartProductItemWidget(
+      index: index,
+      bloc: _bloc,
+      isContractCreateOrder: widget.isContractCreateOrder ?? false,
+      orderFromCheckIn: widget.orderFromCheckIn,
+      buildPopupVvHd: () => buildPopupVvHd(),
+      onApplyManualDiscount: (index, percent) => CartDiscountHelper.applyManualDiscountForItem(
+        bloc: _bloc,
+        index: index,
+        percent: percent,
+        context: context,
+        setState: (fn) => setState(fn),
       ),
+      formatTaxRate: (taxRate) => CartHelperWidgets.formatTaxRate(taxRate),
+      onProductStateChanged: (isGift, indexSelected, itemSelected) {
+        gift = isGift;
+        indexSelect = indexSelected;
+        itemSelect = itemSelected;
+      },
     );
   }
 
-  buildListCart(){
-    return Padding(
-      padding: const EdgeInsets.all(3.0),
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 10,left: 10,right: 14),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Row(
-                    children: [
-                      SizedBox(
-                        //color: Colors.blue,
-                        width: 22,
-                        height: 22,
-                        child: Transform.scale(
-                          scale: 1,
-                          alignment: Alignment.topLeft,
-                          child: Checkbox(
-                            value: true,
-                            activeColor: mainColor,
-                            hoverColor: Colors.orange,
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(4)
-                            ),
-                            side: MaterialStateBorderSide.resolveWith((states){
-                              if(states.contains(MaterialState.pressed)){
-                                return BorderSide(color: mainColor);
-                              }else{
-                                return BorderSide(color: mainColor);
-                              }
-                            }), onChanged: (bool? value) {  },
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 6,),
-                      Text('Sản phẩm (${Utils.formatQuantity(_bloc.totalProductView)})',style: const TextStyle(color: Colors.black,fontSize: 15,fontWeight: FontWeight.bold),),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 20,),
-                  Visibility(
-                  // Hiển thị khi có ít nhất 1 loại chiết khấu (CKN, CKG, HH, CKTDTT, CKTDTH)
-                  visible: (_bloc.hasCknDiscount || _bloc.hasCkgDiscount || _bloc.hasHHDiscount || _bloc.hasCktdttDiscount || _bloc.hasCktdthDiscount) && _bloc.listOrder.isNotEmpty,
-                  child: InkWell( 
-                      onTap: () => _showDiscountFlow(), 
-                      child:const Padding(
-                        padding:  EdgeInsets.only(top: 0),
-                        child: Icon(Icons.card_giftcard_rounded,size: 20,color: Colors.green,),
-                      )),
-                ),
-                Visibility(
-                  visible: Const.isVv == true && _bloc.listOrder.isNotEmpty,
-                  child: InkWell(
-                      onTap: (){
-                        showDialog(
-                            context: context,
-                            builder: (context) {
-                              return WillPopScope(
-                                onWillPop: () async => false,
-                                child: const CustomQuestionComponent(
-                                  showTwoButton: true,
-                                  iconData: Icons.warning_amber_outlined,
-                                  title: 'Chương trình bán hàng',
-                                  content: 'Thêm CTBH cho tất cả các sản phẩm được tích chọn',
-                                ),
-                              );
-                            }).then((value)async{
-                          if(value != null){
-                            if(!Utils.isEmpty(value) && value == 'Yeah'){
-                              showModalBottomSheet(
-                                  context: context,
-                                  isDismissible: true,
-                                  isScrollControlled: true,
-                                  shape: const RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.only(topLeft: Radius.circular(25.0), topRight: Radius.circular(25.0)),
-                                  ),
-                                  backgroundColor: Colors.white,
-                                  builder: (builder){
-                                    return buildPopupVvHd();
-                                  }
-                              ).then((value){
-                                if(value != null){
-                                  if(value[0] == 'ReLoad' && value[1] != '' && value[1] !='null'){
-                                    _bloc.add(AddAllHDVVProductEvent(
-                                      idVv: _bloc.idVv,
-                                      idHd: _bloc.idHd,
-                                      nameVv: _bloc.nameVv,
-                                      nameHd: _bloc.nameHd,
-                                      idHdForVv: _bloc.idHdForVv,
-                                    ));
-                                  }
-                                }
-                              });
-                            }
-                          }
-                        });
-                      },
-                      child:const Padding(
-                        padding:  EdgeInsets.only(left: 20),
-                        child: Icon(Icons.description,size: 20,color: Colors.red,),
-                      )),
-                ),
-
-                Visibility(
-                  visible: Const.enableAutoAddDiscount == true && _bloc.listOrder.isNotEmpty,
-                  child: InkWell(
-                      onTap: (){
-                        showDialog(
-                            context: context,
-                            builder: (context) {
-                              return WillPopScope(
-                                onWillPop: () async => false,
-                                child: const CustomQuestionComponent(
-                                  showTwoButton: true,
-                                  iconData: Icons.warning_amber_outlined,
-                                  title: 'Thêm chiết khấu',
-                                  content: 'Thêm chiết khấu cho tất cả các sản phẩm được tích chọn',
-                                ),
-                              );
-                            }).then((value)async{
-                          if(value != null){
-                            if(!Utils.isEmpty(value) && value == 'Yeah'){
-                              showDialog(
-                                  barrierDismissible: true,
-                                  context: context,
-                                  builder: (context) {
-                                    return const InputDiscountPercent(
-                                      title: 'Vui lòng nhập tỉ lệ chiết khấu',
-                                      subTitle: 'Vui lòng nhập tỉ lệ chiết khấu',
-                                      typeValues: '%',
-                                      percent: 0,
-                                    );
-                                  }).then((value){
-                                if(value[0] == 'BACK'){
-                                  Utils.showCustomToast(context, Icons.check_circle_outline, 'Đã áp dụng chiết khấu tự do');
-                                  _bloc.add(AddDiscountForProductEvent(discountValues: double.parse(value[1].toString())));
-                                }
-                              });
-                            }
-                          }
-                        });
-                      },
-                      child:const Padding(
-                        padding:  EdgeInsets.only(left: 20),
-                        child: Icon(Icons.discount,size: 20,color: Colors.red,),
-                      )),
-                ),
-
-                Visibility(
-                  visible: _bloc.listOrder.isNotEmpty,
-                  child: InkWell(
-                      onTap: (){
-                        showDialog(
-                            context: context,
-                            builder: (context) {
-                              return WillPopScope(
-                                onWillPop: () async => false,
-                                child: const CustomQuestionComponent(
-                                  showTwoButton: true,
-                                  iconData: Icons.warning_amber_outlined,
-                                  title: 'Xoá sản phẩm',
-                                  content: 'Bạn sẽ xoá tất cả sản phẩm trong giỏ hàng',
-                                ),
-                              );
-                            }).then((value)async{
-                          if(value != null){
-                            if(!Utils.isEmpty(value) && value == 'Yeah'){
-                              _bloc.listItemOrder.clear();
-                              _bloc.listCkMatHang.clear();
-                              _bloc.listCkTongDon.clear();
-                              _bloc.listPromotion = '';
-                              _bloc.totalMoney = 0;
-                              _bloc.totalDiscount = 0;
-                              _bloc.totalPayment = 0;
-                              _bloc.totalProductBuy = 0;
-                              _bloc.totalProductView = 0;
-                              DataLocal.listObjectDiscount.clear();
-                              DataLocal.listOrderDiscount.clear();
-                              DataLocal.infoCustomer = ManagerCustomerResponseData();
-                              DataLocal.transactionCode = "";
-                              DataLocal.transaction = ListTransaction();
-                              DataLocal.indexValuesTax = -1;
-                              DataLocal.taxPercent = 0;
-                              DataLocal.taxCode = '';
-                              DataLocal.valuesTypePayment = '';
-                              DataLocal.datePayment = '';DataLocal.noteSell = '';
-                              DataLocal.listCKVT = '';
-                              // Reset CKN selection
-                              _bloc.selectedCknProductCode = null;
-                              _bloc.selectedCknSttRecCk = null;
-                              _bloc.listCkn.clear();
-                              _bloc.hasCknDiscount = false;
-                              _bloc.add(DeleteAllProductEvent());
-                            }
-                          }
-                        });
-                      },
-                      child:Padding(
-                        padding: const EdgeInsets.only(left: 20),
-                        child: const Icon(Icons.delete_forever, size: 20),
-                      )),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8,),
-          Visibility(
-            visible: _bloc.listOrder.isNotEmpty,
-            child: buildListViewProduct(),
-          ),
-          Visibility(
-            visible: _bloc.listOrder.isEmpty,
-            child: const SizedBox(
-                height: 100,
-                width: double.infinity,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Text('Úi, Không có gì ở đây cả.',style: TextStyle(color: Colors.black,fontSize: 11.5)),
-                    SizedBox(height: 5,),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Text('Gợi ý: Bấm nút ',style: TextStyle(color: Colors.blueGrey,fontSize: 10.5)),
-                        Icon(Icons.search_outlined,color: Colors.blueGrey,size: 18,),
-                        Text(' để thêm sản phẩm của bạn',style: TextStyle(color: Colors.blueGrey,fontSize: 10.5)),
-                      ],
-                    ),
-                  ],
-                )
-            ),
-          ),
-        ],
-      ),
+  Widget _buildSingleGiftItem(int index) {
+    return CartGiftItemWidget(
+      index: index,
+      bloc: _bloc,
+      currencyCode: widget.currencyCode,
+      buildPopupVvHd: () => buildPopupVvHd(),
+      onGiftStateChanged: (isGift, indexSelected) {
+        gift = isGift;
+        indexSelectGift = indexSelected;
+      },
     );
   }
 
-  buildListProductGiftCart(){
-    return Padding(
-      padding: const EdgeInsets.all(3.0),
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 0,left: 12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Icon(MdiIcons.cubeOutline,color: mainColor,),
-                    const SizedBox(width: 6,),
-                    Text('Sản phẩm tặng (${_bloc.totalProductGift})',style: const TextStyle(color: Colors.black,fontSize: 15,fontWeight: FontWeight.bold),),
-                  ],
-                ),
-                Visibility(
-                  visible: Const.discountSpecialAdd == true,
-                  child: InkWell(
-                    onTap: (){
-                      PersistentNavBarNavigator.pushNewScreen(context, screen: SearchProductScreen(
-                          idCustomer: widget.codeCustomer.toString(), /// Chỉ có thêm tồn kho ở check-in mới thêm idCustomer
-                          currency: widget.currencyCode ,
-                          viewUpdateOrder: false,
-                          listIdGroupProduct: widget.listIdGroupProduct,
-                          itemGroupCode: '',//widget.itemGroupCode, -> Salonzo bỏ tìm theo nhóm mặt hàng khi thêm hàng tặng, cho phép tìm được tất cả sản phẩm
-                          inventoryControl: false,
-                          addProductFromCheckIn: false,
-                          addProductFromSaleOut: false,
-                          giftProductRe: true,
-                          lockInputToCart: true,checkStockEmployee: Const.checkStockEmployee,
-                          listOrder: _bloc.listProductOrderAndUpdate, backValues: false, isCheckStock: false,),withNavBar: false).then((value){
-                        if(value[0] == 'Yeah'){
-                          SearchItemResponseData item = value[1] as SearchItemResponseData;
-                          item.gifProductByHand = true;
-                          if(Const.enableViewPriceAndTotalPriceProductGift != true){
-                            item.price = 0;
-                            item.priceAfter = 0;
-                          }
-                          _bloc.totalProductGift += item.count!;
-                          _bloc.add(AddOrDeleteProductGiftEvent(true,item));
-                        }
-                      });
-                    },
-                    child: const SizedBox(
-                      height: 30,
-                      width: 50,
-                      child: Icon(Icons.addchart_outlined,color: Colors.black,size: 20,),
-                    ),
-                  ),
-                )
-              ],
-            ),
-          ),
-          const SizedBox(height: 8,),
-          Visibility(
-            visible: DataLocal.listProductGift.isNotEmpty,
-            child: buildListViewProductGift(),
-          ),
-          Visibility(
-            visible: DataLocal.listProductGift.isEmpty,
-            child: const SizedBox(
-                height: 100,
-                width: double.infinity,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Text('Úi, Không có gì ở đây cả.',style: TextStyle(color: Colors.black,fontSize: 11.5)),
-                    SizedBox(height: 5,),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Text('Gợi ý: Bấm nút ',style: TextStyle(color: Colors.blueGrey,fontSize: 10.5)),
-                        Icon(Icons.addchart_outlined,color: Colors.blueGrey,size: 16,),
-                        Text(' để thêm sản phẩm tặng của bạn',style: TextStyle(color: Colors.blueGrey,fontSize: 10.5)),
-                      ],
-                    ),
-                  ],
-                )
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   buildPopupVvHd(){
-    return Container(
-      decoration: const BoxDecoration(
-          borderRadius: BorderRadius.only(
-              topRight: Radius.circular(25),
-              topLeft: Radius.circular(25)
-          )
-      ),
-      margin: MediaQuery.of(context).viewInsets,
-      child: FractionallySizedBox(
-        heightFactor: 0.65,
-        child: StatefulBuilder(
-          builder: (BuildContext context,StateSetter myState){
-            return Padding(
-              padding: const EdgeInsets.only(top: 10,bottom: 0),
-              child: Container(
-                decoration: const BoxDecoration(
-                    borderRadius: BorderRadius.only(
-                        topRight: Radius.circular(25),
-                        topLeft: Radius.circular(25)
-                    )
-                ),
-                child: Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8.0,left: 16,right: 8),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Icon(Icons.check,color: Colors.white,),
-                          const Text('Tuỳ chọn',style: TextStyle(color: Colors.black,fontWeight: FontWeight.w800),),
-                          InkWell(
-                              onTap: ()=> Navigator.pop(context),
-                              child: const Icon(Icons.close,color: Colors.black,)),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 5,),
-                    const Divider(color: Colors.blueGrey,),
-                    const SizedBox(height: 5,),
-                    Expanded(
-                      child: ListView(
-                        padding: const EdgeInsets.only(left: 8,right: 0,bottom: 0),
-                        children: [
-                          Visibility(
-                            visible: Const.isVv == true || Const.isVvHd == true,
-                            child: SizedBox(
-                              height:35,
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  InkWell(
-                                    onTap: (){
-                                      _bloc.idVv = '';
-                                      _bloc.nameVv = 'Chọn Chương trình bán hàng';
-                                      _bloc.idHdForVv = '';
-                                      myState(() {});
-                                    },
-                                    child: SizedBox(
-                                      height: 35,width: 30,
-                                      child: Center(child: Icon(MdiIcons.deleteSweepOutline,size: 20,color: Colors.black,)),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 3,),
-                                  const Text('Chương trình bán hàng',style: TextStyle(color: Colors.black,fontSize: 13),),
-                                  const SizedBox(width: 10,),
-                                  DataLocal.listVv.isEmpty
-                                      ? const Text('Không có dữ liệu',style: TextStyle(color: Colors.blueGrey,fontSize: 12))
-                                      :
-                                  Expanded(
-                                    child: PopupMenuButton(
-                                      shape: const TooltipShape(),
-                                      padding: EdgeInsets.zero,
-                                      offset: const Offset(0, 40),
-                                      itemBuilder: (BuildContext context) {
-                                        return <PopupMenuEntry<Widget>>[
-                                          PopupMenuItem<Widget>(
-                                            child: Container(
-                                              decoration: ShapeDecoration(
-                                                  color: Colors.white,
-                                                  shape: RoundedRectangleBorder(
-                                                      borderRadius: BorderRadius.circular(10))),
-                                              height: 250,
-                                              width: 320,
-                                              child: Scrollbar(
-                                                child: ListView.builder(
-                                                  padding: const EdgeInsets.only(top: 10,),
-                                                  itemCount: DataLocal.listVv.length,
-                                                  itemBuilder: (context, index) {
-                                                    final trans = DataLocal.listVv[index].tenVv.toString().trim();
-                                                    return ListTile(
-                                                      minVerticalPadding: 1,
-                                                      title: Row(
-                                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                                        children: [
-                                                          Flexible(
-                                                            child: Text(
-                                                              trans.toString(),
-                                                              style: const TextStyle(
-                                                                fontSize: 12,
-                                                              ),
-                                                              maxLines: 1,overflow: TextOverflow.fade,
-                                                            ),
-                                                          ),
-                                                          Text(
-                                                            DataLocal.listVv[index].maVv.toString().trim().length > 10 ?
-                                                            '${DataLocal.listVv[index].maVv.toString().trim().substring(0,10)}...' : DataLocal.listVv[index].maVv.toString().trim(),
-                                                            style: const TextStyle(
-                                                              fontSize: 12,
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                      subtitle:const Divider(height: 1,),
-                                                      onTap: () {
-                                                        _bloc.idVv = DataLocal.listVv[index].maVv.toString().trim();
-                                                        _bloc.nameVv = DataLocal.listVv[index].tenVv.toString().trim();
-                                                        _bloc.idHdForVv = DataLocal.listVv[index].maDmhd.toString().trim();
-                                                        myState(() {});
-                                                        Navigator.pop(context);
-                                                      },
-                                                    );
-                                                  },
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        ];
-                                      },
-                                      child: SizedBox(
-                                        height: 35,width: double.infinity,
-                                        child: Align(
-                                          alignment: Alignment.centerRight,
-                                          child: Text(_bloc.nameVv.toString() == '' ? 'Chọn Chương trình bán hàng' : _bloc.nameVv.toString(),style: const TextStyle(color: subColor,fontSize: 12.5)),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  InkWell(
-                                    onTap: (){
-                                      PersistentNavBarNavigator.pushNewScreen(context, screen: const SearchVVHDScreen(isVV: true),withNavBar: false).then((value){
-                                        if(value != '' && value[0] == 'Accept'){
-                                          _bloc.idVv = value[1];
-                                          _bloc.nameVv = value[2];
-                                          _bloc.idHdForVv = value[3];
-                                          myState(() {});
-                                        }
-                                      });
-                                    },
-                                    child: const SizedBox(
-                                      height: 35,width: 45,
-                                      child: Center(child: Icon(Icons.search,size: 20,color: Colors.black,)),
-                                    ),
-                                  )
-                                ],
-                              ),
-                            ),
-                          ),
-                          const Padding(
-                            padding: EdgeInsets.only(top: 8,bottom: 12),
-                            child: Divider(),
-                          ),
-                          Visibility(
-                            visible: Const.isHd == true || Const.isVvHd == true,
-                            child: SizedBox(
-                              height: 35,
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  InkWell(
-                                    onTap: (){
-                                      _bloc.idHd = '';
-                                      _bloc.nameHd = 'Chọn loại Hợp đồng';
-                                      myState(() {});
-                                    },
-                                    child: SizedBox(
-                                      height: 35,width: 30,
-                                      child: Center(child: Icon(MdiIcons.deleteSweepOutline,size: 20,color: Colors.black,)),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 3,),
-                                  const Text('Loại hợp đồng',style: TextStyle(color: Colors.black,fontSize: 13),),
-                                  const SizedBox(width: 10,),
-                                  DataLocal.listHd.isEmpty
-                                      ? const Text('Không có dữ liệu',style: TextStyle(color: Colors.blueGrey,fontSize: 12))
-                                      :
-                                  Expanded(
-                                    child: PopupMenuButton(
-                                      shape: const TooltipShape(),
-                                      padding: EdgeInsets.zero,
-                                      offset: const Offset(0, 40),
-                                      itemBuilder: (BuildContext context) {
-                                        return <PopupMenuEntry<Widget>>[
-                                          PopupMenuItem<Widget>(
-                                            child: Container(
-                                              decoration: ShapeDecoration(
-                                                  color: Colors.white,
-                                                  shape: RoundedRectangleBorder(
-                                                      borderRadius: BorderRadius.circular(10))),
-                                              height: 250,
-                                              width: 320,
-                                              child: Scrollbar(
-                                                child: ListView.builder(
-                                                  padding: const EdgeInsets.only(top: 10,),
-                                                  itemCount: DataLocal.listHd.length,
-                                                  itemBuilder: (context, index) {
-                                                    final trans = DataLocal.listHd[index].tenHd.toString().trim();
-                                                    return ListTile(
-                                                      minVerticalPadding: 1,
-                                                      title: Row(
-                                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                                        children: [
-                                                          Flexible(
-                                                            child: Text(
-                                                              trans.toString(),
-                                                              style: const TextStyle(
-                                                                fontSize: 12,
-                                                              ),
-                                                              maxLines: 1,overflow: TextOverflow.fade,
-                                                            ),
-                                                          ),
-                                                          Text(
-                                                            DataLocal.listHd[index].maHd.toString().trim().length > 10 ?
-                                                            '${DataLocal.listHd[index].maHd.toString().trim().substring(0,10)}...' : DataLocal.listHd[index].maHd.toString().trim(),
-                                                            style: const TextStyle(
-                                                              fontSize: 12,
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                      subtitle:const Divider(height: 1,),
-                                                      onTap: () {
-                                                        _bloc.nameHd = DataLocal.listHd[index].tenHd.toString().trim();
-                                                        _bloc.idHd = DataLocal.listHd[index].maHd.toString().trim();
-                                                        Navigator.pop(context);
-                                                        myState(() {});
-                                                      },
-                                                    );
-                                                  },
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        ];
-                                      },
-                                      child: SizedBox(
-                                          height: 35,width: double.infinity,
-                                          child: Align(
-                                              alignment: Alignment.centerRight,
-                                              child: Text(_bloc.nameHd.toString() == '' ? 'Chọn loại Hợp đồng' : _bloc.nameHd.toString(),style: const TextStyle(color: subColor,fontSize: 12.5)))),
-                                    ),
-                                  ),
-                                  InkWell(
-                                    onTap: (){
-                                      PersistentNavBarNavigator.pushNewScreen(context, screen: const SearchVVHDScreen(isVV: false),withNavBar: false).then((value){
-                                        if(value != '' && value[0] == 'Accept'){
-                                          _bloc.nameHd = value[1];
-                                          _bloc.idHd = value[2];
-                                          myState(() {});
-                                        }
-                                      });
-                                    },
-                                    child: const SizedBox(
-                                      height: 35,width: 45,
-                                      child: Center(child: Icon(Icons.search,size: 20,color: Colors.black,)),
-                                    ),
-                                  )
-                                ],
-                              ),
-                            ),
-                          )
-                        ],
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.only(left: 16,right: 16,bottom: 12),
-                      child: GestureDetector(
-                        onTap: (){
-                          Navigator.pop(context,['ReLoad',_bloc.idVv,_bloc.nameVv,_bloc.idHd,_bloc.nameHd,_bloc.idHdForVv]);
-                        },
-                        child: Container(
-                          height: 45, width: double.infinity,
-                          decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(12),
-                              color: subColor
-                          ),
-                          child: const Center(
-                            child: Text('Áp dụng', style: TextStyle(color: Colors.white,fontSize: 12.5),),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        ),
-      ),
+    return CartPopupVvHd(
+      bloc: _bloc,
+      onApply: (idVv, nameVv, idHd, nameHd, idHdForVv) {
+        // Callback được xử lý trong widget
+      },
     );
   }
 
@@ -1989,7 +2119,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
     final result = await showModalBottomSheet<Map<String, dynamic>>(
       context: context,
       isScrollControlled: true,
-      shape: RoundedRectangleBorder(
+      shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) => BlocProvider.value(
@@ -2468,6 +2598,23 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
       print('💰 listPrice: $listPrice');
       print('💰 listMoney: $listMoney');
       
+      // ✅ Đảm bảo warehouseId không rỗng
+      // Ưu tiên: _bloc.storeCode > codeStore > Const.stockList[0].stockCode
+      final finalWarehouseId = (!Utils.isEmpty(_bloc.storeCode.toString()) && _bloc.storeCode.toString().trim().isNotEmpty)
+          ? _bloc.storeCode.toString()
+          : ((!Utils.isEmpty(codeStore) && codeStore.trim().isNotEmpty)
+              ? codeStore
+              : (Const.stockList.isNotEmpty ? Const.stockList[0].stockCode.toString() : ''));
+      
+      if (finalWarehouseId.isEmpty) {
+        print('⚠️ Warning: warehouseId is empty in _syncListOrderToUI, API may fail!');
+        print('   - _bloc.storeCode = ${_bloc.storeCode}');
+        print('   - codeStore = $codeStore');
+        print('   - Const.stockList.length = ${Const.stockList.length}');
+      }
+      
+      print('💰 warehouseId: $finalWarehouseId');
+      
       // Call API to recalculate discounts
       _bloc.add(GetListItemApplyDiscountEvent(
         listCKVT: DataLocal.listCKVT,
@@ -2476,7 +2623,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
         listQty: listQty,
         listPrice: listPrice,
         listMoney: listMoney,
-        warehouseId: codeStore,
+        warehouseId: finalWarehouseId,
         customerId: _bloc.codeCustomer.toString(),
         keyLoad: 'Second',  // Not first load
       ));
@@ -2491,6 +2638,7 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
     
     double totalMoney = 0;
     double totalDiscount = 0;
+    double totalTax = 0;
     
     // Loop through all products
     for (var element in _bloc.listOrder) {
@@ -2511,27 +2659,47 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
           totalDiscount += lineDiscount;
         }
         
+        // ✅ Calculate tax nếu có sử dụng thuế
+        if (Const.useTax == true && priceAfter > 0) {
+          double taxPercent = DataLocal.taxPercent;
+          double lineTax = ((priceAfter * quantity) * taxPercent) / 100;
+          totalTax += lineTax;
+          
+          // Update element.valuesTax để đảm bảo UI hiển thị đúng
+          element.valuesTax = lineTax / quantity; // Tax per unit
+        }
+        
         double discountPercent = (element.discountPercentByHand ?? 0) > 0 
           ? (element.discountPercentByHand ?? 0) 
           : (element.discountPercent ?? 0);
         
-        print('💰 Product ${element.code}: qty=$quantity, originalPrice=$originalPrice, priceAfter=$priceAfter, discountPercent=$discountPercent%, lineDiscount=${(originalPrice - priceAfter) * quantity}');
+        print('💰 Product ${element.code}: qty=$quantity, originalPrice=$originalPrice, priceAfter=$priceAfter, discountPercent=$discountPercent%, lineDiscount=${(originalPrice - priceAfter) * quantity}, lineTax=${Const.useTax == true ? ((priceAfter * quantity) * DataLocal.taxPercent) / 100 : 0}');
       }
     }
     
-    // ✅ Trừ cả totalDiscountForOder (chiết khấu tổng đơn từ CKTDTT)
-    double totalPayment = totalMoney - totalDiscount - (_bloc.totalDiscountForOder ?? 0);
+    // ✅ Tính totalPayment = totalMoney - totalDiscount - totalDiscountForOder + totalTax
+    // totalMoney: Tổng tiền nguyên giá
+    // totalDiscount: Tổng chiết khấu sản phẩm (CKG, CKN, HH)
+    // totalDiscountForOder: Tổng chiết khấu tổng đơn (CKTDTT - Chiết khấu tổng đơn tặng tiền)
+    // totalTax: Tổng thuế (nếu có)
+    double totalDiscountForOder = _bloc.totalDiscountForOder ?? 0;
+    double totalPayment = totalMoney - totalDiscount - totalDiscountForOder;
+    if (Const.useTax == true) {
+      totalPayment = totalPayment + totalTax;
+    }
     
     // Update BLoC
     _bloc.totalMoney = totalMoney;
     _bloc.totalDiscount = totalDiscount;
+    _bloc.totalTax = totalTax;
     _bloc.totalPayment = totalPayment;
     
     print('💰 Total Calculated:');
-    print('    totalMoney = $totalMoney');
-    print('    totalDiscount = $totalDiscount');
-    print('    totalDiscountForOder (CKTDTT) = ${_bloc.totalDiscountForOder ?? 0}');
-    print('    totalPayment = $totalPayment (totalMoney - totalDiscount - totalDiscountForOder)');
+    print('    totalMoney = $totalMoney (tổng tiền nguyên giá)');
+    print('    totalDiscount = $totalDiscount (tổng chiết khấu sản phẩm)');
+    print('    totalDiscountForOder (CKTDTT) = $totalDiscountForOder (chiết khấu tổng đơn)');
+    print('    totalTax = $totalTax (tổng thuế)');
+    print('    totalPayment = $totalPayment (totalMoney - totalDiscount - totalDiscountForOder + totalTax)');
   }
   
   // Sync listOrder to listProductOrderAndUpdate for UI update
@@ -2858,32 +3026,105 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
     setState(() {});
   }
 
+  // ✅ Helper function để tính và set ck_dac_biet từ các chiết khấu đã chọn
+  void _updateCkDacBiet() {
+    int? calculatedCkDacBiet = 0;
+    
+    // Check CKG đã chọn
+    for (var ckgItem in _bloc.listCkg) {
+      String maCk = (ckgItem.maCk ?? '').trim();
+      if (maCk.isNotEmpty && _bloc.selectedCkgIds.contains(maCk)) {
+        final ckDacBietValue = ckgItem.ck_dac_biet;
+        if (ckDacBietValue != null) {
+          int? ckDacBietInt;
+          if (ckDacBietValue is int) {
+            ckDacBietInt = ckDacBietValue;
+          } else if (ckDacBietValue is String && ckDacBietValue.trim().isNotEmpty) {
+            ckDacBietInt = int.tryParse(ckDacBietValue);
+          } else if (ckDacBietValue is num) {
+            ckDacBietInt = ckDacBietValue.toInt();
+          }
+          
+          if (ckDacBietInt == 1) {
+            calculatedCkDacBiet = 1;
+            print('💰 ✅ Found CKG with ck_dac_biet = 1: maCk=$maCk');
+            break;
+          }
+        }
+      }
+    }
+    
+    // Check CKTDTT đã chọn (chỉ nếu chưa tìm thấy từ CKG)
+    if (calculatedCkDacBiet != 1) {
+      for (var cktdttItem in _bloc.listCktdtt) {
+        String sttRecCk = (cktdttItem.sttRecCk ?? '').trim();
+        String cktdttId = sttRecCk;
+        
+        if (_bloc.selectedCktdttIds.contains(cktdttId)) {
+          final ckDacBietValue = cktdttItem.ck_dac_biet;
+          if (ckDacBietValue != null) {
+            int? ckDacBietInt;
+            if (ckDacBietValue is int) {
+              ckDacBietInt = ckDacBietValue;
+            } else if (ckDacBietValue is String && ckDacBietValue.trim().isNotEmpty) {
+              ckDacBietInt = int.tryParse(ckDacBietValue);
+            } else if (ckDacBietValue is num) {
+              ckDacBietInt = ckDacBietValue.toInt();
+            }
+            
+            if (ckDacBietInt == 1) {
+              calculatedCkDacBiet = 1;
+              print('💰 ✅ Found CKTDTT with ck_dac_biet = 1: cktdttId=$cktdttId');
+              break;
+            }
+          }
+        }
+      }
+    }
+    
+    // Set vào bloc
+    _bloc.ck_dac_biet = calculatedCkDacBiet;
+    if (calculatedCkDacBiet == 1) {
+      print('💰 ✅ Updated bloc.ck_dac_biet = 1');
+    } else {
+      print('💰 ℹ️ Updated bloc.ck_dac_biet = 0');
+    }
+  }
+
   // Handle CKG selection (when user clicks checkbox - apply immediately)
-  void _handleCKGSelection(String ckgId, ListCk ckgItem) {
+  // ✅ CHANGED: ckgId giờ là maCk, apply cho tất cả CKG items cùng ma_ck
+  void _handleCKGSelection(String maCk, ListCk ckgItem) {
     print('💰 ========== CKG SELECTION START ==========');
-    print('💰 CKG: User selecting discount for ckgId=$ckgId');
-    print('💰 CKG Item: sttRecCk=${ckgItem.sttRecCk}, maVt=${ckgItem.maVt}, tenCk=${ckgItem.tenCk}');
+    print('💰 CKG: User selecting discount for maCk=$maCk');
+    print('💰 CKG Item: sttRecCk=${ckgItem.sttRecCk}, maVt=${ckgItem.maVt}, maCk=${ckgItem.maCk}, tenCk=${ckgItem.tenCk}');
     print('💰 CKG Item: tlCk=${ckgItem.tlCk}, ck=${ckgItem.ck}, giaSauCk=${ckgItem.giaSauCk}');
     
-    // Update BLoC state
-    _bloc.selectedCkgIds.add(ckgId);
+    // Update BLoC state - dùng maCk làm key
+    _bloc.selectedCkgIds.add(maCk);
     print('💰 Updated selectedCkgIds: ${_bloc.selectedCkgIds}');
     
-    // Apply CKG discount immediately
-    _applySingleCKG(ckgId, ckgItem, shouldApply: true);
+    // Apply CKG discount cho tất cả items cùng ma_ck
+    _applyCKGByMaCk(maCk, shouldApply: true);
+    
+    // ✅ Tính lại ck_dac_biet sau khi chọn CKG
+    _updateCkDacBiet();
     
     print('💰 ========== CKG SELECTION END ==========');
   }
 
   // Handle CKG removal (when user unchecks checkbox - remove immediately)
-  void _handleRemoveCKG(String ckgId, ListCk ckgItem) {
-    print('💰 CKG: User removing discount for $ckgId');
+  // ✅ CHANGED: ckgId giờ là maCk, remove cho tất cả CKG items cùng ma_ck
+  void _handleRemoveCKG(String maCk, ListCk ckgItem) {
+    print('💰 CKG: User removing discount for maCk=$maCk');
     
     // Update BLoC state
-    _bloc.selectedCkgIds.remove(ckgId);
+    _bloc.selectedCkgIds.remove(maCk);
     
-    // Remove CKG discount immediately
-    _applySingleCKG(ckgId, ckgItem, shouldApply: false);
+    // Remove CKG discount cho tất cả items cùng ma_ck
+    _applyCKGByMaCk(maCk, shouldApply: false);
+    
+    // ✅ Tính lại ck_dac_biet sau khi bỏ chọn CKG
+    _updateCkDacBiet();
   }
 
   // Handle CKTDTT selection (when user clicks checkbox - apply immediately)
@@ -2900,6 +3141,9 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
     // Apply CKTDTT discount immediately
     _applySingleCKTDTT(cktdttId, cktdttItem, shouldApply: true);
     
+    // ✅ Tính lại ck_dac_biet sau khi chọn CKTDTT
+    _updateCkDacBiet();
+    
     print('💰 ========== CKTDTT SELECTION END ==========');
   }
 
@@ -2912,6 +3156,9 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
     
     // Remove CKTDTT discount immediately
     _applySingleCKTDTT(cktdttId, cktdttItem, shouldApply: false);
+    
+    // ✅ Tính lại ck_dac_biet sau khi bỏ chọn CKTDTT
+    _updateCkDacBiet();
   }
 
   // Apply or remove a single CKTDTT discount
@@ -3040,6 +3287,32 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
     // Recalculate totals
     _recalculateTotalLocal();
     setState(() {});
+  }
+
+  // ✅ NEW: Apply CKG discount cho tất cả items cùng ma_ck
+  void _applyCKGByMaCk(String maCk, {required bool shouldApply}) {
+    print('💰 ========== _applyCKGByMaCk START ==========');
+    print('💰 maCk=$maCk, shouldApply=$shouldApply');
+    
+    // Tìm tất cả CKG items có cùng ma_ck
+    List<ListCk> ckgItemsWithSameMaCk = _bloc.listCkg.where((ckg) => 
+      (ckg.maCk ?? '').trim() == maCk.trim()
+    ).toList();
+    
+    print('💰 Found ${ckgItemsWithSameMaCk.length} CKG items with maCk=$maCk');
+    
+    // Apply cho từng item
+    for (var ckgItem in ckgItemsWithSameMaCk) {
+      // Tạo ckgId từ sttRecCk và productCode để dùng với _applySingleCKG
+      String sttRecCk = ckgItem.sttRecCk?.trim() ?? '';
+      String productCode = ckgItem.maVt?.trim() ?? '';
+      String ckgId = '${sttRecCk}_$productCode';
+      
+      print('💰 Applying CKG for product: $productCode (sttRecCk=$sttRecCk)');
+      _applySingleCKG(ckgId, ckgItem, shouldApply: shouldApply);
+    }
+    
+    print('💰 ========== _applyCKGByMaCk END ==========');
   }
 
   // Apply or remove a single CKG discount
@@ -3584,2129 +3857,165 @@ class _CartScreenState extends State<CartScreen> with TickerProviderStateMixin{
     }
   }
 
-  buildListViewProductGift(){
-    return ListView.builder(
-        physics: const NeverScrollableScrollPhysics(),
-        padding: EdgeInsets.zero,
-        shrinkWrap: true,
-        itemCount: DataLocal.listProductGift.length,
-        itemBuilder: (context,index){
-          return Slidable(
-              key: const ValueKey(1),
-              startActionPane: ActionPane(
-                motion: const ScrollMotion(),
-                // extentRatio: 0.25,
-                dragDismissible: false,
-                children: [
-                  Visibility(
-                    visible: Const.isVv == true,
-                    child: SlidableAction(
-                      onPressed:(_) {
-                        setState(() {
-                          if(DataLocal.listProductGift[index].chooseVuViec == true){
-                            DataLocal.listProductGift[index].chooseVuViec = false;
-                            DataLocal.listProductGift[index].idVv = '';
-                            DataLocal.listProductGift[index].idHd = '';
-                            DataLocal.listProductGift[index].nameVv = '';
-                            DataLocal.listProductGift[index].nameHd = '';
-                            DataLocal.listProductGift[index].idHdForVv = '';
-                            Utils.showCustomToast(context, Icons.check_circle_outline, 'Đã huỷ áp dụng CTBH cho mặt hàng này');
-                          }
-                          else{
-                            showModalBottomSheet(
-                                context: context,
-                                isDismissible: true,
-                                isScrollControlled: true,
-                                shape: const RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.only(topLeft: Radius.circular(25.0), topRight: Radius.circular(25.0)),
-                                ),
-                                backgroundColor: Colors.white,
-                                builder: (builder){
-                                  return buildPopupVvHd();
-                                }
-                            ).then((value){
-                              if(value != null){
-                                if(value[0] == 'ReLoad' && value[1] != '' && value[1] !='null'){
-                                  setState(() {
-                                    DataLocal.listProductGift[index].chooseVuViec = true;
-                                    DataLocal.listProductGift[index].idVv = _bloc.idVv;
-                                    DataLocal.listProductGift[index].nameVv = _bloc.nameVv;
-                                    DataLocal.listProductGift[index].idHd = _bloc.idHd;
-                                    DataLocal.listProductGift[index].nameHd = _bloc.nameHd;
-                                    DataLocal.listProductGift[index].idHdForVv = _bloc.idHdForVv;
-                                  });
-                                }else{
-                                  DataLocal.listProductGift[index].chooseVuViec = false;
-                                }
-                              }else{
-                                DataLocal.listProductGift[index].chooseVuViec = false;
-                              }
-                            });
-                          }
-                        });
-                      },
-                      borderRadius:const BorderRadius.all(Radius.circular(8)),
-                      backgroundColor: DataLocal.listProductGift[index].chooseVuViec == false ? const Color(0xFFA8B1A6) : const Color(
-                          0xFF2DC703),
-                      foregroundColor: Colors.white,
-                      icon: Icons.description,
-                      label: 'CTBH',
-                    ),
-                  )
-                ],
-              ),
-              endActionPane: ActionPane(
-                motion: const DrawerMotion(),
-                // extentRatio: 0.25,
-                dragDismissible: false,
-                children: [
-                  SlidableAction(
-                    onPressed:(_) {
-                      final deletedItem = DataLocal.listProductGift[index];
-                      
-                      // Reset CKN selection if deleting a CKN product
-                      if(deletedItem.typeCK == 'CKN'){
-                        final deletedSttRecCk = deletedItem.sttRecCK?.toString().trim();
-                        
-                        // Check if there are any other CKN products with same sttRecCK
-                        final hasOtherProductsInSameGroup = DataLocal.listProductGift.any((item) =>
-                          item.typeCK == 'CKN' && 
-                          item.sttRecCK?.toString().trim() == deletedSttRecCk &&
-                          item.code != deletedItem.code
-                        );
-                        
-                        print('🔍 CKN Debug: Deleting CKN product - code: ${deletedItem.code}, sttRecCk: $deletedSttRecCk');
-                        print('🔍 CKN Debug: hasOtherProductsInSameGroup: $hasOtherProductsInSameGroup');
-                        
-                        // If this is the last product in the group, clear selection
-                        if (!hasOtherProductsInSameGroup) {
-                          print('🔍 CKN Debug: Last product in group! Clearing selectedDiscountGroup');
-                          _bloc.selectedDiscountGroup = null;
-                        }
-                        
-                        _bloc.selectedCknProductCode = null;
-                        _bloc.selectedCknSttRecCk = null;
-                      }
-                      
-                      _bloc.totalProductGift = _bloc.totalProductGift - deletedItem.count!;
-                      _bloc.add(AddOrDeleteProductGiftEvent(false, deletedItem));
-                    },
-                    borderRadius:const BorderRadius.all(Radius.circular(8)),
-                    backgroundColor: const Color(0xFFC90000),
-                    foregroundColor: Colors.white,
-                    icon: Icons.delete_forever,
-                    label: 'Delete',
-                  ),
-                ],
-              ),
-              child: GestureDetector(
-                onTap: Const.lockStockInItemGift == true ? null : (){
-                  gift = true;
-                  indexSelectGift = index;
-                  _bloc.add(GetListStockEvent(
-                      itemCode: DataLocal.listProductGift[index].code.toString(),
-                      getListGroup: false,
-                      lockInputToCart: true,
-                      checkStockEmployee: Const.checkStockEmployee == true ? true : false));
-                },
-                child: Card(
-                  semanticContainer: true,
-                  margin: const EdgeInsets.only(left: 10,right: 10,top: 5,bottom: 5),
-                  child: Padding(
-                    padding: const EdgeInsets.only(left: 8,right: 6,top: 10,bottom: 10),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.max,
-                      children: [
-                        Container(
-                            width: 50,
-                            height: 50,
-                            padding: const EdgeInsets.all(5),
-                            decoration: BoxDecoration(
-                              borderRadius: const BorderRadius.all(Radius.circular(6)),
-                              color:  const Color(0xFF0EBB00),
-                              boxShadow: <BoxShadow>[
-                                BoxShadow(
-                                    color: Colors.grey.shade200,
-                                    offset: const Offset(2, 4),
-                                    blurRadius: 5,
-                                    spreadRadius: 2)
-                              ],),
-                            child: const Icon(Icons.card_giftcard_rounded ,size: 16,color: Colors.white,)),
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.only(left: 10,right: 3,top: 6,bottom: 5),
-                            width: double.infinity,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisAlignment: MainAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Expanded(
-                                        child: Text.rich(
-                                          TextSpan(
-                                            children: [
-                                              TextSpan(
-                                                text: '[${DataLocal.listProductGift[index].code.toString().trim()}] ',
-                                                style: const TextStyle(fontWeight: FontWeight.normal,fontSize: 12,color:  Color(
-                                                    0xff555a55)),
-                                              ),
-                                              TextSpan(
-                                                text: DataLocal.listProductGift[index].name.toString().trim(),
-                                                style: const TextStyle(fontWeight: FontWeight.bold,fontSize: 12),
-                                              ),
-                                            ],
-                                          ),
-                                        )
-                                    ),
-                                    const SizedBox(width: 10,),
-                                    Column(
-                                      children: [
-                                        (DataLocal.listProductGift[index].price! > 0 && DataLocal.listProductGift[index].price == DataLocal.listProductGift[index].priceAfter ) ?
-                                        Container()
-                                            :
-                                        Text(
-                                          ((widget.currencyCode == "VND"
-                                              ?
-                                          DataLocal.listProductGift[index].price
-                                              :
-                                          DataLocal.listProductGift[index].price))
-                                              == 0 ? 'Giá đang cập nhật' : '${widget.currencyCode == "VND"
-                                              ?
-                                          Utils.formatMoneyStringToDouble(DataLocal.listProductGift[index].price??0)
-                                              :
-                                          Utils.formatMoneyStringToDouble(DataLocal.listProductGift[index].price??0)} ₫'
-                                          ,
-                                          textAlign: TextAlign.left,
-                                          style: TextStyle(color:
-                                          ((widget.currencyCode == "VND"
-                                              ?
-                                          DataLocal.listProductGift[index].price
-                                              :
-                                          DataLocal.listProductGift[index].price)) == 0
-                                              ?
-                                          Colors.grey : Colors.red, fontSize: 10, decoration: ((widget.currencyCode == "VND"
-                                              ?
-                                          DataLocal.listProductGift[index].price
-                                              :
-                                          DataLocal.listProductGift[index].price)) == 0 ? TextDecoration.none : TextDecoration.lineThrough),
-                                        ),
-                                        const SizedBox(height: 3,),
-                                        Visibility(
-                                          visible: DataLocal.listProductGift[index].priceAfter! > 0,
-                                          child: Text(
-                                            '${Utils.formatMoneyStringToDouble(DataLocal.listProductGift[index].priceAfter??0)} ₫',
-                                            textAlign: TextAlign.left,
-                                            style: const TextStyle(color: Color(
-                                                0xff067902), fontSize: 13,fontWeight: FontWeight.w700),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 5,),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Const.lockStockInItemGift == false
-                                        ? Flexible(
-                                        child:
-                                        Padding(padding:const EdgeInsets.only(right: 20), child:Text(
-                                          '${(DataLocal.listProductGift[index].stockName.toString().isNotEmpty && DataLocal.listProductGift[index].stockName.toString() != 'null') ? DataLocal.listProductGift[index].stockName : 'Chọn kho xuất hàng'}',
-                                          textAlign: TextAlign.left,
-                                          style: TextStyle(fontWeight: FontWeight.normal,fontSize: 12,color:
-                                          (DataLocal.listProductGift[index].stockName.toString().isNotEmpty && DataLocal.listProductGift[index].stockName.toString() != 'null')
-                                              ?
-                                          const Color(0xff358032)
-                                              :
-                                          Colors.red
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),)) :
-                                    Container(),
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.end,
-                                      crossAxisAlignment: CrossAxisAlignment.end,
-                                      children: [
-                                        Text(
-                                          'KL Tặng:',
-                                          style: TextStyle(color: DataLocal.listProductGift[index].gifProduct == true ? Colors.red : Colors.black.withOpacity(0.7), fontSize: 11),
-                                          textAlign: TextAlign.left,
-                                        ),
-                                        const SizedBox(
-                                          width: 5,
-                                        ),
-                                        Text("${DataLocal.listProductGift[index].count??0} (${DataLocal.listProductGift[index].dvt.toString().trim()})",
-                                          style: TextStyle(color: DataLocal.listProductGift[index].gifProduct == true ? Colors.red : blue, fontSize: 12),
-                                          textAlign: TextAlign.left,
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                                Visibility(
-                                  visible: Const.noteForEachProduct == true,
-                                  child: Padding(
-                                    padding: const EdgeInsets.only(top: 5),
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Flexible(
-                                          child: Text(
-                                            'Ghi chú: ${DataLocal.listProductGift[index].note}',
-                                            textAlign: TextAlign.left,
-                                            style: const TextStyle(fontWeight: FontWeight.normal,fontSize: 12,color: Colors.grey
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          )
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                Visibility(
-                                  visible: Const.isVv == true || Const.isHd == true,
-                                  child: Padding(
-                                    padding: EdgeInsets.only(top: Const.lockStockInItem == false ? 0 : 5),
-                                    child: Row(
-                                      children: [
-                                        Flexible(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            mainAxisAlignment: MainAxisAlignment.start,
-                                            children: [
-                                              Visibility(
-                                                visible: Const.isVv == true,
-                                                child: Row(
-                                                  mainAxisAlignment: MainAxisAlignment.start,
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: [
-                                                    const Text(
-                                                      'Chương trình bán hàng:',
-                                                      style: TextStyle(color: Colors.blueGrey, fontSize: 11),
-                                                      textAlign: TextAlign.left,
-                                                    ),
-                                                    const SizedBox(
-                                                      width: 5,
-                                                    ),
-                                                    Flexible(
-                                                        child:
-                                                        Text(
-                                                          '${(DataLocal.listProductGift[index].idVv.toString() != '' && DataLocal.listProductGift[index].idVv.toString() != 'null') ? DataLocal.listProductGift[index].nameVv : 'Chọn Chương trình bán hàng'}',
-                                                          textAlign: TextAlign.left,
-                                                          style: TextStyle(fontWeight: FontWeight.normal,fontSize: 12,color:
-                                                          (DataLocal.listProductGift[index].idVv.toString() != '' && DataLocal.listProductGift[index].idVv.toString() != 'null')
-                                                              ?
-                                                          Colors.blueGrey
-                                                              :
-                                                          Colors.red
-                                                          ),
-                                                          maxLines: 1,
-                                                          overflow: TextOverflow.ellipsis,
-                                                        )
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                              Visibility(
-                                                visible: Const.isHd == true,
-                                                child: Row(
-                                                  mainAxisAlignment: MainAxisAlignment.start,
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: [
-                                                    const Text(
-                                                      'Hợp đồng:',
-                                                      style: TextStyle(color: Colors.blueGrey, fontSize: 11),
-                                                      textAlign: TextAlign.left,
-                                                    ),
-                                                    const SizedBox(
-                                                      width: 5,
-                                                    ),
-                                                    Flexible(
-                                                        child:
-                                                        Text(
-                                                          '${(DataLocal.listProductGift[index].idHd.toString().isNotEmpty && DataLocal.listProductGift[index].idHd.toString() != 'null') ? DataLocal.listProductGift[index].nameHd : 'Chọn hợp đồng'}',
-                                                          textAlign: TextAlign.left,
-                                                          style: TextStyle(fontWeight: FontWeight.normal,fontSize: 12,color:
-                                                          (DataLocal.listProductGift[index].idHd.toString().isNotEmpty && DataLocal.listProductGift[index].idHd.toString() != 'null') == true
-                                                              ?
-                                                          Colors.blueGrey
-                                                              :
-                                                          Colors.red
-                                                          ),
-                                                          maxLines: 1,
-                                                          overflow: TextOverflow.ellipsis,
-                                                        )
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        const SizedBox(width: 5,),
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.end,
-                                          crossAxisAlignment: CrossAxisAlignment.end,
-                                          children: [
-                                            Text(
-                                              'KL Tặng:',
-                                              style: TextStyle(color: DataLocal.listProductGift[index].gifProduct == true ? Colors.red : Colors.black.withOpacity(0.7), fontSize: 11),
-                                              textAlign: TextAlign.left,
-                                            ),
-                                            const SizedBox(
-                                              width: 5,
-                                            ),
-                                            Text("${DataLocal.listProductGift[index].count??0} (${DataLocal.listProductGift[index].dvt.toString().trim()})",
-                                              style: TextStyle(color: DataLocal.listProductGift[index].gifProduct == true ? Colors.red : blue, fontSize: 12),
-                                              textAlign: TextAlign.left,
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              )
-          );
-        }
 
+
+  Widget buildMethodReceive() {
+    return CartMethodReceive(
+      bloc: _bloc,
+      maGD: maGD,
+      buildInfoCallOtherPeople: () => buildInfoCallOtherPeople(),
+      transactionWidget: () => transactionWidget(),
+      typeOrderWidget: () => typeOrderWidget(),
+      genderWidget: () => genderWidget(),
+      genderTaxWidget: () => genderTaxWidget(),
+      typePaymentWidget: () => typePaymentWidget(),
+      typeDeliveryWidget: () => typeDeliveryWidget(),
+      buildPopupVvHd: () => buildPopupVvHd(),
+      onStateChanged: () => setState(() {}),
     );
   }
 
-  buildListViewProduct(){
-    return ListView.builder(
-        physics: const NeverScrollableScrollPhysics(),
-        padding: EdgeInsets.zero,
-        shrinkWrap: true,
-        itemCount: _bloc.listOrder.length,
-        itemBuilder: (context,index){
-          return Slidable(
-              key: const ValueKey(1),
-              startActionPane: ActionPane(
-                motion: const ScrollMotion(),
-                dragDismissible: false,
-                children: [
-                  if (Const.isVv == true)
-                    SlidableAction(
-                      onPressed:(_) {
-                        setState(() {
-                          if(_bloc.listOrder[index].chooseVuViec == true){
-                            _bloc.listOrder[index].chooseVuViec = false;
-                            _bloc.listOrder[index].idVv = '';
-                            _bloc.listOrder[index].idHd = '';
-                            _bloc.listOrder[index].nameVv = '';
-                            _bloc.listOrder[index].nameHd = '';
-                            _bloc.listOrder[index].idHdForVv = '';
-                            Utils.showCustomToast(context, Icons.check_circle_outline, 'Đã huỷ áp dụng CTBH cho mặt hàng này');
-                          }
-                          else{
-                            showModalBottomSheet(
-                                context: context,
-                                isDismissible: true,
-                                isScrollControlled: true,
-                                shape: const RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.only(topLeft: Radius.circular(25.0), topRight: Radius.circular(25.0)),
-                                ),
-                                backgroundColor: Colors.white,
-                                builder: (builder){
-                                  return buildPopupVvHd();
-                                }
-                            ).then((value){
-                              if(value != null){
-                                if(value[0] == 'ReLoad' && value[1] != '' && value[1] !='null'){
-                                  _bloc.listOrder[index].chooseVuViec = true;
-                                  _bloc.listOrder[index].idVv = _bloc.idVv;
-                                  _bloc.listOrder[index].nameVv = _bloc.nameVv;
-                                  _bloc.listOrder[index].idHd = _bloc.idHd;
-                                  _bloc.listOrder[index].nameHd = _bloc.nameHd;
-                                  _bloc.listOrder[index].idHdForVv = _bloc.idHdForVv;
-                                  _bloc.add(CalculatorDiscountEvent(addOnProduct: true,product: _bloc.listOrder[index],reLoad: false, addTax: false));
-                                }else{
-                                  _bloc.listOrder[index].chooseVuViec = false;
-                                }
-                              }
-                              else{
-                                _bloc.listOrder[index].chooseVuViec = false;
-                              }
-                            });
-                          }
-                        });
-                      },
-                      borderRadius:const BorderRadius.all(Radius.circular(8)),
-                      padding:const EdgeInsets.all(10),
-                      backgroundColor: _bloc.listOrder[index].chooseVuViec == false ? const Color(0xFFA8B1A6) : const Color(0xFF2DC703),
-                      foregroundColor: Colors.white,
-                      icon: Icons.description,
-                      label: 'CTBH', /// VV & HĐ
-                    ),
-                  if (Const.freeDiscount == true && _bloc.listOrder[index].gifProduct != true && _bloc.listOrder[index].gifProductByHand != true)
-                    SlidableAction(
-                      onPressed: (_) async {
-                        final percent = await showDialog(
-                            barrierDismissible: true,
-                            context: context,
-                            builder: (context) {
-                              return const InputDiscountPercent(
-                                title: 'Vui lòng nhập tỉ lệ chiết khấu',
-                                subTitle: 'Vui lòng nhập tỉ lệ chiết khấu',
-                                typeValues: '%',
-                                percent: 0,
-                              );
-                            });
-                        if (percent != null && percent is List && percent.isNotEmpty && percent[0] == 'BACK') {
-                          final value = double.tryParse(percent[1].toString()) ?? 0;
-                          _applyManualDiscountForItem(index, value);
-                        }
-                      },
-                      borderRadius: const BorderRadius.all(Radius.circular(8)),
-                      padding: const EdgeInsets.all(10),
-                      backgroundColor: Colors.orange,
-                      foregroundColor: Colors.white,
-                      icon: Icons.discount_outlined,
-                      label: 'Chiết khấu',
-                    ),
-                ],
-              ),
-              endActionPane: ActionPane(
-                motion: const ScrollMotion(),
-                dragDismissible: false,
-                children: [
-                  Visibility(
-                    visible: _bloc.listOrder[index].gifProduct != true,
-                    child: SlidableAction(
-                      onPressed:(_) {
-                        if(widget.isContractCreateOrder == true){
-                          // Tìm giá trị LỚN NHẤT của availableQuantity trong các items cùng maVt2
-                          // Đây mới là TỔNG khả dụng gốc ban đầu
-                          double totalAvailableForMaVt2 = 0;
-                          for (var item in _bloc.listOrder) {
-                            if (item.maVt2 == _bloc.listOrder[index].maVt2) {
-                              double itemAvailable = item.availableQuantity ?? item.so_luong_kd;
-                              if (itemAvailable > totalAvailableForMaVt2) {
-                                totalAvailableForMaVt2 = itemAvailable;
-                              }
-                            }
-                          }
-                          
-                          // Tính TỔNG số lượng đã đặt của TẤT CẢ items cùng maVt2
-                          double totalOrderedForMaVt2 = 0;
-                          for (var item in _bloc.listOrder) {
-                            if (item.maVt2 == _bloc.listOrder[index].maVt2) {
-                              totalOrderedForMaVt2 += item.count ?? 0;
-                            }
-                          }
-                          
-                          // B = Số còn lại CHUNG = Tổng khả dụng - Tổng đã đặt (TẤT CẢ)
-                          double remainingAvailableForAll = (totalAvailableForMaVt2 - totalOrderedForMaVt2).clamp(0, totalAvailableForMaVt2);
-                          
-                          // Tính TỔNG số lượng đã đặt của các items KHÁC (để tính Max)
-                          double totalOrderedExcludingCurrent = 0;
-                          for (var item in _bloc.listOrder) {
-                            if (item.maVt2 == _bloc.listOrder[index].maVt2 && item.sttRec0 != _bloc.listOrder[index].sttRec0) {
-                              totalOrderedExcludingCurrent += item.count ?? 0;
-                            }
-                          }
-                          
-                          // Max = Tổng khả dụng - Số đã đặt (items KHÁC)
-                          double maxCanOrder = totalAvailableForMaVt2 - totalOrderedExcludingCurrent;
-                          
-                          showChangeQuantityPopup(
-                            context: context,
-                            originalQuantity: maxCanOrder, // Max validation
-                            productName: _bloc.listOrder[index].name,
-                            onConfirmed: (newQty) {
-                              gift = false;
-                              _bloc.listOrder[index].count = newQty;
-                              indexSelect = index;
-                              itemSelect = _bloc.listOrder[index];
-                              Product production = Product(
-                                code: itemSelect.code,
-                                sttRec0: itemSelect.sttRec0,
-                                name: itemSelect.name,
-                                name2:itemSelect.name2,
-                                dvt:  itemSelect.dvt,
-                                description:itemSelect.descript,
-                                price: Const.isWoPrice == false ? itemSelect.price :itemSelect.woPrice,
-                                priceAfter:  itemSelect.priceAfter ,
-                                discountPercent:itemSelect.discountPercent,
-                                stockAmount:itemSelect.stockAmount,
-                                taxPercent:itemSelect.taxPercent,
-                                imageUrl:itemSelect.imageUrl ?? '',
-                                count:itemSelect.count,
-                                countMax: itemSelect.countMax,
-                                isMark: itemSelect.isMark,
-                                discountMoney:itemSelect.discountMoney ?? '0',
-                                discountProduct:itemSelect.discountProduct ?? '0',
-                                budgetForItem:itemSelect.budgetForItem ?? '',
-                                budgetForProduct:itemSelect.budgetForProduct ?? '',
-                                residualValueProduct:itemSelect.residualValueProduct ?? 0,
-                                residualValue:itemSelect.residualValue ?? 0,
-                                unit:itemSelect.unit ?? '',
-                                unitProduct:itemSelect.unitProduct ?? '',
-                                dsCKLineItem:itemSelect.maCk.toString(),
-                                allowDvt: itemSelect.allowDvt == true ? 0 : 1,
-                                availableQuantity: totalAvailableForMaVt2, // Giữ tổng khả dụng gốc cho maVt2
-                                contentDvt: itemSelect.contentDvt,
-                                kColorFormatAlphaB: itemSelect.kColorFormatAlphaB?.value,
-                                codeStock: itemSelect.stockCode,
-                                nameStock: itemSelect.stockName,
-                                editPrice:  0,
-                                isSanXuat: ( 0),
-                                isCheBien: ( 0),   
-                                giaSuaDoi: itemSelect.giaSuaDoi,
-                                giaGui: itemSelect.giaGui,
-                                priceMin: _bloc.listStockResponse.isNotEmpty ? _bloc.listStockResponse[0].priceMin??0 : 0,
-                                note: itemSelect.note,
-                                jsonOtherInfo: itemSelect.jsonOtherInfo,
-                                heSo: itemSelect.heSo,
-                                idNVKD: itemSelect.idNVKD,
-                                nameNVKD:itemSelect.nameNVKD,
-                                nuocsx:itemSelect.nuocsx,
-                                quycach:itemSelect.quycach,
-                                maThue: itemSelect.maThue,
-                                tenThue: itemSelect.tenThue,
-                                thueSuat: itemSelect.thueSuat,
-                                applyPriceAfterTax: itemSelect.applyPriceAfterTax == true ? 1 : 0,
-                                discountByHand: itemSelect.discountByHand == true ? 1 : 0,
-                                discountPercentByHand: itemSelect.discountPercentByHand,
-                                ckntByHand: itemSelect.ckntByHand,
-                                priceOk: itemSelect.priceOk,
-                                woPrice: itemSelect.woPrice,
-                                woPriceAfter: itemSelect.woPriceAfter,
-                                maVt2: itemSelect.maVt2,
-                                so_luong_kd: itemSelect.so_luong_kd,
-                              );
-                              _bloc.add(UpdateProductCount(
-                                index: indexSelect,
-                                count: double.parse(newQty.toString()),
-                                addOrderFromCheckIn:  widget.orderFromCheckIn,
-                                product: production,
-                                stockCodeOld: itemSelect.stockCode.toString().trim(),
-                              ));
-                            },
-                            maVt2: _bloc.listOrder[index].maVt2 ?? '',
-                            listOrder: _bloc.listOrder,
-                            currentQuantity: _bloc.listOrder[index].count ?? 0,
-                            availableQuantity: maxCanOrder, // A + B = Tối đa có thể đặt
-                          );
-                        }else{
-                          gift = false;
-                          indexSelect = index;
-                          itemSelect = _bloc.listOrder[index];
-                          _bloc.add(GetListStockEvent(
-                              itemCode: _bloc.listOrder[index].code.toString(),
-                              getListGroup: false,
-                              lockInputToCart: false,
-                              checkStockEmployee: Const.checkStockEmployee == true ? true : false));
-                        }
-                      },
-                      borderRadius:const BorderRadius.all(Radius.circular(8)),
-                      padding:const EdgeInsets.all(10),
-                      backgroundColor: Colors.indigoAccent,
-                      foregroundColor: Colors.white,
-                      icon: Icons.edit_calendar_outlined,
-                      label: 'Sửa',
-                    ),
-                  ),
-                  const SizedBox(width: 2,),
-                  Visibility(
-                    visible: _bloc.listOrder[index].gifProduct != true,
-                    child: SlidableAction(
-                      onPressed:(_) {
-                        itemSelect = _bloc.listOrder[index];
-                        
-                        // ✅ FIX: Clean up DataLocal.listCKVT properly khi xóa product
-                        if(DataLocal.listCKVT.isNotEmpty) {
-                          String productCode = itemSelect.code.toString().trim();
-                          
-                          // Remove ALL discounts related to this product (check cả sttRecCK và sctGoc)
-                          List<String> ckList = DataLocal.listCKVT.split(',').where((s) => s.isNotEmpty).toList();
-                          ckList.removeWhere((item) {
-                            // Format: "sttRecCk-productCode"
-                            return item.endsWith('-$productCode');
-                          });
-                          DataLocal.listCKVT = ckList.join(',');
-                          
-                          print('💰 Removed product $productCode from listCKVT, new value: ${DataLocal.listCKVT}');
-                          
-                          // Also clear from BLoC state
-                          _bloc.selectedCkgIds.removeWhere((id) => 
-                            _bloc.listCkg.any((ckg) => 
-                              ckg.sttRecCk == id && ckg.maVt?.trim() == productCode
-                            )
-                          );
-                        }
-                        
-                        _bloc.add(DeleteProductFromDB(false,index,_bloc.listOrder[index].code.toString(),_bloc.listOrder[index].stockCode.toString()));
-                        _bloc.add(GetListProductFromDB(addOrderFromCheckIn: false, getValuesTax: false,key: ''));
-                      },
-                      borderRadius:const BorderRadius.all(Radius.circular(8)),
-                      padding:const EdgeInsets.all(10),
-                      backgroundColor: const Color(0xFFC90000),
-                      foregroundColor: Colors.white,
-                      icon: Icons.delete_forever,
-                      label: 'Xoá',
-                    ),
-                  ),
-                ],
-              ),
-              child: Card(
-                semanticContainer: true,
-                margin: const EdgeInsets.only(left: 10,right: 10,top: 5,bottom: 5),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        _bloc.listOrder[index].gifProduct == true  || _bloc.listOrder[index].gifProductByHand == true?
-                        Container(
-                            width: 100,
-                            height: 130,
-                            padding: const EdgeInsets.all(5),
-                            child: const Icon(EneftyIcons.gift_outline ,size: 32,color: Color(0xFF0EBB00),))
-                            :
-                        Container(
-                          width: 100,
-                          height: 130,
-                          decoration: const BoxDecoration(
-                              borderRadius:BorderRadius.all( Radius.circular(6),)
-                          ),
-                          child: const Icon(EneftyIcons.image_outline,size: 50,weight: 0.6,),
-                          //Image.network('https://i.pinimg.com/564x/49/77/91/4977919321475b060fcdd89504cee992.jpg',fit: BoxFit.contain,),
-                        ),
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.only(top: 5,right: 6,bottom: 5),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisAlignment: MainAxisAlignment.start,
-                              children: [
-                                Text(
-                                  '[${_bloc.listOrder[index].code.toString().trim()}] ${_bloc.listOrder[index].name.toString().toUpperCase()}',
-                                  style:const TextStyle(color: subColor, fontSize: 14, fontWeight: FontWeight.w600,),
-                                  maxLines: 4,overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: 5,),
-                                Visibility(
-                                  visible: (_bloc.listOrder[index].thueSuat ?? 0.0) > 0,
-                                  child: Container(
-                                    margin: const EdgeInsets.only(bottom: 5),
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xffdc2626).withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: const Color(0xffdc2626).withOpacity(0.3),
-                                        width: 1,
-                                      ),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(
-                                          Icons.account_balance,
-                                          size: 14,
-                                          color: Color(0xffdc2626),
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          'Thuế: ${_formatTaxRate(_bloc.listOrder[index].thueSuat ?? 0)}%',
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 11,
-                                            color: Color(0xffdc2626),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.center,
-                                  children: [
-                                    _bloc.listOrder[index].gifProduct == true || _bloc.listOrder[index].gifProductByHand == true? const Icon(EneftyIcons.card_tick_outline,color: Color(0xFF0EBB00),size: 15,) : const Icon(FluentIcons.cart_16_filled),
-                                    const SizedBox(width: 5,),
-                                    Expanded(
-                                      flex: 3,
-                                      child: SizedBox(
-                                        height: 13,
-                                        child:(_bloc.listOrder[index].gifProduct != true  && _bloc.listOrder[index].gifProductByHand != true)
-                                            ?
-                                        Text(
-                                          '${(_bloc.listOrder[index].stockName.toString().isNotEmpty && _bloc.listOrder[index].stockName.toString() != 'null') ? _bloc.listOrder[index].stockName : 'Chọn kho xuất hàng'}',
-                                          textAlign: TextAlign.left,
-                                          style: const TextStyle(color: Colors.blueGrey,fontSize: 12
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        )
-                                            :
-                                        const Text('Hàng khuyến mãi kèm theo',style: TextStyle(color: Color(0xFF0EBB00),fontSize: 13),),
-                                      ),
-                                    ),
-                                    Const.typeProduction == true ? Expanded(
-                                      flex: 4,
-                                      child: Row(
-                                        children: [
-                                          const SizedBox(width: 10,),
-                                          Container(
-                                            height: 13,
-                                            width: 1.5,
-                                            color: Colors.grey,
-                                          ),
-                                          const SizedBox(width: 10,),
-                                          Expanded(
-                                            child: Text(
-                                              'Loại: ${_bloc.listOrder[index].isSanXuat == true ? 'Sản xuất' : _bloc.listOrder[index].isCheBien == true ? 'Chế biến' :'Thường'}',
-                                              style:const TextStyle(color: Colors.blueGrey,fontSize: 12), textAlign: TextAlign.left,
-                                            ),
-                                          ),
-                                        ],
-                                      )
-                                    ) : Container()
-                                  ],
-                                ),
-                                Visibility(
-                                  visible: Const.isVv == true || Const.isHd == true,
-                                  child: Padding(
-                                    padding: const EdgeInsets.only(top: 3),
-                                    child: Row(
-                                      crossAxisAlignment: CrossAxisAlignment.center,
-                                      children: [
-                                        const Icon(FluentIcons.clipboard_task_list_ltr_20_filled),
-                                        const SizedBox(width: 5,),
-                                        Visibility(
-                                          visible: Const.isVv == true,
-                                          child: Expanded(
-                                            child: SizedBox(
-                                                height: 13,
-                                                child:   Text(
-                                                  '${(_bloc.listOrder[index].idVv.toString() != '' && _bloc.listOrder[index].idVv.toString() != 'null') ? _bloc.listOrder[index].nameVv : 'Chương trình bán hàng'}',
-                                                  textAlign: TextAlign.left,
-                                                  style: const TextStyle(color: Colors.blueGrey,fontSize: 12
-                                                  ),
-                                                  maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
-                                                )
-                                            ),
-                                          ),
-                                        ),
-                                        Visibility(
-                                          visible: Const.isHd == true,
-                                          child: Expanded(
-                                            child: Row(
-                                              children: [
-                                                const SizedBox(width: 10,),
-                                                Container(
-                                                  height: 13,
-                                                  width: 1.5,
-                                                  color: Colors.grey,
-                                                ),
-                                                const SizedBox(width: 10,),
-                                                Text(
-                                                  '${(_bloc.listOrder[index].idHd.toString().isNotEmpty && _bloc.listOrder[index].idHd.toString() != 'null') ? _bloc.listOrder[index].nameHd : 'Hợp đồng'}',
-                                                  textAlign: TextAlign.left,
-                                                  style: const TextStyle(color: Colors.blueGrey,fontSize: 12
-                                                  ),
-                                                  maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
-                                                )
-                                              ],
-                                            ),
-                                          ),
-                                        )
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                Visibility(
-                                  visible: _bloc.listOrder[index].giaGui  > 0 ||  _bloc.listOrder[index].giaSuaDoi > 0,
-                                  child: Padding(
-                                    padding: const EdgeInsets.only(top: 5),
-                                    child: Row(
-                                      crossAxisAlignment: CrossAxisAlignment.center,
-                                      children: [
-                                        const Icon(EneftyIcons.money_recive_bold),
-                                        const SizedBox(width: 5,),
-                                        Expanded(
-                                          flex: 3,
-                                          child: _bloc.listOrder[index].giaSuaDoi > 0 ? SizedBox(
-                                              height: 13,
-                                              child: Builder(
-                                                builder: (context) {
-                                                  final discountPercent = _bloc.listOrder[index].discountPercentByHand > 0 
-                                                    ? _bloc.listOrder[index].discountPercentByHand 
-                                                    : (_bloc.listOrder[index].discountPercent ?? 0);
-                                                  
-                                                  return Text.rich(
-                                                TextSpan(
-                                                  children: [
-                                                    TextSpan(
-                                                      text:'Giá bán: \$${Utils.formatMoneyStringToDouble(_bloc.listOrder[index].giaSuaDoi)}',
-                                                      style: const TextStyle(color: Colors.blueGrey,fontSize: 12, overflow: TextOverflow.ellipsis,),
-                                                    ),
-                                                        if (discountPercent > 0)
-                                                    TextSpan(
-                                                            text: '  (-${discountPercent.toStringAsFixed(1)} %)',
-                                                      style: const TextStyle(fontWeight: FontWeight.bold,fontSize: 11, color: Colors.red),
-                                                    ),
-                                                  ],
-                                                ),
-                                                  );
-                                                },
-                                              )
-                                          )
-                                              :
-                                          SizedBox(
-                                              height: 13,
-                                              child: Text('Giá Gửi: \$${Utils.formatMoneyStringToDouble(_bloc.listOrder[index].giaGui??0)}',
-                                                textAlign: TextAlign.left, style: const TextStyle(color: Colors.blueGrey,fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis,)
-                                          ),
-                                        ),
-                                        Visibility(
-                                          visible: _bloc.listOrder[index].giaGui > 0 &&  _bloc.listOrder[index].giaSuaDoi > 0,
-                                          child: Expanded(
-                                            flex: 4,
-                                            child: Row(
-                                              children: [
-                                                const SizedBox(width: 10,),
-                                                Container(
-                                                  height: 13,
-                                                  width: 1.5,
-                                                  color: Colors.grey,
-                                                ),
-                                                const SizedBox(width: 10,),
-                                                SizedBox(
-                                                    height: 13,
-                                                    child: Text('Giá thu: \$${Utils.formatMoneyStringToDouble(_bloc.listOrder[index].giaGui)}',
-                                                      textAlign: TextAlign.left, style: const TextStyle(color: Colors.blueGrey,fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis,)
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        )
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                Padding(
-                                  padding: EdgeInsets.only(top: (_bloc.listOrder[index].giaGui > 0 ||  _bloc.listOrder[index].giaSuaDoi > 0) ? 0 : 5),
-                                  child: Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Expanded(
-                                        child: Container(
-                                          height: 35,
-                                          padding: const EdgeInsets.only(left: 5),
-                                          decoration: BoxDecoration(
-                                            borderRadius: BorderRadius.circular(16),
-                                            color: Colors.white,
-                                          ),
-                                          child: Row(
-                                            mainAxisAlignment: MainAxisAlignment.start,
-                                            children: [
-                                              Visibility(
-                                                visible: _bloc.listOrder[index].gifProduct != true  && _bloc.listOrder[index].gifProductByHand != true,
-                                                child: Row(
-                                                  children: [
-                                                    // ✅ Hiển thị giá gốc với gạch ngang khi có discount
-                                                    Builder(
-                                                      builder: (context) {
-                                                        final discountPercent = _bloc.listOrder[index].discountPercentByHand > 0 
-                                                          ? _bloc.listOrder[index].discountPercentByHand 
-                                                          : (_bloc.listOrder[index].discountPercent ?? 0);
-                                                        final originalPrice = _bloc.listOrder[index].giaSuaDoi ?? 0;
-                                                        final priceAfter = _bloc.listOrder[index].priceAfter ?? 0;
-                                                        
-                                                        // Hiển thị giá gốc với gạch ngang nếu:
-                                                        // - Có discountPercent > 0 HOẶC
-                                                        // - Có priceAfter > 0 và priceAfter != originalPrice
-                                                        final hasDiscount = discountPercent > 0 || (priceAfter > 0 && priceAfter != originalPrice);
-                                                        
-                                                        if (!hasDiscount || originalPrice == 0) {
-                                                          return Container();
-                                                        }
-                                                        
-                                                        return Text(
-                                                          '\$ ${Utils.formatMoneyStringToDouble(originalPrice * (_bloc.listOrder[index].count ?? 0))} ',
-                                                      textAlign: TextAlign.left,
-                                                          style: const TextStyle(
-                                                            color: Colors.grey,
-                                                            fontSize: 10,
-                                                            decoration: TextDecoration.lineThrough,
-                                                          ),
-                                                        );
-                                                      },
-                                                    ),
-                                                    const SizedBox(width: 5,),
-                                                    // ✅ Hiển thị giá sau chiết khấu (hoặc giá gốc nếu không có discount)
-                                                    Builder(
-                                                      builder: (context) {
-                                                        final discountPercent = _bloc.listOrder[index].discountPercentByHand > 0 
-                                                          ? _bloc.listOrder[index].discountPercentByHand 
-                                                          : (_bloc.listOrder[index].discountPercent ?? 0);
-                                                        final originalPrice = _bloc.listOrder[index].giaSuaDoi ?? 0;
-                                                        final priceAfter = _bloc.listOrder[index].priceAfter ?? 0;
-                                                        
-                                                        // ✅ Nếu có discount:
-                                                        //   - Nếu priceAfter > 0 và priceAfter != originalPrice → hiển thị priceAfter
-                                                        //   - Nếu priceAfter = 0 nhưng có discountPercent → tính lại từ originalPrice
-                                                        //   - Nếu không có discount → hiển thị giá gốc
-                                                        double displayPrice;
-                                                        final hasDiscount = discountPercent > 0 || (priceAfter > 0 && priceAfter != originalPrice);
-                                                        
-                                                        if (hasDiscount) {
-                                                          if (priceAfter > 0 && priceAfter != originalPrice) {
-                                                            displayPrice = priceAfter;
-                                                          } else if (originalPrice > 0 && discountPercent > 0) {
-                                                            // Tính lại priceAfter từ originalPrice và discountPercent
-                                                            displayPrice = originalPrice - (originalPrice * discountPercent / 100);
-                                                            if (displayPrice < 0) displayPrice = 0;
-                                                          } else {
-                                                            displayPrice = originalPrice;
-                                                          }
-                                                        } else {
-                                                          displayPrice = originalPrice;
-                                                        }
-                                                        
-                                                        return Text(
-                                                          displayPrice == 0 && originalPrice == 0
-                                                            ? 'Giá đang cập nhật'
-                                                            : '\$ ${Utils.formatMoneyStringToDouble(displayPrice * (_bloc.listOrder[index].count ?? 0))}',
-                                                          textAlign: TextAlign.left,
-                                                          style: const TextStyle(
-                                                            color: Colors.black,
-                                                            fontSize: 14,
-                                                            fontWeight: FontWeight.bold,
-                                                          ),
-                                                        );
-                                                      },
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                      QuantityInfoBox(
-                                        quantity: _bloc.listOrder[index].count?.toString() ?? '0',
-                                        unit: _bloc.listOrder[index].dvt.toString(),
-                                        isShowInfo: widget.isContractCreateOrder == true ? true : false,
-                                        contractQuantity: widget.isContractCreateOrder == true
-                                            ? () {
-                                          // A = Số lượng hiện tại của item này
-                                          double currentCount = _bloc.listOrder[index].count ?? 0;
-
-                                          // Tìm giá trị LỚN NHẤT của availableQuantity trong các items cùng maVt2
-                                          // Đây mới là TỔNG khả dụng gốc ban đầu
-                                          double totalAvailableForMaVt2 = 0;
-                                          for (var item in _bloc.listOrder) {
-                                            if (item.maVt2 == _bloc.listOrder[index].maVt2) {
-                                              double itemAvailable = item.availableQuantity ?? item.so_luong_kd;
-                                              if (itemAvailable > totalAvailableForMaVt2) {
-                                                totalAvailableForMaVt2 = itemAvailable;
-                                              }
-                                            }
-                                          }
-
-                                          // Tính TỔNG số lượng đã đặt của TẤT CẢ items cùng maVt2
-                                          double totalOrderedForMaVt2 = 0;
-                                          for (var item in _bloc.listOrder) {
-                                            if (item.maVt2 == _bloc.listOrder[index].maVt2) {
-                                              totalOrderedForMaVt2 += item.count ?? 0;
-                                            }
-                                          }
-
-                                          // B = Số lượng còn lại CHUNG = Tổng khả dụng - Tổng đã đặt
-                                          double remainingAvailable = (totalAvailableForMaVt2 - totalOrderedForMaVt2).clamp(0, totalAvailableForMaVt2);
-
-                                          return '${Utils.formatQuantity(currentCount)}/${Utils.formatQuantity(remainingAvailable)}';
-                                        }()
-                                            : null,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        )
-                      ],
-                    ),
-                    Visibility(
-                      visible: Const.noteForEachProduct == true && _bloc.listOrder[index].note.toString().trim().replaceAll('null', '').isNotEmpty,
-                      child: Padding(
-                        padding: const EdgeInsets.only(left: 10,right: 10,top: 0,bottom: 5),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Flexible(
-                              child: Text(
-                                'Ghi chú: ${_bloc.listOrder[index].note}',
-                                textAlign: TextAlign.left,
-                                style: const TextStyle(fontWeight: FontWeight.normal,fontSize: 12,color: Colors.grey
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              )
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    Visibility(
-                      visible:  Const.isBaoGia,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8,vertical: 5),
-                        child: Column(
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text('Thuế: ${_bloc.listOrder[index].tenThue.toString()}'),
-                                  Text(_bloc.listOrder[index].thueSuat.toString()),
-                                ],
-                              ),
-                              const SizedBox(height: 10,),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  const Text('Nhân viên kinh doanh'),
-                                  Text(_bloc.listOrder[index].nameNVKD.toString()),
-                                ],
-                              ),
-                              const SizedBox(height: 10,),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  const Text('Nước sản xuất'),
-                                  Text(_bloc.listOrder[index].nuocsx.toString()),
-                                ],
-                              ),
-                              const SizedBox(height: 10,),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  const Text('Quy cách'),
-                                  Text(_bloc.listOrder[index].quycach.toString()),
-                                ],
-                              ),
-                            ]
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              )
-          );
-        }
-    );
-  }
-
-  void _applyManualDiscountForItem(int index, double percent) {
-    if (percent <= 0) return;
-    if (index < 0 || index >= _bloc.listOrder.length) return;
-
-    final item = _bloc.listOrder[index];
-    if (item.gifProduct == true || item.gifProductByHand == true) return;
-
-    final double quantity = item.count ?? 0;
-    final double price = _bloc.allowTaxPercent == true
-        ? (item.priceAfterTax ?? item.priceAfter ?? 0)
-        : (item.giaSuaDoi != 0 ? item.giaSuaDoi : item.price ?? 0);
-
-    final double discountValue = (price * quantity * percent) / 100;
-
-    setState(() {
-      item.discountByHand = true;
-      item.discountPercentByHand = percent;
-      item.ckntByHand = discountValue;
-      item.priceAfter2 = price;
-      item.priceAfter = (item.giaSuaDoi - ((item.giaSuaDoi * percent) / 100));
-    });
-
-    // Persist to local cache so reload keeps manual discount
-    if (DataLocal.listOrderCalculatorDiscount.any(
-        (element) => element.code.toString().trim() == item.code.toString().trim())) {
-      DataLocal.listOrderCalculatorDiscount.removeAt(
-          DataLocal.listOrderCalculatorDiscount.indexWhere(
-              (element) => element.code.toString().trim() == item.code.toString().trim()));
-    }
-    DataLocal.listOrderCalculatorDiscount.add(item);
-
-    // Recalculate totals for this item
-    _bloc.add(CalculatorDiscountEvent(
-        addOnProduct: true, product: item, reLoad: false, addTax: false));
-
-    Utils.showCustomToast(context, Icons.check_circle_outline, 'Đã áp dụng chiết khấu tự do');
-  }
-
-  buildInfo(){
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16,vertical: 6),
-            child: Text('Hãy kiểm tra thông tin khách hàng, ghi chú của đơn hàng trước khi lên đơn hàng nhé bạn.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12.5,color: Colors.grey),),
-          ),
-          buildMethodReceive(),
-        ],
-      ),
-    );
-  }
-
-  buildBill(){
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16,vertical: 6),
-            child: Text('Hãy kiểm tra thông tin thanh toán của đơn hàng trước khi lên đơn hàng nhé bạn.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12.5,color: Colors.grey),),
-          ),
-          buildPaymentDetail(),
-          Utils.buildLine(),
-          buildOtherRequest(),
-        ],
-      ),
-    );
-  }
-
-  buildMethodReceive(){
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisAlignment: MainAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 16,right: 8,top: 10,bottom: 6),
-          child: Row(
-            children: [
-              Icon(MdiIcons.truckFast,color: mainColor,),
-              const SizedBox(width: 10,),
-              const Text('Thông tin & Phương thức nhận hàng',style: TextStyle(color: Colors.black,fontWeight: FontWeight.bold),),
-            ],
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.only(left: 16,right: 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.start,
-            children: [
-              Text('Thông tin nhận hàng:',style:  TextStyle(color: mainColor,fontSize: 13,fontStyle: FontStyle.italic),),
-              buildInfoCallOtherPeople(),
-              const SizedBox(height: 14,),
-              Utils.buildLine(),
-              InkWell(
-                onTap: (){
-                  showDialog(
-                      barrierDismissible: true,
-                      context: context,
-                      builder: (context) {
-                        return InputAddressPopup(note: (DataLocal.noteSell != '' && DataLocal.noteSell != "null") ? DataLocal.noteSell.toString() : "",
-                          title: 'Thêm ghi chú cho đơn hàng',desc: 'Vui lòng nhập ghi chú',convertMoney: false, inputNumber: false,);
-                      }).then((note){
-                    if(note != null){
-                      _bloc.add(AddNote(
+  Widget buildInfoCallOtherPeople() {
+    return CartCustomerInfoWidget(
+      bloc: _bloc,
+      nameCustomerController: nameCustomerController,
+      phoneCustomerController: phoneCustomerController,
+      addressCustomerController: addressCustomerController,
+      nameCustomerFocus: nameCustomerFocus,
+      phoneCustomerFocus: phoneCustomerFocus,
+      addressCustomerFocus: addressCustomerFocus,
+      isContractCreateOrder: widget.isContractCreateOrder ?? false,
+      orderFromCheckIn: widget.orderFromCheckIn,
+      addInfoCheckIn: widget.addInfoCheckIn ?? false,
+      inputWidget: ({
+        String? title,
+        String? hideText,
+        IconData? iconPrefix,
+        IconData? iconSuffix,
+        bool? isEnable,
+        TextEditingController? controller,
+        Function? onTapSuffix,
+        Function? onSubmitted,
+        FocusNode? focusNode,
+        TextInputAction? textInputAction,
+        bool inputNumber = false,
+        bool note = false,
+        bool isPassWord = false,
+      }) {
+        return inputWidget(
+          title: title,
+          hideText: hideText,
+          iconPrefix: iconPrefix,
+          iconSuffix: iconSuffix,
+          isEnable: isEnable,
+          controller: controller,
+          onTapSuffix: onTapSuffix,
+          onSubmitted: onSubmitted,
+          focusNode: focusNode,
+          textInputAction: textInputAction,
+          inputNumber: inputNumber,
                         note: note,
-                      ));
-                    }
-                  });
-                },
-                child: SizedBox(
-                  height: 40,
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 5,left: 16,right: 10),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Ghi chú:',style: TextStyle(color: Colors.black,fontStyle: FontStyle.italic,decoration: TextDecoration.underline,fontSize: 12),),
-                        const SizedBox(width: 12,),
-                        Expanded(child: Align(
-                            alignment: Alignment.centerRight,
-                            child: Text((DataLocal.noteSell.isNotEmpty && DataLocal.noteSell != '' && DataLocal.noteSell != "null") ? DataLocal.noteSell.toString() : "Viết tin nhắn...",style: const TextStyle(color: Colors.grey,fontStyle: FontStyle.italic,fontSize: 12),maxLines: 2,overflow: TextOverflow.ellipsis,))),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              Utils.buildLine(),
-              Visibility(
-                visible: Const.typeTransfer == true,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 14,),
-                    Text('Loại giao dịch:',style:  TextStyle(color: mainColor,fontSize: 13,fontStyle: FontStyle.italic),),
-                    const SizedBox(height: 10,),
-                    Container(
-                        height: 45,
-                        width: double.infinity,
-                        padding: const EdgeInsets.only(left: 16,top: 8,right: 16,bottom: 7),
-                        decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.grey)
-                        ),
-                        child: (Const.woPrice == true && Const.allowsWoPriceAndTransactionType == false) ? Padding(
-                          padding: const EdgeInsets.only(top: 7),
-                          child: Text( Const.isWoPrice == false ? 'Bán lẻ' : 'Bán buôn',style: const TextStyle(fontSize: 12,color: Colors.black),),
-                        )
-                            :
-                        transactionWidget()
-                    ),
-                  ],
-                ),
-              ),
-              Visibility(
-                visible: maGD.toString().replaceAll('null', '').isNotEmpty && (maGD.toString().replaceAll('null', '') == '5' || maGD.toString().replaceAll('null', '') == '6'),
-                child: CustomOrder(bloc: _bloc, idCustomer: DataLocal.infoCustomer.customerCode.toString(),),
-              ),
-              Visibility(
-                  visible: Const.typeOrder == true,
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 14,bottom: 10),
-                    child: Text('Loại đơn hàng:',style:  TextStyle(color: mainColor,fontSize: 13,fontStyle: FontStyle.italic),),
-                  )),
-              Visibility(
-                visible: Const.typeOrder == true,
-                child: Padding(
-                  padding:const EdgeInsets.only(top:10),
-                  child: Container(
-                      height: 45,
-                      width: double.infinity,
-                      padding: const EdgeInsets.only(left: 16,top: 8,right: 16,bottom: 7),
-                      decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.grey)
-                      ),
-                      child: typeOrderWidget()
-                  ),
-                )
-              ),
-              Visibility(
-                  visible: Const.chooseAgency == true && _bloc.showSelectAgency == true,
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 14,bottom: 10),
-                    child: Text('Thông tin đại lý:',style:  TextStyle(color: mainColor,fontSize: 13,fontStyle: FontStyle.italic),),
-                  )),
-              Visibility(
-                visible: Const.chooseAgency == true && _bloc.showSelectAgency == true,
-                child: GestureDetector(
-                  onTap: (){
-                    PersistentNavBarNavigator.pushNewScreen(context, screen: const SearchCustomerScreen(selected: true,allowCustomerSearch: false,typeName: true, inputQuantity: false,),withNavBar: false).then((value){
-                      if(value != null){
-                        _bloc.chooseAgencyCode = false;
-                        _bloc.add(PickInfoAgency(typeDiscount: '',codeAgency: '', nameAgency: '',cancelAgency: true));
-
-                        ManagerCustomerResponseData infoCustomer = value;
-                        _bloc.chooseAgencyCode = true;
-                        _bloc.add(PickInfoAgency(typeDiscount: infoCustomer.typeDiscount,codeAgency: infoCustomer.customerCode, nameAgency: infoCustomer.customerName,cancelAgency: false));
-                      }
-                    });
-                  },
-                  child: Container(
-                    height: 45,
-                    width: double.infinity,
-                    padding: const EdgeInsets.only(left: 16,top: 8,right: 16,bottom: 7),
-                    decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey)
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(child: Text(_bloc.nameAgency??'Chọn đại lý bán hàng',style: const TextStyle(color: Colors.black,fontSize: 13),)),
-                        _bloc.chooseAgencyCode == false ? const Icon(Icons.search, color: Colors.blueGrey,size: 20,) : InkWell(
-                            onTap: (){
-                              _bloc.chooseAgencyCode = false;
-                              _bloc.add(PickInfoAgency(typeDiscount: '',codeAgency: '', nameAgency: '',cancelAgency: true));
-                            },
-                            child: const Icon(Icons.cancel_outlined, color: Colors.blueGrey,size: 20,)),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              Visibility(
-                  visible: Const.lockStockInCart == false,
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 14),
-                    child: Text('Kho xuất hàng:',style:  TextStyle(color: mainColor,fontSize: 13,fontStyle: FontStyle.italic),),
-                  )),
-              Visibility(
-                  visible: Const.lockStockInCart == false,
-                  child: const SizedBox(height: 10,)),
-              Visibility(
-                visible: Const.lockStockInCart == false,
-                child: Container(
-                    height: 45,
-                    width: double.infinity,
-                    padding: const EdgeInsets.only(left: 16,top: 8,right: 16,bottom: 7),
-                    decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey)
-                    ),
-                    child: genderWidget()
-                ),
-              ),
-              Visibility(
-                visible: Const.isVvHd == true,
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 10,top: 14),
-                  child: Text('Loại Chương trình bán hàng:',style:  TextStyle(color: mainColor,fontSize: 13,fontStyle: FontStyle.italic),),
-                ),
-              ),
-              Visibility(
-                visible: Const.isVvHd == true,
-                child: GestureDetector(
-                  onTap: (){
-                    showModalBottomSheet(
-                        context: context,
-                        isDismissible: true,
-                        isScrollControlled: true,
-                        shape: const RoundedRectangleBorder(
-                          borderRadius: BorderRadius.only(topLeft: Radius.circular(25.0), topRight: Radius.circular(25.0)),
-                        ),
-                        backgroundColor: Colors.white,
-                        builder: (builder){
-                          return buildPopupVvHd();
-                        }
-                    ).then((value){
-                      if(value != null){
-                        if(value[0] == 'ReLoad'){
-                          setState(() {
-                            _bloc.idVv = value[1];
-                            _bloc.nameVv = value[2];
-                            _bloc.idHd = value[3];
-                            _bloc.nameHd = value[4];
-                            _bloc.idHdForVv = value[5];
-                          });
-                        }
-                      }
-                    });
-                  },
-                  child: Container(
-                      height: 45,
-                      width: double.infinity,
-                      padding: const EdgeInsets.only(left: 16,top: 8,right: 16,bottom: 7),
-                      decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.grey)
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Flexible(child: Text((_bloc.nameVv.toString().trim() != '' && _bloc.nameVv.toString().trim() != 'null') ? _bloc.nameVv.toString().trim() : 'Chọn Chương trình bán hàng', style:  const TextStyle(fontSize: 12.0, color: black),maxLines: 1,overflow: TextOverflow.ellipsis,)),
-                          const SizedBox(width: 8,),
-                          Flexible(child: Text((_bloc.nameHd.toString().trim() != '' && _bloc.nameHd.toString().trim() != 'null') ? _bloc.nameHd.toString().trim() : 'Chọn loại hợp đồng', style:  const TextStyle(fontSize: 12.0, color: black),maxLines: 1,overflow: TextOverflow.ellipsis,))
-                        ],
-                      )
-                  ),
-                ),
-              ),
-              Visibility(
-                  visible: Const.useTax == true,
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 14,bottom: 10),
-                    child: Text( Const.afterTax == true ? 'Áp dụng thuế sau chiết khấu cho đơn hàng:' : 'Áp dụng thuế trước chiết khấu cho đơn hàng:',style:  TextStyle(color: mainColor,fontSize: 13,fontStyle: FontStyle.italic),),
-                  )),
-              Visibility(
-                visible: Const.useTax == true,
-                child: Container(
-                    height: 45,
-                    width: double.infinity,
-                    padding: const EdgeInsets.only(left: 16,top: 8,right: 16,bottom: 7),
-                    decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey)
-                    ),
-                    child: genderTaxWidget()
-                ),
-              ),
-              Visibility(
-                  visible: Const.chooseTypePayment == true,
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 14,bottom: 10),
-                    child: Text('Loại hình thức thanh toán:',style:  TextStyle(color: mainColor,fontSize: 13,fontStyle: FontStyle.italic),),
-                  )),
-              Visibility(
-                visible: Const.chooseTypePayment == true,
-                child: Container(
-                    height: 45,
-                    width: double.infinity,
-                    padding: const EdgeInsets.only(left: 16,top: 8,right: 16,bottom: 7),
-                    decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey)
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(child: typePaymentWidget()),
-                        Visibility(
-                            visible: _bloc.showDatePayment == true,
-                            child: InkWell(
-                              onTap: (){
-                                Utils.dateTimePickerCustom(context).then((value){
-                                  if(value != null){
-                                    setState(() {
-                                      DataLocal.datePayment = Utils.parseStringDateToString(value.toString(), Const.DATE_TIME_FORMAT,Const.DATE_SV_FORMAT);
-                                    });
-                                  }
-                                });
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.only(left: 50),
-                                child: Row(
-                                  children: [
-                                    Text(DataLocal.datePayment, style:  const TextStyle(fontSize: 12.0, color: black),maxLines: 1,overflow: TextOverflow.ellipsis,),
-                                    const SizedBox(width: 5,),
-                                    Icon(Icons.calendar_today_rounded,color: mainColor,size: 19,),
-                                  ],
-                                ),
-                              ),
-                            )
-                        ),
-                      ],
-                    )
-                ),
-              ),
-              Visibility(
-                  visible: Const.chooseTypeDelivery == true,
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 14,bottom: 10),
-                    child: Text('Loại hình vận chuyển:',style:  TextStyle(color: mainColor,fontSize: 13,fontStyle: FontStyle.italic),),
-                  )),
-              Visibility(
-                visible: Const.chooseTypeDelivery == true,
-                child: Container(
-                    height: 45,
-                    width: double.infinity,
-                    padding: const EdgeInsets.only(left: 16,top: 8,right: 16,bottom: 7),
-                    decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey)
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(child: typeChooseTypeDelivery()),
-                      ],
-                    )
-                ),
-              ),
-              Visibility(
-                  visible: Const.dateEstDelivery == true,
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 14,bottom: 10),
-                    child: Text('Dự kiến giao hàng:',style:  TextStyle(color: mainColor,fontSize: 13,fontStyle: FontStyle.italic),),
-                  )),
-              Visibility(
-                visible: Const.dateEstDelivery == true,
-                child: Container(
-                  padding:const EdgeInsets.only(left: 12,right: 2,top: 10,bottom: 10),
-                  height: 45,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                      border: Border.all(color: grey.withOpacity(0.8),width: 1),
-                      borderRadius: const BorderRadius.all(Radius.circular(8))
-                  ),
-                  child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: <Widget>[
-                        Row(
-                          children: [
-                            const Text('Ngày dự kiến giao hàng: ',style:  TextStyle(color: Colors.black,fontSize: 12),textAlign: TextAlign.center,),
-                            const SizedBox(width: 5,),
-                            Text(DataLocal.dateEstDelivery,style: const TextStyle(color: Colors.black,fontSize: 12),textAlign: TextAlign.center,maxLines: 1,overflow: TextOverflow.ellipsis,),
-                          ],
-                        ),
-                        SizedBox(
-                          width: 50,
-                          child: InkWell(
-                            onTap: (){
-                              Utils.dateTimePickerCustom(context).then((value){
-                                if(value != null){
-                                  setState(() {
-                                    DataLocal.dateEstDelivery = Utils.parseStringDateToString(value.toString(), Const.DATE_TIME_FORMAT,Const.DATE_SV_FORMAT);
-                                  });
-                                }
-                              });
-                            },
-                            child: const Icon(Icons.event,color: Colors.blueGrey,size: 22,),
-                          ),
-                        ),
-                      ]),
-                ),
-              )
-            ],
-          ),
-        ),
-      ],
+          isPassWord: isPassWord,
+        );
+      },
+      onStateChanged: () => setState(() {}),
     );
   }
 
-  buildInfoCallOtherPeople(){
-    return Padding(
-      padding: const EdgeInsets.only(top: 10),
-      child: Container(
-        decoration: BoxDecoration(
-          border: Border.all(color: subColor),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Column(
-          children: [
-            Container(padding: const EdgeInsets.all(10),
-              height: 40,
-              width: double.infinity,
-              color: Colors.amber.withOpacity(0.4),
-              child: const Align(
-                alignment: Alignment.centerLeft,
-                child: Text('Thông tin khách hàng',style: TextStyle(color: Colors.black,fontSize: 13),),
-              ),
-            ),
-            const SizedBox(height: 22,),
-            GestureDetector(
-              onTap:(){
-                if(widget.isContractCreateOrder == true){
-                  return;
-                }
-                if((widget.orderFromCheckIn == false && widget.addInfoCheckIn != true)){
-                  PersistentNavBarNavigator.pushNewScreen(context, screen: const SearchCustomerScreen(selected: true,allowCustomerSearch: true, inputQuantity: false,),withNavBar: false).then((value){
-                    if(value != null){
-                      DataLocal.infoCustomer = value;
-                      _bloc.add(PickInfoCustomer(customerName: DataLocal.infoCustomer.customerName,phone: DataLocal.infoCustomer.phone,address: DataLocal.infoCustomer.address,codeCustomer: DataLocal.infoCustomer.customerCode));
-                    }
-                  });
-                }
-              },
-              child: Stack(
-                children: [
-                  inputWidget(title:'Tên khách hàng',hideText: "Nguyễn Văn A",controller: nameCustomerController,focusNode: nameCustomerFocus,textInputAction: TextInputAction.done, onTapSuffix: (){},note: true,isEnable: false),
-                  Positioned(
-                      top: 20,right: 10,
-                      child: (widget.orderFromCheckIn == false && widget.addInfoCheckIn != true) ?  Icon(Icons.search_outlined,color: widget.isContractCreateOrder == true ? Colors.transparent : Colors.grey,size: 20,) : Container())
-                ],
-              ),
-            ),
-            inputWidget(title:"SĐT khách hàng",hideText: '0963 xxx xxx ',controller: phoneCustomerController,focusNode: phoneCustomerFocus,textInputAction: TextInputAction.done, onTapSuffix: (){},note: true),
-            GestureDetector(
-              onTap:(){
-                showDialog(
-                    barrierDismissible: true,
-                    context: context,
-                    builder: (context) {
-                      // ignore: unnecessary_null_comparison
-                      return InputAddressPopup(note: addressCustomerController.text != null ? addressCustomerController.text.toString() : "",title: 'Địa chỉ KH',desc: 'Vui lòng nhập địa chỉ KH',convertMoney: false, inputNumber: false,);
-                    }).then((note){
-                  if(note != null){
-                    setState(() {
-                      addressCustomerController.text = note;
-                    });
-                  }
-                });
-              },
-              child: Stack(
-                children: [
-                  inputWidget(title:'Địa chỉ khách hàng',hideText: "Vui lòng nhập địa chỉ KH",controller: addressCustomerController,focusNode: addressCustomerFocus,textInputAction: TextInputAction.done, onTapSuffix: (){},note: true,isEnable: false),
-                  const Positioned(
-                      top: 20,right: 10,
-                      child: Icon(Icons.edit,color: Colors.grey,size: 20,))
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget typePaymentWidget() {
-    return Utils.isEmpty(DataLocal.typePaymentList)
-        ? const Padding(
-      padding: EdgeInsets.only(top: 6),
-      child:  Text('Không có dữ liệu',style: TextStyle(color: Colors.blueGrey,fontSize: 12)),
-    )
-        : DropdownButtonHideUnderline(
-      child: DropdownButton<String>(
-          isDense: true,
-          // iconEnabledColor: _bloc.showDatePayment == true ? Colors.transparent : Colors.black54,
-          isExpanded: true,
-          style: const TextStyle(
-            color: black,
-            fontSize: 12.0,
-          ),
-          value: DataLocal.typePaymentList[_bloc.typePaymentIndex],
-          items: DataLocal.typePaymentList.map((value) => DropdownMenuItem<String>(
-            value: value,
-            child: Text(value.toString(), style:  const TextStyle(fontSize: 12.0, color: black),maxLines: 1,overflow: TextOverflow.ellipsis,),
-          )).toList(),
-          onChanged: (value) {
-            DataLocal.valuesTypePayment = value.toString();
-            _bloc.add(PickTypePayment(DataLocal.typePaymentList.indexOf(value!),  DataLocal.valuesTypePayment));
-          }),
-    );
-  }
-
-  Widget typeChooseTypeDelivery() {
-    return Utils.isEmpty(DataLocal.listTypeDelivery)
-        ? const Padding(
-      padding: EdgeInsets.only(top: 6),
-      child:  Text('Không có dữ liệu',style: TextStyle(color: Colors.blueGrey,fontSize: 12)),
-    )
-        : DropdownButtonHideUnderline(
-      child: DropdownButton<ListTypeDelivery>(
-          isDense: true,
-          isExpanded: true,
-          style: const TextStyle(
-            color: black,
-            fontSize: 12.0,
-          ),
-          value: DataLocal.listTypeDelivery[_bloc.typeDeliveryIndex < 0 ? 0 : _bloc.typeDeliveryIndex],
-          items: DataLocal.listTypeDelivery.map((value) => DropdownMenuItem<ListTypeDelivery>(
-            value: value,
-            child: Text(value.nameTypeDelivery.toString(), style: const TextStyle(fontSize: 12.0, color: black),maxLines: 1,overflow: TextOverflow.ellipsis,),
-          )).toList(),
-          onChanged: (value) {
-            ListTypeDelivery item = value??ListTypeDelivery();
-            _bloc.add(PickListTypeDeliveryEvent(item,DataLocal.listTypeDelivery.indexOf(item)));
-          }),
-    );
-  }
-
+  // Helper widgets moved to CartHelperWidgets class
   String maGD = '';
-  Widget transactionWidget() {
-    return Utils.isEmpty(Const.listTransactionsOrder)
-        ?
-    const Padding(
-      padding: EdgeInsets.only(top: 6),
-      child:  Text('Không có dữ liệu',style: TextStyle(color: Colors.blueGrey,fontSize: 12)),
-    )
-        :
-    DropdownButtonHideUnderline(
-      child: DropdownButton<ListTransaction>(
-          isDense: true,
-          isExpanded: true,
-          style: const TextStyle(
-            color: black,
-            fontSize: 12.0,
-          ),
-          value: Const.listTransactionsOrder[_bloc.transactionIndex < 0 ? 0 : _bloc.transactionIndex],
-          items: Const.listTransactionsOrder.map((value) => DropdownMenuItem<ListTransaction>(
-            value: value,
-            child: Text(value.tenGd.toString(), style:  const TextStyle(fontSize: 12.0, color: black),maxLines: 1,overflow: TextOverflow.ellipsis,),
-          )).toList(),
-          onChanged: (value) {
-            DataLocal.transaction = value!;
-            DataLocal.transactionCode = DataLocal.transaction.maGd.toString();
-            DataLocal.transactionYN = DataLocal.transaction.chonDLYN??0;
-            maGD = value.maGd.toString().trim();
-
-            _bloc.add(PickTransactionName(Const.listTransactionsOrder.indexOf(DataLocal.transaction),DataLocal.transaction.tenGd.toString(),DataLocal.transaction.chonDLYN??0));
-          }),
-    );
-  }
-
-  Widget typeOrderWidget() {
-    return Padding(
-      padding: const EdgeInsets.only(top: 6),
-      child:  Text(Const.nameTypeAdvOrder.toString().trim().replaceAll('null', '').isNotEmpty ?
-      Const.nameTypeAdvOrder.toString() : 'Vui lòng chọn loại đơn hàng',style: const TextStyle(color: Colors.blueGrey,fontSize: 12)),
-    );
-  }
-
-  Widget genderTaxWidget() {
-    return
-      Utils.isEmpty(DataLocal.listTax)
-          ?
-      const Padding(
-        padding: EdgeInsets.only(top: 6),
-        child:  Text('Không có dữ liệu',style: TextStyle(color: Colors.blueGrey,fontSize: 12)),
-      )
-          :
-      DropdownButtonHideUnderline(
-        child: DropdownButton<GetListTaxResponseData>(
-            isDense: true,
-            isExpanded: true,
-            style: const TextStyle(
-              color: black,
-              fontSize: 12.0,
-            ),
-            value: DataLocal.listTax[_bloc.taxIndex],
-            items: DataLocal.listTax.map((value) => DropdownMenuItem<GetListTaxResponseData>(
-              value: value,
-              child: Text(
-                value.tenThue.toString(), style:  const TextStyle(fontSize: 12.0, color: black),maxLines: 1,overflow: TextOverflow.ellipsis,),
-            )).toList(),
-            onChanged: (value) {
-              GetListTaxResponseData tax = value!;
-              if(tax.maThue.toString().trim() == '#000'){
-                _bloc.allowTaxPercent = false;
-              }else{
-                _bloc.allowTaxPercent = true;
-              }
-              indexValuesTax = DataLocal.listTax.indexOf(value);
-              DataLocal.indexValuesTax = indexValuesTax;
-              DataLocal.taxPercent = tax.thueSuat!.toDouble();
-              DataLocal.taxCode = tax.maThue.toString().trim();
-              if(Const.afterTax == true){
-                _bloc.add(PickTaxAfter(DataLocal.indexValuesTax,DataLocal.taxPercent));
-              }else{
-                _bloc.add(PickTaxBefore(DataLocal.indexValuesTax,DataLocal.taxPercent));
-              }
-            }),
-      );
-  }
-
-  Widget genderWidget() {
-    return Utils.isEmpty(Const.stockList)
-        ? const Padding(
-      padding: EdgeInsets.only(top: 6),
-      child:  Text('Không có dữ liệu',style: TextStyle(color: Colors.blueGrey,fontSize: 12)),
-    )
-        : DropdownButtonHideUnderline(
-      child: DropdownButton<StockList>(
-          isDense: true,
-          isExpanded: true,
-          style: const TextStyle(
-            color: black,
-            fontSize: 12.0,
-          ),
-          value: Const.stockList[_bloc.storeIndex],
-          items: Const.stockList.map((value) => DropdownMenuItem<StockList>(
-            value: value,
-            child: Text(value.stockName.toString(), style:  const TextStyle(fontSize: 12.0, color: black),maxLines: 1,overflow: TextOverflow.ellipsis,),
-          )).toList(),
-          onChanged: (value) {
-            StockList stocks = value!;
-            _bloc.storeCode = stocks.stockCode;
-            _bloc.add(PickStoreName(Const.stockList.indexOf(value)));
-          }),
-    );
-  }
-
+  
+  Widget typePaymentWidget() => CartHelperWidgets.typePaymentWidget(_bloc);
+  Widget typeChooseTypeDelivery() => CartHelperWidgets.typeChooseTypeDelivery(_bloc);
+  Widget typeDeliveryWidget() => CartHelperWidgets.typeChooseTypeDelivery(_bloc); // Alias for typeChooseTypeDelivery
+  Widget transactionWidget() => CartHelperWidgets.transactionWidget(_bloc, (maGDValue) {
+    maGD = maGDValue;
+  });
+  Widget typeOrderWidget() => CartHelperWidgets.typeOrderWidget();
+  Widget genderTaxWidget() => CartHelperWidgets.genderTaxWidget(
+    context,
+    _bloc,
+    (index) {
+      indexValuesTax = index;
+    },
+    // ✅ Callback để load tax list từ API khi mở bottom sheet
+    () async {
+      try {
+        // Call API để lấy danh sách thuế thông qua CartBloc
+        // Sử dụng SellBloc nếu có, hoặc call trực tiếp qua NetworkFactory
+        final response = await _bloc.getListTaxFromAPI();
+        
+        // Parse response
+        if (response != null && response is Map<String, dynamic>) {
+          final taxResponse = GetListTaxResponse.fromJson(response);
+          DataLocal.listTax = taxResponse.data ?? [];
+          
+          // ✅ Tự động thêm option "Không áp dụng thuế" vào đầu danh sách
+          if (DataLocal.listTax.isNotEmpty) {
+            GetListTaxResponseData element = GetListTaxResponseData(
+              maThue: '#000',
+              tenThue: 'Không áp dụng thuế cho đơn hàng này',
+              thueSuat: 0.0,
+            );
+            
+            // Chỉ thêm nếu chưa có
+            bool hasNoTaxOption = DataLocal.listTax.any((tax) => tax.maThue?.trim() == '#000');
+            if (!hasNoTaxOption) {
+              DataLocal.listTax.insert(0, element);
+            }
+          }
+          
+          return DataLocal.listTax;
+        }
+        
+        // Fallback: return DataLocal.listTax nếu đã có
+        return DataLocal.listTax;
+      } catch (e) {
+        print('❌ Error loading tax list: $e');
+        // Fallback: return DataLocal.listTax nếu có lỗi
+        return DataLocal.listTax;
+      }
+    },
+  );
+  Widget genderWidget() => CartHelperWidgets.genderWidget(_bloc);
   Widget inputWidget({String? title,String? hideText,IconData? iconPrefix,IconData? iconSuffix, bool? isEnable,
     TextEditingController? controller,Function? onTapSuffix, Function? onSubmitted,FocusNode? focusNode,
-    TextInputAction? textInputAction,bool inputNumber = false,bool note = false,bool isPassWord = false}){
-    return Padding(
-      padding: const EdgeInsets.only(top: 0,left: 10,right: 10,bottom: 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                title??'',
-                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13,color: Colors.black),
-              ),
-              Visibility(
-                visible: note == true,
-                child: const Text(' *',style: TextStyle(color: Colors.red),),
-              )
-            ],
-          ),
-          const SizedBox(height: 5,),
-          Container(
-            height: 45,
-            decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8)
-            ),
-            child: TextFieldWidget2(
-              controller: controller!,
-              suffix: iconSuffix,
-              textInputAction: textInputAction!,
-              isEnable: isEnable ?? true,
-              keyboardType: inputNumber == true ? TextInputType.phone : TextInputType.text,
-              hintText: hideText,
+    TextInputAction? textInputAction,bool inputNumber = false,bool note = false,bool isPassWord = false}) {
+    return CartHelperWidgets.inputWidget(
+      title: title,
+      hideText: hideText,
+      iconPrefix: iconPrefix,
+      iconSuffix: iconSuffix,
+      isEnable: isEnable,
+      controller: controller,
+      onTapSuffix: onTapSuffix,
+      onSubmitted: onSubmitted,
               focusNode: focusNode,
-              onSubmitted: (text)=> onSubmitted,
-              isPassword: isPassWord,
-              isNull: true,
-              color: Colors.blueGrey,
-
-            ),
-          ),
-        ],
-      ),
+      textInputAction: textInputAction,
+      inputNumber: inputNumber,
+      note: note,
+      isPassWord: isPassWord,
     );
   }
 
-  buildOtherRequest(){
-    return Padding(
-      padding: const EdgeInsets.only(left: 16,right: 16,top: 10,),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Yêu cầu khác:',style: TextStyle(color: Colors.black,fontWeight: FontWeight.bold),),
-          const SizedBox(height: 16,),
-          GestureDetector(
-              onTap: ()=>_bloc.add(CheckInTransferEvent(index: 4)),
-              child: _buildCheckboxList('Đính kèm hoá đơn (nếu có)',_bloc.attachInvoice,4)),
-          Visibility(
-            visible: _bloc.attachInvoice == true,
-            child: buildAttachFileInvoice(),),
-          const SizedBox(height: 16,),
-          GestureDetector(
-              onTap: ()=>_bloc.add(CheckInTransferEvent(index: 5)),
-              child: _buildCheckboxList('Xuất hoá đơn cho công ty',_bloc.exportInvoice,5)),
-          Visibility(
-            visible: _bloc.exportInvoice == true,
-            child: buildInfoInvoice(),),
-        ],
-      ),
+  Widget buildOtherRequest() {
+    return CartOtherRequestWidget(
+      bloc: _bloc,
+      buildAttachFileInvoice: () => buildAttachFileInvoice(),
+      buildInfoInvoice: () => buildInfoInvoice(),
+      buildCheckboxList: (title, value, index) =>
+          CartHelperWidgets.buildCheckboxList(title, value, index, _bloc),
     );
   }
 
-  Widget buildPaymentDetail(){
-    return Padding(
-      padding: const EdgeInsets.only(left: 16,right: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding:const EdgeInsets.only(top: 10,bottom: 6,),
-            child: Row(
-              children: [
-                Icon(MdiIcons.idCard,color: mainColor,),
-                const SizedBox(width: 10,),
-                const Text('Thanh toán',style: TextStyle(color: Colors.black,fontSize: 15,fontWeight: FontWeight.bold,),maxLines: 1,overflow: TextOverflow.ellipsis,),
-              ],
-            ),
-          ),
-          customWidgetPayment('Tổng tiền đặt hàng:','${Utils.formatMoneyStringToDouble(_bloc.totalMoney)} ₫',0,''),
-          Visibility(
-              visible: Const.enableViewPriceAndTotalPriceProductGift == true && DataLocal.listProductGift.isNotEmpty,
-              child: customWidgetPayment('Tổng tiền hàng được khuyến mại:','${Utils.formatMoneyStringToDouble(_bloc.totalMoneyProductGift)} ₫',0,'')),
-          customWidgetPayment('Thuế:','${Utils.formatMoneyStringToDouble((_bloc.totalTax + _bloc.totalTax2))} ₫',0,''),
-customWidgetPayment('Chiết khấu:','- ${Utils.formatMoneyStringToDouble(_bloc.totalDiscount)} ₫',0,''),
-          InkWell(
-              onTap: (){
-                if(_bloc.listCkTongDon.isNotEmpty && _bloc.listCkTongDon.length > 1){
-                  for (var element in _bloc.listCkTongDon) {
-                    if(_bloc.listPromotion.split(',').any((values) => values.toString().trim() == element.sttRecCk.toString().trim()) == true){
-                      _bloc.codeDiscountOld = element.maCk.toString().trim();
-                    }
-                  }
-                  showDialog(
-                      context: context,
-                      builder: (context) {
-                        return WillPopScope(
-                            onWillPop: () async => true,
-                            child:  CustomViewDiscountComponent(
-                              iconData: Icons.card_giftcard_rounded,
-                              title: 'Chương trình Khuyến Mại',
-                              listDiscount: const [],
-                              codeDiscountOld: _bloc.codeDiscountOld,
-                              listDiscountTotal: _bloc.listCkTongDon,
-                            )
-                        );
-                      }).then((value){
-                    if(value != '' && value[0] == 'Yeah'){
-                      /// add list
-                      /// check trùng
-                      /// xoá list
-                      if(_bloc.listPromotion.isNotEmpty && _bloc.listPromotion.contains(value[6].toString().trim())){
-                        _bloc.listPromotion = _bloc.listPromotion.replaceAll(value[6].toString().trim(), value[7].toString().trim());
-                        // _bloc.listCKVT = _bloc.listCKVT.replaceAll('${value[6].toString().trim()}-', value[7].toString().trim());
-                      }else{
-                        _bloc.listPromotion = _bloc.listPromotion == '' ? value[7].toString().trim() : '${_bloc.listPromotion},${value[7].toString().trim()}';
-                      }
-                      _bloc.codeDiscountTD = value[2];
-                      _bloc.sttRecCKOld = value[7];
-                      _bloc.listCkMatHang.clear();
-                      _bloc.add(GetListItemApplyDiscountEvent(
-                          listCKVT: DataLocal.listCKVT,
-                          listPromotion: _bloc.listPromotion,
-                          listItem: listItem,
-                          listQty: listQty,
-                          listPrice: listPrice,
-                          listMoney: listMoney,
-                          warehouseId: codeStore,
-                          customerId: _bloc.codeCustomer.toString(),
-                          keyLoad: 'Second'
-                      ));
-                    }
-                  });
-                }
-              },
-              child: customWidgetPayment('Voucher:','',1 ,
-                  _bloc.codeDiscountTD.isEmpty
-                      ?
-                  'FreeShip'
-                      :
-                  "${_bloc.codeDiscountTD.toString().trim()} ${(_bloc.totalDiscountForOder ?? 0) == 0 ? '0 ₫'
-                      :
-                  '- ${Utils.formatMoneyStringToDouble(_bloc.totalDiscountForOder ?? 0)} ₫'}"
-              )),
-          Padding(
-            padding: const EdgeInsets.only(top: 15,bottom: 6,),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Tổng Thanh toán',style: TextStyle(color: Colors.black,fontSize: 15,fontWeight: FontWeight.bold,),maxLines: 1,overflow: TextOverflow.ellipsis,),
-                Text('${Utils.formatMoneyStringToDouble(_bloc.totalPayment)} ₫',style: const TextStyle(color: Colors.black,fontSize: 15,fontWeight: FontWeight.bold,),maxLines: 1,overflow: TextOverflow.ellipsis,),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCheckboxList(String title,bool value,int index) {
-    return Row(
-      children: [
-        SizedBox(
-          height: 10,
-          child: Transform.scale(
-            scale: 1,
-            alignment: Alignment.topLeft,
-            child: Checkbox(
-              value: value,
-              onChanged: (b){
-                // if(index == 1){
-                //   _bloc.add(CheckInTransferEvent(index: 1));
-                // }else if(index == 2){
-                //   _bloc.add(CheckInTransferEvent(index: 2));
-                // }else if(index == 3){
-                //   _bloc.add(CheckInTransferEvent(index: 3));
-                // }else
-                if(index == 4){
-                  _bloc.add(CheckInTransferEvent(index: 4));
-                }else if(index == 5){
-                  _bloc.add(CheckInTransferEvent(index: 5));
-                }
-              },
-              activeColor: mainColor,
-              hoverColor: Colors.orange,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(4)
-              ),
-              side: MaterialStateBorderSide.resolveWith((states){
-                if(states.contains(MaterialState.pressed)){
-                  return BorderSide(color: mainColor);
-                }else{
-                  return BorderSide(color: mainColor);
-                }
-              }),
-            ),
-          ),
-        ),
-        Text(title,style: const TextStyle(color: Colors.blueGrey,fontSize: 12),),
-      ],
-    );
-  }
-
-  buildAttachFileInvoice(){
-    return Padding(
-      padding: const EdgeInsets.only(top: 10),
-      child: Container(
-        decoration: BoxDecoration(
-          border: Border.all(color: subColor),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Column(
-          children: [
-            InkWell(
-              onTap: (){
-                getImage();
-                // _bloc.add(GetCameraEvent());
-              },
-              child: Container(padding: const EdgeInsets.only(left: 10,right: 15,top: 8,bottom: 8),
-                height: 40,
-                width: double.infinity,
-                color: Colors.amber.withOpacity(0.4),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Ảnh của bạn',style: TextStyle(color: Colors.black,fontSize: 13),),
-                    Icon(Icons.add_a_photo_outlined,size: 20,),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 16,),
-            // GalleryImage(imageUrls: [],),
-            _bloc.listFileInvoice.isEmpty ? const SizedBox(height: 100,width: double.infinity,child: Center(child: Text('Hãy chọn thêm hình ảnh của bạn từ thư viện ảnh hoặc từ camera',style: TextStyle(color: Colors.blueGrey,fontSize: 12),textAlign: TextAlign.center,),),) :
-            SizedBox(
-              height: 120,
-              width: double.infinity,
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: ListView.builder(
-                    padding: EdgeInsets.zero,
-                    shrinkWrap: true,
-                    scrollDirection: Axis.horizontal,
-                    itemCount: _bloc.listFileInvoice.length,
-                    itemBuilder: (context,index){
-                      return (start > 1 && waitingLoad == true && _bloc.listFileInvoice.length == (index + 1)) ? const SizedBox(height: 100,width: 80,child: PendingAction()) : GestureDetector(
-                        onTap: (){
-                          openImageFullScreen(index,_bloc.listFileInvoice[index]);
-                        },
-                        child: Padding(
-                          padding: const EdgeInsets.only(left: 10.0),
-                          child: Stack(
-                            children: [
-                              SizedBox(
-                                width: 115,
-                                child: ClipRRect(
-                                  borderRadius: const BorderRadius.all(Radius.circular(8)),
-                                  child: Hero(
-                                    tag: index,
-                                    /*semanticContainer: true,
-                                    margin: const EdgeInsets.only(left: 10,right: 10,top: 5,bottom: 5),*/
-                                    child: Image.file(
-                                      _bloc.listFileInvoice[index],
-                                      fit: BoxFit.cover,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              Positioned(
-                                top: 6,right: 6,
-                                child: InkWell(
-                                  onTap: (){
-                                    setState(() {
-                                      _bloc.listFileInvoice.removeAt(index);
-                                      _bloc.listFileInvoiceSave.removeAt(index);
-                                    });
-                                  },
-                                  child: Container(
-                                    height: 20,width: 20,
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(12),
-                                      color: Colors.black.withOpacity(.7),
-                                    ),
-                                    child: const Icon(Icons.clear,color: Colors.white,size: 12,),
-                                  ),
-                                ),
-                              )
-                            ],
-                          ),
-                        ),
-                      );
-                    }
-
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+  Widget buildAttachFileInvoice() {
+    return CartAttachFileInvoiceWidget(
+      bloc: _bloc,
+      start: start,
+      waitingLoad: waitingLoad,
+      getImage: getImage,
+      openImageFullScreen: openImageFullScreen,
+      onStateChanged: () => setState(() {}),
     );
   }
 
@@ -5729,173 +4038,51 @@ customWidgetPayment('Chiết khấu:','- ${Utils.formatMoneyStringToDouble(_bloc
     );
   }
 
-  buildInfoInvoice(){
-    return Padding(
-      padding: const EdgeInsets.only(top: 15),
-      child: Container(
-        decoration: BoxDecoration(
-          border: Border.all(color: subColor),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Column(
-          children: [
-            Container(padding: const EdgeInsets.all(10),
-              height: 40,
-              width: double.infinity,
-              color: Colors.amber.withOpacity(0.4),
-              child: const Align(
-                alignment: Alignment.centerLeft,
-                child: Text('Thông tin xuất hoá đơn',style: TextStyle(color: Colors.black,fontSize: 13),),
-              ),
-            ),
-            const SizedBox(height: 8,),
-            inputWidget(title: "Công ty",hideText: 'Tên công ty',controller: nameCompanyController,focusNode: nameCompanyFocus,textInputAction: TextInputAction.done, onTapSuffix: (){},note: true),
-            inputWidget(title: "Mã số thuế",hideText: 'Mã số thuế',controller: mstController,focusNode: mstFocus,textInputAction: TextInputAction.done, onTapSuffix: (){},note: true),
-            inputWidget(title: "Địa chỉ",hideText: 'Địa chỉ',controller: addressCompanyController,focusNode: addressFocus,textInputAction: TextInputAction.done, onTapSuffix: (){},note: true),
-            inputWidget(title: "Ghi chú",hideText: 'Ghi chú',controller: noteController,focusNode: noteFocus,textInputAction: TextInputAction.done, onTapSuffix: (){},note: false),
-          ],
-        ),
-      ),
+  Widget buildInfoInvoice() {
+    return CartInfoInvoiceWidget(
+      nameCompanyController: nameCompanyController,
+      mstController: mstController,
+      addressCompanyController: addressCompanyController,
+      noteController: noteController,
+      nameCompanyFocus: nameCompanyFocus,
+      mstFocus: mstFocus,
+      addressFocus: addressFocus,
+      noteFocus: noteFocus,
+      inputWidget: ({
+        String? title,
+        String? hideText,
+        IconData? iconPrefix,
+        IconData? iconSuffix,
+        bool? isEnable,
+        TextEditingController? controller,
+        Function? onTapSuffix,
+        Function? onSubmitted,
+        FocusNode? focusNode,
+        TextInputAction? textInputAction,
+        bool inputNumber = false,
+        bool note = false,
+        bool isPassWord = false,
+      }) {
+        return inputWidget(
+          title: title,
+          hideText: hideText,
+          iconPrefix: iconPrefix,
+          iconSuffix: iconSuffix,
+          isEnable: isEnable,
+          controller: controller,
+          onTapSuffix: onTapSuffix,
+          onSubmitted: onSubmitted,
+          focusNode: focusNode,
+          textInputAction: textInputAction,
+          inputNumber: inputNumber,
+          note: note,
+          isPassWord: isPassWord,
+        );
+      },
     );
   }
 
-  Widget customWidgetPayment(String title,String subtitle,int discount, String codeDiscount){
-    return Padding(
-      padding:const EdgeInsets.only(top: 10),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(title,style: const TextStyle(fontSize: 12,color: Colors.blueGrey),),
-              subtitle != '' ? Text(subtitle,style: const TextStyle(fontSize: 13,color: Colors.black),) :
-              discount > 0 ?
-              Row(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(left: 5),
-                    child: DottedBorder(
-                        dashPattern: const [5, 3],
-                        color: Colors.red,
-                        borderType: BorderType.RRect,
-                        radius: const Radius.circular(2),
-                        padding: const EdgeInsets.only(top: 2,bottom: 2,left: 10,right: 10),
-                        child: Container(
-                          decoration: const BoxDecoration(
-                            borderRadius: BorderRadius.all(Radius.circular(8)),
-                          ),
-                          child: Text(codeDiscount,style: const TextStyle(fontSize: 11,color: Colors.red),
-                          ),
-                        )
-                    ),
-                  )
-                ],
-              )
-                  : Container(),
-            ],
-          ),
-          const Divider(color: Colors.grey,)
-        ],
-      ),
-    );
+  Widget customWidgetPayment(String title, String subtitle, int discount, String codeDiscount) {
+    return CartHelperWidgets.customWidgetPayment(title, subtitle, discount, codeDiscount);
   }
-
-
-  buildAppBar(){
-    return Container(
-      height: 83,
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(5, 35, 12,0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          InkWell(
-            onTap: ()=> Navigator.of(context).pop(widget.currencyCode),
-            child: const SizedBox(
-              width: 40,
-              height: 50,
-              child: Icon(
-                Icons.arrow_back_rounded,
-                size: 25,
-                color: Colors.black,
-              ),
-            ),
-          ),
-          Expanded(
-            child: InkWell(
-              onTap: (){
-              },
-              child: Center(
-                child: Text(
-                  widget.viewUpdateOrder == true ? widget.nameCustomer?.toString()??'' :'Giỏ hàng',
-                  style: const TextStyle(fontWeight: FontWeight.bold,fontSize: 17,color: Colors.black,),
-                  maxLines: 1,overflow: TextOverflow.fade,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 10,),
-          InkWell(
-            onTap: (){
-              if(widget.isContractCreateOrder == true){
-                PersistentNavBarNavigator.pushNewScreen(context, screen: DetailContractScreen(
-                  contractMaster: widget.contractMaster!, 
-                  isSearchItem: true,
-                  cartItems: _bloc.listOrder, // Truyền dữ liệu giỏ hàng hiện tại
-                ),withNavBar: false).then((result){
-                  if(result == 'refresh_cart'){
-                    // Nếu có thêm sản phẩm mới, refresh lại giỏ hàng
-                    _bloc.add(GetListProductFromDB(addOrderFromCheckIn: false, getValuesTax: false,key: ''));
-                  }
-                });
-              }else
-              if(widget.viewDetail == false && widget.orderFromCheckIn == false){
-
-                PersistentNavBarNavigator.pushNewScreen(context, screen: SearchProductScreen(
-                 idCustomer: widget.codeCustomer.toString(), /// Chỉ có thêm tồn kho ở check-in mới thêm idCustomer
-                 currency: widget.currencyCode ,
-                 viewUpdateOrder: false,
-                 listIdGroupProduct: widget.listIdGroupProduct,
-                 itemGroupCode: widget.itemGroupCode,
-                 inventoryControl: false,
-                 addProductFromCheckIn: false,
-                 addProductFromSaleOut: false,
-                 giftProductRe: false,
-                 lockInputToCart: false,checkStockEmployee: Const.checkStockEmployee,
-                 listOrder: _bloc.listProductOrderAndUpdate, backValues: false, isCheckStock: false,),withNavBar: false).then((value){
-                 _bloc.listOrder.clear();
-                 _bloc.listItemOrder.clear();
-                 _bloc.listCkMatHang.clear();
-                 _bloc.listCkTongDon.clear();
-                 _bloc.listPromotion = '';
-                 _bloc.add(GetListProductFromDB(addOrderFromCheckIn: false, getValuesTax: false,key: ''));
-               });
-              }
-            },
-            child: SizedBox(
-              width: 40,
-              height: 50,
-              child: Icon(
-                Icons.search,
-                size: 25,
-                color: widget.orderFromCheckIn == false ? Colors.black : Colors.transparent,
-              ),
-            ),
-          )
-        ],
-      ),
-    );
-  }
-
-  String _formatTaxRate(double taxRate) {
-    // Nếu số là số nguyên thì hiển thị không có phần thập phân
-    if (taxRate == taxRate.roundToDouble()) {
-      return taxRate.round().toString();
-    } else {
-      // Nếu có phần thập phân thì hiển thị với 1 chữ   số thập phân
-      return taxRate.toStringAsFixed(1);
-    }
-  }
-
 }

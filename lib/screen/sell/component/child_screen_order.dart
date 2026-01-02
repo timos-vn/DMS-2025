@@ -33,15 +33,8 @@ class _ChildScreenOrderState extends State<ChildScreenOrder> {
   @override
   void initState() {
     super.initState();
+    // Không gọi API ở đây nữa, sẽ được gọi từ TabController listener
     widget.bloc.statusOrderList = widget.i;
-    widget.bloc.list.clear();
-    widget.bloc.add(GetListHistoryOrder(
-      status: widget.i,
-      dateFrom: Const.dateFrom,
-      dateTo: Const.dateTo,
-      userId: widget.userId,
-      typeLetterId: 'ORDERLIST',
-    ));
 
     _scrollController = ScrollController();
     _scrollController.addListener(() {

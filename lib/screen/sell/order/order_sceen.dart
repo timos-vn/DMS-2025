@@ -1,5 +1,7 @@
 // ignore_for_file: library_private_types_in_public_api
 
+import 'dart:convert';
+
 import 'package:dms/model/entity/entity.dart';
 import 'package:dms/widget/custom_dropdown.dart';
 import 'package:dms/widget/custom_question.dart';
@@ -16,7 +18,9 @@ import '../../../themes/colors.dart';
 import '../../../utils/const.dart';
 import '../../../utils/images.dart';
 import '../../../utils/utils.dart';
+import '../../../model/database/dbhelper.dart';
 import '../cart/cart_screen.dart';
+import '../cart/helpers/cart_draft_storage.dart';
 import '../component/search_product.dart';
 import 'order_bloc.dart';
 import 'order_event.dart';
@@ -67,6 +71,13 @@ class _OrderScreenState extends State<OrderScreen> with TickerProviderStateMixin
     }else{
       _orderBloc.typePriceName = Const.isWoPrice == true ? 'Bán buôn' : 'Bán lẻ';
     }
+    
+    // ❌ REMOVED: Không cần check draft nữa vì:
+    // - GetCountProductEvent sẽ đếm từ DB (số products có isMark == 1)
+    // - Nếu draft được restore, CartDraftStorage sẽ set Const.numberProductInCart = listOrder.length
+    // - Cộng thêm draft sẽ gây double count (draft products chưa được lưu vào DB nên không có trong DB count)
+    // _checkDraftAndUpdateBadge();
+    
     _orderBloc.add(GetPrefs());
 
   }
@@ -81,6 +92,14 @@ class _OrderScreenState extends State<OrderScreen> with TickerProviderStateMixin
               _orderBloc.add(GetCountProductEvent(true));
             }
             else if(state is GetCountProductSuccess){
+              // ✅ KHÔNG cộng draft nữa vì:
+              // - Nếu draft đã được restore: CartDraftStorage đã set Const.numberProductInCart rồi
+              // - GetCountProductEvent đếm từ DB (không bao gồm draft chưa lưu)
+              // - Nếu cộng thêm draft sẽ bị double count
+              // GetCountProductEvent đã set Const.numberProductInCart = số products có isMark == 1 trong DB
+              // Đây là số lượng chính xác vì draft products chưa được lưu vào DB
+              // _updateBadgeWithDraft(); // ❌ REMOVED: Gây double count
+              
               if(state.firstLoad == true){
                 _orderBloc.add(GetListOderEvent(idCustomer: widget.codeCustomer.toString(),searchValues: itemGroupCode,codeCurrency: currencyCode, pageIndex: selectedPage,listCodeGroupProduct: _orderBloc.listGroupProductCode));
               }

@@ -1107,9 +1107,7 @@ class NetWorkFactory{
     ));
   }
 
-  Future<Object> createOrderV3(ApplyDiscountRequest request, String token) async {
-    return await requestApi(_dio!.post('/api/v1/discount/apply-discount-v2', options: Options(headers: {"Authorization": "Bearer $token"}), data: request.toJson()));
-  }
+
 
   Future<Object> getListMDC(GetListItemSearchInOrderRequest request, String token) async {
     return await requestApi(_dio!.post('/api/v1/order/get-list-dispatch-code', options: Options(headers: {"Authorization": "Bearer $token"}), data: request.toJson()));

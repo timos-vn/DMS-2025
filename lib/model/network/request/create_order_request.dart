@@ -188,6 +188,7 @@ class CreateOrderV3RequestData {
   String? tien;
   String? baoGia;
   String? sttRecHD;
+  int? ck_dac_biet;
 
   CreateOrderV3RequestData(
       {this.customerCode, this.idDVTC,this.idNguoiNhan,     this.ghiChuKM,this.idMDC,     this.thoiGianGiao,this.tien,this.baoGia,
@@ -206,7 +207,7 @@ class CreateOrderV3RequestData {
         this.total, this.idVv,this.idHd, this.discountPercentAgency,this.datePayment,
         this.discountPercentTypePayment,this.codeAgency,this.codeTypePayment,this.orderStatus,this.dateEstDelivery,
         this.nameCompany, this.mstCompany,
-        this.addressCompany, this.noteCompany, this.typeDelivery,this.idTypeOrder});
+        this.addressCompany, this.noteCompany, this.typeDelivery,this.idTypeOrder,this.ck_dac_biet});
 
   CreateOrderV3RequestData.fromJson(Map<String, dynamic> json) {
     customerCode = json['CustomerCode'];  idDVTC = json['s2'];  thoiGianGiao = json['delivery_time'];
@@ -251,6 +252,7 @@ class CreateOrderV3RequestData {
     noteCompany = json['noteCompany'];
     idTypeOrder = json['idTypeOrder'];
     sttRecHD = json['sttRecHD'];
+    ck_dac_biet = json['ck_dac_biet'];
   }
 
   Map<String, dynamic> toJson() {
@@ -294,6 +296,7 @@ class CreateOrderV3RequestData {
     data['typeDelivery'] = typeDelivery;
     data['idTypeOrder'] = idTypeOrder;
     data['sttRecHD'] = sttRecHD;
+    data['ck_dac_biet'] = ck_dac_biet;
     return data;
   }
 }

@@ -621,7 +621,7 @@ class _DetailShippingScreenState extends State<DetailShippingScreen> {
                                                 lng = double.tryParse(parts[1].trim());
                                               }
                                             }
-
+                                            print('🚚 Parsed lat/lng: $lat , $lng');
                                             if(lat != null && lng != null){
                                               print('🚚 Parsed lat/lng: $lat , $lng');
                                               if((Utils.getDistance(lat, lng, current) < Const.deliveryPhotoRange)){

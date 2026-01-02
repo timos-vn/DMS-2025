@@ -8,12 +8,14 @@ class CustomOrderComponent extends StatefulWidget {
   final IconData? iconData;
   final String? title;
   final String? content;
+  final int? ck_dac_biet; // ✅ Chiết khấu đặc biệt: nếu = 1 thì chỉ cho chọn "Lập ctừ" và "Chờ duyệt"
 
   const CustomOrderComponent({
     super.key,
     this.iconData,
     this.title,
-    this.content,});
+    this.content,
+    this.ck_dac_biet,});
   @override
   _CustomOrderComponentState createState() => _CustomOrderComponentState();
 }
@@ -28,9 +30,65 @@ class _CustomOrderComponentState extends State<CustomOrderComponent> {
   void initState() {
     // TODO: implement initState
     super.initState();
-    if(DataLocal.listStatusToOrderCustom.isNotEmpty){
-      currentDecodingTypeName = DataLocal.listStatusToOrderCustom[0];
+    // ✅ Debug: Log ck_dac_biet value
+    print('🔒 CustomOrderComponent initState: ck_dac_biet = ${widget.ck_dac_biet}');
+    
+    // ✅ Filter listStatusToOrderCustom dựa trên ck_dac_biet
+    List<ListStatusOrderResponseData> availableStatuses = _getAvailableStatuses();
+    if(availableStatuses.isNotEmpty){
+      currentDecodingTypeName = availableStatuses[0];
+      idStatus = int.parse(
+        currentDecodingTypeName.status.toString().trim().replaceAll('*', '').replaceAll('null', '').isNotEmpty ?
+        currentDecodingTypeName.status.toString().trim().replaceAll('*', '').replaceAll('null', '') : '0'
+      );
     }
+  }
+  
+  // ✅ Lấy danh sách trạng thái khả dụng dựa trên ck_dac_biet
+  List<ListStatusOrderResponseData> _getAvailableStatuses() {
+    if (DataLocal.listStatusToOrderCustom.isEmpty) {
+      return [];
+    }
+    
+    // Nếu ck_dac_biet = 1, chỉ cho chọn "Lập ctừ" và "Chờ duyệt" (loại bỏ "Duyệt")
+    if (widget.ck_dac_biet == 1) {
+      print('🔒 Filtering statuses: ck_dac_biet = 1');
+      print('🔒 Total statuses: ${DataLocal.listStatusToOrderCustom.length}');
+      
+      List<ListStatusOrderResponseData> filtered = DataLocal.listStatusToOrderCustom.where((status) {
+        String statusName = (status.statusname ?? '').trim();
+        String statusNameLower = statusName.toLowerCase();
+        
+        // ✅ Chỉ giữ lại "Lập ctừ" và "Chờ duyệt"
+        // Loại bỏ tất cả các trạng thái khác, đặc biệt là "Duyệt"
+        
+        // Kiểm tra "Lập ctừ" (có thể viết là "Lập ctừ", "Lập CT", "Lập Ctừ", v.v.)
+        bool isLapCTu = statusNameLower.contains('lập') && statusNameLower.contains('ctừ');
+        
+        // Kiểm tra "Chờ duyệt" (phải chứa cả "chờ" và "duyệt")
+        bool isChoDuyet = statusNameLower.contains('chờ') && statusNameLower.contains('duyệt');
+        
+        // ✅ Loại bỏ "Duyệt" đơn thuần (chỉ chứa "duyệt" mà không chứa "chờ" và không phải "Lập ctừ")
+        bool isDuyet = statusNameLower.contains('duyệt') && !statusNameLower.contains('chờ') && !isLapCTu;
+        
+        bool shouldKeep = isLapCTu || isChoDuyet;
+        
+        if (!shouldKeep) {
+          print('🔒 ❌ Filtered out: "$statusName" (isLapCTu=$isLapCTu, isChoDuyet=$isChoDuyet, isDuyet=$isDuyet)');
+        } else {
+          print('🔒 ✅ Kept: "$statusName"');
+        }
+        
+        return shouldKeep;
+      }).toList();
+      
+      print('🔒 Filtered statuses: ${filtered.length}');
+      return filtered;
+    }
+    
+    // Nếu không có ck_dac_biet hoặc ck_dac_biet != 1, hiển thị tất cả
+    print('🔒 No filter: ck_dac_biet = ${widget.ck_dac_biet}');
+    return DataLocal.listStatusToOrderCustom;
   }
 
   @override
@@ -42,7 +100,7 @@ class _CustomOrderComponentState extends State<CustomOrderComponent> {
             padding: const EdgeInsets.only(left: 30, right: 30),
             child: Container(
               decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.all(Radius.circular(16))),
-              height: DataLocal.listStatusToOrderCustom.isNotEmpty == true ? 270 : 240,
+              height: _getAvailableStatuses().isNotEmpty == true ? 270 : 240,
               width: double.infinity,
               child: Material(
                   animationDuration: const Duration(seconds: 3),
@@ -118,7 +176,7 @@ class _CustomOrderComponentState extends State<CustomOrderComponent> {
                         //     ],
                         //   ),
                         // ),
-                        DataLocal.listStatusToOrderCustom.isNotEmpty == true ? Padding(
+                        _getAvailableStatuses().isNotEmpty == true ? Padding(
                           padding: const EdgeInsets.only(top: 7,bottom: 9),
                           child: Container(
                             height: 45,
@@ -152,7 +210,7 @@ class _CustomOrderComponentState extends State<CustomOrderComponent> {
                                         setState(() {});
                                       }
                                     },
-                                    items: DataLocal.listStatusToOrderCustom
+                                    items: _getAvailableStatuses()
                                         .map<DropdownMenuItem<ListStatusOrderResponseData>>(
                                             (e) => DropdownMenuItem<ListStatusOrderResponseData>(
                                           value: e,

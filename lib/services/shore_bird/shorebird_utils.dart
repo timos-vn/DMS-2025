@@ -66,7 +66,6 @@ class ShorebirdUtils {
       }
     }
 
-
     showDialog(
       context: context,
       barrierDismissible: false,

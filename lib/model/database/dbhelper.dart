@@ -15,7 +15,7 @@ import '../entity/item_check_in.dart';
 import '../entity/product.dart';
 
 class DatabaseHelper {
- static const NEW_DB_VERSION = 20251208; // Thêm availableQuantity vào product table
+ static const NEW_DB_VERSION = 20260102; // Thêm toàn bộ thông tin đơn hàng vào cartDraftOrder (kho, giao dịch, VV/HD, đại lý, thuế, v.v.)
   static final DatabaseHelper _instance = DatabaseHelper._();
   Database? _database;
 
@@ -299,6 +299,56 @@ class DatabaseHelper {
      )
   ''');
     print("Database listTicketOffLine was created!");
+
+    db.execute('''
+      CREATE TABLE cartDraftOrder(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        listOrder TEXT,
+        listProductGift TEXT,
+        listPromotion TEXT,
+        listOrderCalculatorDiscount TEXT,
+        listObjectDiscount TEXT,
+        totalMoney REAL,
+        totalDiscount REAL,
+        totalPayment REAL,
+        totalTax REAL,
+        totalTax2 REAL,
+        totalMoneyProductGift REAL,
+        transactionCode TEXT,
+        transactionYN INTEGER,
+        valuesTypePayment TEXT,
+        datePayment TEXT,
+        taxPercent REAL,
+        taxCode TEXT,
+        noteSell TEXT,
+        listCKVT TEXT,
+        customerName TEXT,
+        phoneCustomer TEXT,
+        addressCustomer TEXT,
+        codeCustomer TEXT,
+        typeDeliveryIndex INTEGER,
+        typeDeliveryName TEXT,
+        typeDeliveryCode TEXT,
+        storeCode TEXT,
+        storeIndex INTEGER,
+        transactionIndex INTEGER,
+        typeOrderIndex INTEGER,
+        typePaymentIndex INTEGER,
+        taxIndex INTEGER,
+        idVv TEXT,
+        nameVv TEXT,
+        idHd TEXT,
+        nameHd TEXT,
+        idHdForVv TEXT,
+        codeAgency TEXT,
+        nameAgency TEXT,
+        typeDiscount TEXT,
+        discountAgency REAL,
+        chooseAgencyCode INTEGER,
+        createdAt TEXT
+      )
+    ''');
+    print("Database cartDraftOrder was created!");
   }
 
   void _onUpgrade(Database db, int oldVersion, int newVersion) {
@@ -308,8 +358,8 @@ class DatabaseHelper {
     );
     print('"Migration: $oldVersion, $newVersion"');
     
-    // Migration for version 20250831 - Add availableQuantity column
-    if (oldVersion < NEW_DB_VERSION) {
+    // Migration for version 20251208 - Add availableQuantity column
+    if (oldVersion < 20251209 && oldVersion >= 20251208) {
       try {
         // Add availableQuantity column to product table if it doesn't exist
         db.execute('ALTER TABLE product ADD COLUMN availableQuantity REAL');
@@ -324,6 +374,81 @@ class DatabaseHelper {
         print("Added availableQuantity column to saleOut table");
       } catch (e) {
         print("Column availableQuantity might already exist in saleOut table: $e");
+      }
+    }
+    
+    // Migration for version 20251209 - Add cartDraftOrder table
+    if (oldVersion < 20251209) {
+      try {
+        db.execute('''
+          CREATE TABLE IF NOT EXISTS cartDraftOrder(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            listOrder TEXT,
+            listProductGift TEXT,
+            listPromotion TEXT,
+            listOrderCalculatorDiscount TEXT,
+            listObjectDiscount TEXT,
+            totalMoney REAL,
+            totalDiscount REAL,
+            totalPayment REAL,
+            totalTax REAL,
+            totalTax2 REAL,
+            totalMoneyProductGift REAL,
+            transactionCode TEXT,
+            transactionYN INTEGER,
+            valuesTypePayment TEXT,
+            datePayment TEXT,
+            taxPercent REAL,
+            taxCode TEXT,
+            noteSell TEXT,
+            listCKVT TEXT,
+            createdAt TEXT
+          )
+        ''');
+        print("Added cartDraftOrder table");
+      } catch (e) {
+        print("cartDraftOrder table might already exist: $e");
+      }
+    }
+    
+    // Migration for version 20251210 - Add customer info and delivery method
+    if (oldVersion < 20251210 && oldVersion >= 20251209) {
+      try {
+        db.execute('ALTER TABLE cartDraftOrder ADD COLUMN customerName TEXT');
+        db.execute('ALTER TABLE cartDraftOrder ADD COLUMN phoneCustomer TEXT');
+        db.execute('ALTER TABLE cartDraftOrder ADD COLUMN addressCustomer TEXT');
+        db.execute('ALTER TABLE cartDraftOrder ADD COLUMN codeCustomer TEXT');
+        db.execute('ALTER TABLE cartDraftOrder ADD COLUMN typeDeliveryIndex INTEGER');
+        db.execute('ALTER TABLE cartDraftOrder ADD COLUMN typeDeliveryName TEXT');
+        db.execute('ALTER TABLE cartDraftOrder ADD COLUMN typeDeliveryCode TEXT');
+        print("Added customer info and delivery method columns to cartDraftOrder");
+      } catch (e) {
+        print("Columns might already exist in cartDraftOrder: $e");
+      }
+    }
+    
+    // Migration for version 20251211 - Add all order information (store, transaction, VV/HD, agency, tax, etc.)
+    if (oldVersion < NEW_DB_VERSION && oldVersion >= 20251210) {
+      try {
+        db.execute('ALTER TABLE cartDraftOrder ADD COLUMN storeCode TEXT');
+        db.execute('ALTER TABLE cartDraftOrder ADD COLUMN storeIndex INTEGER');
+        db.execute('ALTER TABLE cartDraftOrder ADD COLUMN transactionIndex INTEGER');
+        db.execute('ALTER TABLE cartDraftOrder ADD COLUMN typeOrderIndex INTEGER');
+        db.execute('ALTER TABLE cartDraftOrder ADD COLUMN typePaymentIndex INTEGER');
+        db.execute('ALTER TABLE cartDraftOrder ADD COLUMN taxIndex INTEGER');
+        db.execute('ALTER TABLE cartDraftOrder ADD COLUMN idVv TEXT');
+        db.execute('ALTER TABLE cartDraftOrder ADD COLUMN nameVv TEXT');
+        db.execute('ALTER TABLE cartDraftOrder ADD COLUMN idHd TEXT');
+        db.execute('ALTER TABLE cartDraftOrder ADD COLUMN nameHd TEXT');
+        db.execute('ALTER TABLE cartDraftOrder ADD COLUMN idHdForVv TEXT');
+        db.execute('ALTER TABLE cartDraftOrder ADD COLUMN codeAgency TEXT');
+        db.execute('ALTER TABLE cartDraftOrder ADD COLUMN nameAgency TEXT');
+        db.execute('ALTER TABLE cartDraftOrder ADD COLUMN typeDiscount TEXT');
+        db.execute('ALTER TABLE cartDraftOrder ADD COLUMN discountAgency REAL');
+        db.execute('ALTER TABLE cartDraftOrder ADD COLUMN chooseAgencyCode INTEGER');
+        print("Added all order information columns to cartDraftOrder");
+      } catch (e) {
+        print("Columns might already exist in cartDraftOrder: $e");
       }
     }
     
@@ -1314,6 +1439,116 @@ class DatabaseHelper {
     var countDb = await countProduct(database: client);
     if (countDb == null) return 0;
     return countDb[0]['COUNT (id)'];
+  }
+
+  /// Cart Draft Order - Lưu draft đơn hàng để khôi phục sau khi sửa đơn khác
+  Future<void> saveCartDraftOrder({
+    required String listOrderJson,
+    required String listProductGiftJson,
+    required String listPromotion,
+    required String listOrderCalculatorDiscountJson,
+    required String listObjectDiscountJson,
+    required double totalMoney,
+    required double totalDiscount,
+    required double totalPayment,
+    required double totalTax,
+    required double totalTax2,
+    required double totalMoneyProductGift,
+    required String transactionCode,
+    required int transactionYN,
+    required String valuesTypePayment,
+    required String datePayment,
+    required double taxPercent,
+    required String taxCode,
+    required String noteSell,
+    required String listCKVT,
+    String? customerName,
+    String? phoneCustomer,
+    String? addressCustomer,
+    String? codeCustomer,
+    int? typeDeliveryIndex,
+    String? typeDeliveryName,
+    String? typeDeliveryCode,
+    String? storeCode,
+    int? storeIndex,
+    int? transactionIndex,
+    int? typeOrderIndex,
+    int? typePaymentIndex,
+    int? taxIndex,
+    String? idVv,
+    String? nameVv,
+    String? idHd,
+    String? nameHd,
+    String? idHdForVv,
+    String? codeAgency,
+    String? nameAgency,
+    String? typeDiscount,
+    double? discountAgency,
+    int? chooseAgencyCode,
+  }) async {
+    var client = await db;
+    // Xóa draft cũ trước khi lưu mới (chỉ giữ 1 draft)
+    await client.delete('cartDraftOrder');
+    
+    await client.insert('cartDraftOrder', {
+      'listOrder': listOrderJson,
+      'listProductGift': listProductGiftJson,
+      'listPromotion': listPromotion,
+      'listOrderCalculatorDiscount': listOrderCalculatorDiscountJson,
+      'listObjectDiscount': listObjectDiscountJson,
+      'totalMoney': totalMoney,
+      'totalDiscount': totalDiscount,
+      'totalPayment': totalPayment,
+      'totalTax': totalTax,
+      'totalTax2': totalTax2,
+      'totalMoneyProductGift': totalMoneyProductGift,
+      'transactionCode': transactionCode,
+      'transactionYN': transactionYN,
+      'valuesTypePayment': valuesTypePayment,
+      'datePayment': datePayment,
+      'taxPercent': taxPercent,
+      'taxCode': taxCode,
+      'noteSell': noteSell,
+      'listCKVT': listCKVT,
+      'customerName': customerName ?? '',
+      'phoneCustomer': phoneCustomer ?? '',
+      'addressCustomer': addressCustomer ?? '',
+      'codeCustomer': codeCustomer ?? '',
+      'typeDeliveryIndex': typeDeliveryIndex ?? 0,
+      'typeDeliveryName': typeDeliveryName ?? '',
+      'typeDeliveryCode': typeDeliveryCode ?? '',
+      'storeCode': storeCode ?? '',
+      'storeIndex': storeIndex ?? 0,
+      'transactionIndex': transactionIndex ?? 0,
+      'typeOrderIndex': typeOrderIndex ?? 0,
+      'typePaymentIndex': typePaymentIndex ?? 0,
+      'taxIndex': taxIndex ?? 0,
+      'idVv': idVv ?? '',
+      'nameVv': nameVv ?? '',
+      'idHd': idHd ?? '',
+      'nameHd': nameHd ?? '',
+      'idHdForVv': idHdForVv ?? '',
+      'codeAgency': codeAgency ?? '',
+      'nameAgency': nameAgency ?? '',
+      'typeDiscount': typeDiscount ?? '',
+      'discountAgency': discountAgency ?? 0,
+      'chooseAgencyCode': chooseAgencyCode ?? 0,
+      'createdAt': DateTime.now().toIso8601String(),
+    });
+  }
+
+  Future<Map<String, dynamic>?> fetchCartDraftOrder() async {
+    var client = await db;
+    final res = await client.query('cartDraftOrder', limit: 1);
+    if (res.isNotEmpty) {
+      return res.first;
+    }
+    return null;
+  }
+
+  Future<void> deleteCartDraftOrder() async {
+    var client = await db;
+    await client.delete('cartDraftOrder');
   }
 
   Future closeDb() async {

@@ -38,6 +38,7 @@ import '../../../utils/const.dart';
 import '../../../utils/utils.dart';
 import 'cart_event.dart';
 import 'cart_state.dart';
+import 'helpers/cart_draft_storage.dart';
 
 class CartBloc extends Bloc<CartEvent,CartState>{
 
@@ -47,11 +48,28 @@ class CartBloc extends Bloc<CartEvent,CartState>{
   String get accessToken => _accessToken!;
   String? _refreshToken;
   String get refreshToken => _refreshToken!;
+  
+  // ✅ Helper method để call API get list tax
+  Future<Object?> getListTaxFromAPI() async {
+    try {
+      if (_networkFactory != null && _accessToken != null && _accessToken!.isNotEmpty) {
+        return await _networkFactory!.getListTax(_accessToken!);
+      }
+      return null;
+    } catch (e) {
+      print('❌ Error in getListTaxFromAPI: $e');
+      return null;
+    }
+  }
 
   final db = DatabaseHelper();
 
   List<SearchItemResponseData> listOrder = [];
-
+  
+  // ✅ Biến tạm để lưu listOrder từ draft khi AddProductToCartEvent chạy
+  // Sẽ được restore trong GetListProductFromDBSuccess nếu đang tạo đơn mới
+  List<SearchItemResponseData>? preservedListOrderFromDraft;
+  
   // List<SearchItemResponseData> listProductGift = [];
   List<Product> listProductOrder = [];
   List<Product> listProductOrderAndUpdate = [];
@@ -139,7 +157,7 @@ class CartBloc extends Bloc<CartEvent,CartState>{
   // CKG - Chiết khấu giá: Giảm giá trực tiếp cho sản phẩm (từ list_ck)
   List<ListCk> listCkg = [];
   bool hasCkgDiscount = false;
-  Set<String> selectedCkgIds = {}; // Set of sttRecCk đã chọn (multiple selection)
+  Set<String> selectedCkgIds = {}; // Set of maCk đã chọn (multiple selection) - ✅ CHANGED: dùng maCk thay vì sttRecCk_productCode
   
   // HH - Hàng hóa tặng: Tặng hàng cố định kèm theo (từ list_ck)
   List<ListCk> listHH = [];
@@ -172,6 +190,9 @@ class CartBloc extends Bloc<CartEvent,CartState>{
 
   String maHangTangOld = '';
   String codeDiscountOld = '';
+  
+  // ✅ Lưu ck_dac_biet từ response apply-discount-v2
+  int? ck_dac_biet;
 
   String codeDiscountTD = '';
   String sttRecCKOld = '';
@@ -290,27 +311,70 @@ class CartBloc extends Bloc<CartEvent,CartState>{
     print('💰 _getPrefs: Preserving ${preservedGiftsFromAPI.length} gifts from discount API before restore from cache');
     
     // Khôi phục danh sách sản phẩm tặng từ cache (chỉ gifts thêm bằng tay)
+    // ✅ CHỈ restore từ cache nếu DataLocal.listProductGift đang rỗng (chưa được restore từ draft)
+    // Nếu đã có dữ liệu từ draft, không restore từ cache để tránh restore lại hàng tặng đã xóa
     List<SearchItemResponseData> restoredGiftsFromCache = [];
-    try{
-      final storedGifts = box.read('listProductGift');
-      if(storedGifts != null){
-        final List decoded = jsonDecode(storedGifts) as List;
-        // Chỉ khôi phục quà tặng thêm thủ công (gifProductByHand == true)
-        restoredGiftsFromCache = decoded
-            .map((e)=> SearchItemResponseData.fromJson(e as Map<String,dynamic>))
-            .where((e)=> e.gifProductByHand == true)
-            .toList();
-        print('💰 _getPrefs: Restored ${restoredGiftsFromCache.length} gifts from cache (manual gifts)');
+    if (DataLocal.listProductGift.isEmpty) {
+      // Chỉ restore từ cache nếu chưa có dữ liệu (chưa được restore từ draft)
+      try{
+        final storedGifts = box.read('listProductGift');
+        if(storedGifts != null){
+          final List decoded = jsonDecode(storedGifts) as List;
+          // Chỉ khôi phục quà tặng thêm thủ công (gifProductByHand == true)
+          restoredGiftsFromCache = decoded
+              .map((e)=> SearchItemResponseData.fromJson(e as Map<String,dynamic>))
+              .where((e)=> e.gifProductByHand == true)
+              .toList();
+          print('💰 _getPrefs: Restored ${restoredGiftsFromCache.length} gifts from cache (manual gifts)');
+        }
+      }catch(_){
+        // nếu parse lỗi thì bỏ qua
       }
-    }catch(_){
-      // nếu parse lỗi thì bỏ qua
+    } else {
+      print('💰 _getPrefs: Skip restore from cache - DataLocal.listProductGift already has ${DataLocal.listProductGift.length} items (likely from draft)');
     }
     
     // ✅ MERGE: Gifts từ chi tiết đơn hàng + Gifts từ API + Gifts từ cache (thêm bằng tay)
-    DataLocal.listProductGift.clear();
-    DataLocal.listProductGift.addAll(preservedGiftsFromOrderDetail); // 1. Từ chi tiết đơn hàng
-    DataLocal.listProductGift.addAll(preservedGiftsFromAPI); // 2. Từ API tính chiết khấu
-    DataLocal.listProductGift.addAll(restoredGiftsFromCache); // 3. Từ cache (thêm bằng tay)
+    // Chỉ clear và merge nếu chưa có dữ liệu từ draft
+    if (DataLocal.listProductGift.isEmpty) {
+      DataLocal.listProductGift.addAll(preservedGiftsFromOrderDetail); // 1. Từ chi tiết đơn hàng
+      DataLocal.listProductGift.addAll(preservedGiftsFromAPI); // 2. Từ API tính chiết khấu
+      DataLocal.listProductGift.addAll(restoredGiftsFromCache); // 3. Từ cache (thêm bằng tay)
+    } else {
+      // Đã có dữ liệu từ draft, chỉ merge gifts từ API (không merge từ cache)
+      print('💰 _getPrefs: DataLocal.listProductGift already has data, only merging gifts from API');
+      // Merge gifts từ API vào danh sách hiện tại (tránh duplicate)
+      // ✅ Khi merge, giữ stockCode và stockName từ draft nếu đã có
+      for (var apiGift in preservedGiftsFromAPI) {
+        final existingGift = DataLocal.listProductGift.firstWhere(
+          (gift) =>
+            gift.code == apiGift.code &&
+            gift.typeCK == apiGift.typeCK &&
+            gift.sttRecCK == apiGift.sttRecCK,
+          orElse: () => apiGift, // Nếu không tìm thấy, dùng apiGift
+        );
+        
+        if (existingGift == apiGift) {
+          // Không tìm thấy trong draft, thêm mới
+          DataLocal.listProductGift.add(apiGift);
+        } else {
+          // ✅ Tìm thấy trong draft, giữ stockCode và stockName từ draft nếu đã có
+          if ((existingGift.stockCode != null && existingGift.stockCode.toString().trim().isNotEmpty && existingGift.stockCode.toString().trim() != 'null') ||
+              (existingGift.stockName != null && existingGift.stockName.toString().trim().isNotEmpty && existingGift.stockName.toString().trim() != 'null')) {
+            // Draft đã có kho, giữ lại
+            print('💰 Preserving stock info from draft for gift ${apiGift.code}: stockCode=${existingGift.stockCode}, stockName=${existingGift.stockName}');
+          } else {
+            // Draft chưa có kho, cập nhật từ API nếu có
+            if ((apiGift.stockCode != null && apiGift.stockCode.toString().trim().isNotEmpty && apiGift.stockCode.toString().trim() != 'null') ||
+                (apiGift.stockName != null && apiGift.stockName.toString().trim().isNotEmpty && apiGift.stockName.toString().trim() != 'null')) {
+              existingGift.stockCode = apiGift.stockCode;
+              existingGift.stockName = apiGift.stockName;
+              print('💰 Updated stock info from API for gift ${apiGift.code}: stockCode=${apiGift.stockCode}, stockName=${apiGift.stockName}');
+            }
+          }
+        }
+      }
+    }
     
     // Tính lại totalProductGift
     totalProductGift = 0;
@@ -768,15 +832,65 @@ class CartBloc extends Bloc<CartEvent,CartState>{
   void _pickTaxBefore(PickTaxBefore event, Emitter<CartState> emitter){
     emitter(CartLoading());
     taxIndex = event.taxIndex;
-    listOrder.clear();
-    listItemOrder.clear();
+    
+    // 不要清空 listOrder 和 listItemOrder，因为UI需要它们来显示产品
+    // 只需要更新税额相关的计算
+    
+    // 重置税额和总金额
+    totalTax = 0;
+    totalPayment = 0;
+    
     if(listProductOrderAndUpdate.isNotEmpty){
       for (var element in listProductOrderAndUpdate) {
-        SearchItemResponseData item = listOrder.firstWhere((valuesE) => valuesE.code.toString().trim() == element.code.toString().trim());
-        if(item.code != '' && item.code != 'null'){
-          element.priceAfterTax =  (/* element.giaGui > 0 ?  element.giaGui :*/ item.giaSuaDoi) + ((( /*element.giaGui > 0 ?  element.giaGui :*/ item.giaSuaDoi * 1) * DataLocal.taxPercent)/100);
+        try {
+          if(element.code != null && element.code != '' && element.code != 'null'){
+            // 获取价格（优先使用 giaSuaDoi，如果没有则使用 price）
+            double basePrice = element.giaSuaDoi > 0 ? element.giaSuaDoi : (element.price ?? 0);
+            double count = element.count ?? 0;
+            
+            if(basePrice > 0 && count > 0){
+              // 设置税率
+              element.taxPercent = DataLocal.taxPercent;
+              
+              // 计算含税单价（税在折扣前）
+              element.priceAfterTax = basePrice + ((basePrice * DataLocal.taxPercent) / 100);
+              
+              // 计算税额（单价含税 * 数量 - 不含税金额）
+              element.valuesTax = ((basePrice * count) * DataLocal.taxPercent) / 100;
+              
+              // 累加总税额
+              totalTax = totalTax + element.valuesTax!;
+              
+              // 累加总金额（不含税金额）
+              totalPayment = totalPayment + (basePrice * count);
+              
+              // 同时更新 listOrder 中对应项的税额信息
+              var matchingItems = listOrder.where((valuesE) => valuesE.code.toString().trim() == element.code.toString().trim());
+              if(matchingItems.isNotEmpty){
+                SearchItemResponseData item = matchingItems.first;
+                item.taxPercent = DataLocal.taxPercent;
+                item.priceAfterTax = element.priceAfterTax;
+                item.valuesTax = element.valuesTax;
+              }
+            }
+          }
+        } catch (e) {
+          // 如果计算出错，跳过这个产品
+          print('Error in _pickTaxBefore for code ${element.code}: $e');
         }
       }
+      
+      // 根据 allowTaxPercent 决定是否将税额加入总金额
+      if(allowTaxPercent == false){
+        totalPayment = totalPaymentOld - totalDiscount;
+      } else {
+        totalPayment = totalPayment + totalTax;
+      }
+      
+      print("_pickTaxBefore - totalPayment: $totalPayment");
+      print("_pickTaxBefore - totalTax: $totalTax");
+      print("_pickTaxBefore - totalDiscount: $totalDiscount");
+      
       emitter(PickTaxBeforeSuccess());
     }else{
       emitter(PickTaxNameFail());
@@ -856,7 +970,8 @@ class CartBloc extends Bloc<CartEvent,CartState>{
       }
       discountTypePayment = 0;
       totalDiscount = totalDiscount - totalDiscountWhenChooseTypePayment;
-      totalPayment = totalMoney - totalDiscount;
+      double totalDiscountForOderValue = totalDiscountForOder ?? 0;
+      totalPayment = totalMoney - totalDiscount - totalDiscountForOderValue;
       totalDiscountWhenChooseTypePayment = 0;
     }
     if(discountTypePayment > 0 && listProductOrderAndUpdate.isNotEmpty){
@@ -871,7 +986,8 @@ class CartBloc extends Bloc<CartEvent,CartState>{
       }
       totalDiscountWhenChooseTypePayment = (totalMoneyTypePayment * discountTypePayment)/100;
       totalDiscount = totalDiscount + totalDiscountWhenChooseTypePayment;
-      totalPayment = totalMoney - (totalDiscount + valuesTax);
+      double totalDiscountForOderValue = totalDiscountForOder ?? 0;
+      totalPayment = totalMoney - (totalDiscount + valuesTax) - totalDiscountForOderValue;
     }
   }
 
@@ -901,7 +1017,8 @@ class CartBloc extends Bloc<CartEvent,CartState>{
       codeAgency = null;
       discountAgency = 0;
       totalDiscount = totalDiscount - totalDiscountWhenChooseAgency;
-      totalPayment = totalMoney - totalDiscount;
+      double totalDiscountForOderValue = totalDiscountForOder ?? 0;
+      totalPayment = totalMoney - totalDiscount - totalDiscountForOderValue;
     }
     if(discountAgency > 0 && listProductOrderAndUpdate.isNotEmpty && typeDiscount.isNotEmpty && cancelAgency == false){
       if(discountTypePayment == 0){
@@ -916,7 +1033,8 @@ class CartBloc extends Bloc<CartEvent,CartState>{
       }
       totalDiscountWhenChooseAgency = (totalMoneyAgency * discountAgency)/100;
       totalDiscount = totalDiscount + totalDiscountWhenChooseAgency;
-      totalPayment = totalMoney - (totalDiscount + valuesTax);
+      double totalDiscountForOderValue = totalDiscountForOder ?? 0;
+      totalPayment = totalMoney - (totalDiscount + valuesTax) - totalDiscountForOderValue;
     }
   }
 
@@ -1217,6 +1335,78 @@ class CartBloc extends Bloc<CartEvent,CartState>{
       totalDiscountForItem: (totalDiscount - totalDiscountForOder), 
       totalDiscountForOrder: totalDiscountForOder
     );
+    // ✅ Helper function để tính ck_dac_biet từ các chiết khấu đã chọn
+    int? calculateCkDacBiet() {
+      // Check CKG đã chọn - ✅ CHANGED: selectedCkgIds giờ chứa maCk thay vì ckgId
+      for (var ckgItem in listCkg) {
+        String maCk = (ckgItem.maCk ?? '').trim();
+        
+        // ✅ Check theo maCk (thay vì ckgId)
+        if (maCk.isNotEmpty && selectedCkgIds.contains(maCk)) {
+          final ckDacBietValue = ckgItem.ck_dac_biet;
+          if (ckDacBietValue != null) {
+            int? ckDacBietInt;
+            if (ckDacBietValue is int) {
+              ckDacBietInt = ckDacBietValue;
+            } else if (ckDacBietValue is String && ckDacBietValue.trim().isNotEmpty) {
+              ckDacBietInt = int.tryParse(ckDacBietValue);
+            } else if (ckDacBietValue is num) {
+              ckDacBietInt = ckDacBietValue.toInt();
+            }
+            
+            if (ckDacBietInt == 1) {
+              print('💰 ✅ Found CKG with ck_dac_biet = 1: maCk=$maCk, sttRecCk=${ckgItem.sttRecCk}');
+              return 1; // Đã tìm thấy, không cần check tiếp
+            }
+          }
+        }
+      }
+      
+      // Check CKTDTT đã chọn
+      for (var cktdttItem in listCktdtt) {
+        String sttRecCk = (cktdttItem.sttRecCk ?? '').trim();
+        String cktdttId = sttRecCk;
+        
+        if (selectedCktdttIds.contains(cktdttId)) {
+          final ckDacBietValue = cktdttItem.ck_dac_biet;
+          if (ckDacBietValue != null) {
+            int? ckDacBietInt;
+            if (ckDacBietValue is int) {
+              ckDacBietInt = ckDacBietValue;
+            } else if (ckDacBietValue is String && ckDacBietValue.trim().isNotEmpty) {
+              ckDacBietInt = int.tryParse(ckDacBietValue);
+            } else if (ckDacBietValue is num) {
+              ckDacBietInt = ckDacBietValue.toInt();
+            }
+            
+            if (ckDacBietInt == 1) {
+              print('💰 ✅ Found CKTDTT with ck_dac_biet = 1: cktdttId=$cktdttId, sttRecCk=$sttRecCk');
+              return 1; // Đã tìm thấy, không cần check tiếp
+            }
+          }
+        }
+      }
+      
+      return 0; // Không tìm thấy chiết khấu nào có ck_dac_biet = 1
+    }
+    
+    // ✅ Check tất cả các chiết khấu đã chọn (CKG, CKTDTT) - nếu có bất kỳ chiết khấu nào có ck_dac_biet = 1 thì set ck_dac_biet = 1
+    int? finalCkDacBiet = calculateCkDacBiet();
+    
+    // ✅ Set ck_dac_biet vào bloc để UI có thể sử dụng
+    ck_dac_biet = finalCkDacBiet;
+    
+    // ✅ API không chấp nhận null, nên nếu finalCkDacBiet là null thì set = 0
+    final int finalCkDacBietValue = finalCkDacBiet ?? 0;
+    
+    if (finalCkDacBiet == 1) {
+      print('💰 ✅ Final ck_dac_biet = 1 (at least one selected discount has ck_dac_biet = 1)');
+      print('💰 ✅ Set bloc.ck_dac_biet = 1');
+    } else {
+      print('💰 ℹ️ Final ck_dac_biet = 0 (no selected discount has ck_dac_biet = 1)');
+      print('💰 ℹ️ Set bloc.ck_dac_biet = 0');
+    }
+    
     CreateOrderV3Request request = CreateOrderV3Request(
         requestData: CreateOrderV3RequestData(
             customerCode: event.code,
@@ -1254,7 +1444,8 @@ class CartBloc extends Bloc<CartEvent,CartState>{
             idTypeOrder: typeOrderCode,
             idDVTC:idDVTC, idNguoiNhan: nguoiNhan.text,
             ghiChuKM: ghiChu.text,     idMDC:idMDC,     thoiGianGiao:thoiGianGiao.text,        tien:tien.text,        baoGia:baoGia.text,
-            sttRecHD: event.sttRectHD
+            sttRecHD: event.sttRectHD,
+            ck_dac_biet: finalCkDacBietValue
         )
     );
     CartState state = _handlerCreateOrder(await _networkFactory!.createOrder(request, _accessToken!));
@@ -1418,11 +1609,16 @@ class CartBloc extends Bloc<CartEvent,CartState>{
   }
 
   void _pickInfoCustomer(PickInfoCustomer event, Emitter<CartState> emitter){
+    print('💾 _pickInfoCustomer called:');
+    print('💾   - event.codeCustomer = ${event.codeCustomer}');
+    print('💾   - event.customerName = ${event.customerName}');
+    print('💾   - Before: bloc.codeCustomer = $codeCustomer');
     emitter(CartInitial());
     customerName = event.customerName;
     phoneCustomer = event.phone;
     addressCustomer = event.address;
     codeCustomer = event.codeCustomer;
+    print('💾   - After: bloc.codeCustomer = $codeCustomer');
     emitter(PickInfoCustomerSuccess());
   }
 
@@ -1529,6 +1725,7 @@ class CartBloc extends Bloc<CartEvent,CartState>{
 
   void _calculatorDiscountEvent(CalculatorDiscountEvent event, Emitter<CartState> emitter)async{
     emitter(CartLoading());
+    totalMoney = 0; // ✅ FIX: Reset totalMoney về 0 để tính lại từ đầu
     totalDiscount = 0;
     totalDiscountOldByHand = 0;
     totalMoneyOld = 0;
@@ -1623,7 +1820,13 @@ class CartBloc extends Bloc<CartEvent,CartState>{
         print('totalDiscountOld------ ${totalDiscountOld}');
       }
       else{
-        totalDiscount = totalDiscountOld;
+        // ✅ FIX: Tính discount từ priceAfter thay vì dùng totalDiscountOld
+        // Vì khi apply CKG discount, priceAfter đã được cập nhật, cần tính lại discount từ đó
+        if (element.giaSuaDoi > 0 && element.priceAfter != null && element.priceAfter! < element.giaSuaDoi) {
+          double lineDiscount = (element.giaSuaDoi - element.priceAfter!) * (element.count ?? 0);
+          totalDiscount += lineDiscount;
+        }
+        // totalDiscount = totalDiscountOld; // ❌ REMOVED: Không dùng giá trị cũ, tính lại từ priceAfter
       }
       if(Const.useTax == true){
         element.valuesTax = 0;
@@ -1633,7 +1836,9 @@ class CartBloc extends Bloc<CartEvent,CartState>{
       // valuesTax += element.priceAfterTax != null ? element.priceAfterTax! : 0;
 
 
-      if(Const.useTax == true && element.giaSuaDoi > 0){
+      // ✅ Calculate totalMoney từ originalPrice (giaSuaDoi) - chỉ tính cho products được mark
+      if(element.giaSuaDoi > 0 && element.isMark == 1 && element.gifProduct != true){
+        totalMoney = totalMoney + (element.giaSuaDoi * element.count!);
         totalMoneyOld = totalMoneyOld + (element.giaSuaDoi * element.count!);
       }
     }
@@ -1643,12 +1848,20 @@ class CartBloc extends Bloc<CartEvent,CartState>{
     if(Const.chooseTypePayment == true && codeTypePayment.contains('Thanh toán ngay')){
       chooseTypePayment();
     }
-    double cktd = 0;
-    if(listCkTongDon.isNotEmpty){
-      cktd = listCkTongDon[0].tCkTt??0;
-    }
+    // ✅ FIX: Dùng totalDiscountForOder thay vì cktd từ listCkTongDon[0]
+    // totalDiscountForOder đã được cập nhật từ API response và có thể chứa tổng của nhiều CKTDTT
+    double cktd = totalDiscountForOder;
+    
+    // ✅ FIX: Tính totalPayment = totalMoney - totalDiscount - totalDiscountForOder + totalTax
+    // totalMoney: Tổng tiền nguyên giá
+    // totalDiscount: Tổng chiết khấu sản phẩm (CKG, CKN, HH)
+    // totalDiscountForOder: Tổng chiết khấu tổng đơn (CKTDTT - Chiết khấu tổng đơn tặng tiền)
+    // totalTax: Tổng thuế (nếu có)
+    double totalDiscountForOderValue = totalDiscountForOder ?? 0;
     if(Const.freeDiscount == true){
-      totalPayment = totalMoney + totalTax - (totalDiscount + cktd);
+      totalPayment = totalMoney + totalTax - totalDiscount - totalDiscountForOderValue;
+    } else {
+      totalPayment = totalMoney + totalTax - totalDiscount - totalDiscountForOderValue;
     }
 
     // if(Const.useTax  == true){
@@ -1656,10 +1869,10 @@ class CartBloc extends Bloc<CartEvent,CartState>{
     // }
     print('check money');
     print('totalMoney------: $totalMoney');
-    print('cktd------: $cktd');
+    print('cktd (totalDiscountForOder)------: $cktd');
     print('totalDiscount------: $totalDiscount');
     print('totalTax------: $totalTax');
-    print('check money:${ totalMoney - (totalDiscount + totalTax + cktd)}');
+    print('check money:${ totalMoney - totalDiscount + totalTax}');
     emitter(CalculatorDiscountSuccess());
   }
 
@@ -1667,7 +1880,9 @@ class CartBloc extends Bloc<CartEvent,CartState>{
     totalTax = 0;
     totalPayment = 0;
     for (var element in listProductOrderAndUpdate) {
-      SearchItemResponseData item = listOrder.firstWhere((valuesE) => valuesE.code.toString().trim() == element.code.toString().trim());
+      var matchingItems = listOrder.where((valuesE) => valuesE.code.toString().trim() == element.code.toString().trim());
+      if(matchingItems.isEmpty) continue;
+      SearchItemResponseData item = matchingItems.first;
       if(item.code != '' && item.code != 'null'){
         element.taxPercent = DataLocal.taxPercent;
         if(Const.afterTax == true){
@@ -1902,6 +2117,41 @@ class CartBloc extends Bloc<CartEvent,CartState>{
 
   List<SearchItemResponseData> listProductGift = [];
   void _addProductToCartEvent(AddProductToCartEvent event, Emitter<CartState> emitter)async{
+    print('💾 ========== AddProductToCartEvent TRIGGERED ==========');
+    print('💾 This event is called when editing order from history_order_detail_screen');
+    print('💾 BEFORE clear:');
+    print('💾   - DataLocal.listProductGift.length = ${DataLocal.listProductGift.length}');
+    print('💾   - listProductGift.length = ${listProductGift.length}');
+    print('💾   - listOrder.length = ${listOrder.length}');
+    
+    // ✅ PRESERVE listOrder từ draft TRƯỚC KHI clear
+    // Vì AddProductToCartEvent sẽ load đơn cũ vào database, có thể làm mất listOrder từ draft
+    List<SearchItemResponseData> preservedListOrderFromDraft = [];
+    final draftExists = await CartDraftStorage.checkDraftExists();
+    if (draftExists) {
+      print('💾 ⚠️ WARNING: Draft exists in database!');
+      print('💾   - Preserving listOrder from draft before loading order...');
+      
+      // Restore draft tạm thời để lấy listOrder
+      final tempBloc = CartBloc(context);
+      final restored = await CartDraftStorage.restoreDraft(tempBloc);
+      if (restored && tempBloc.listOrder.isNotEmpty) {
+        preservedListOrderFromDraft = List<SearchItemResponseData>.from(tempBloc.listOrder);
+        print('💾   - Preserved ${preservedListOrderFromDraft.length} items from draft listOrder');
+        for (int i = 0; i < preservedListOrderFromDraft.length; i++) {
+          final item = preservedListOrderFromDraft[i];
+          print('💾     - Draft item[$i]: ${item.code} - ${item.name} (qty: ${item.count})');
+        }
+      }
+      
+      print('💾   - DataLocal.listProductGift will be CLEARED (dòng 2065)');
+      print('💾   - This may affect draft if it contains listProductGift');
+      final draftInfo = await CartDraftStorage.getDraftInfo();
+      print('💾   - Draft info: $draftInfo');
+    } else {
+      print('💾 No draft in database, safe to clear');
+    }
+    
     emitter(CartLoading());
     db.deleteAllProduct().then((value) => print('delete success'));
     // Clear listProductGift trước khi thêm mới
@@ -2009,8 +2259,25 @@ class CartBloc extends Bloc<CartEvent,CartState>{
     ).toList();
     print('💰 _addProductToCartEvent: Preserving ${preservedGiftsFromOrderDetail.length} gifts from order detail before clear');
     
-    // Copy danh sách khuyến mại vào DataLocal ngay sau khi xử lý xong
+    // ✅ PRESERVE gifts từ DRAFT trước khi clear
+    // (gifProductByHand == true - gifts được thêm bằng tay từ draft)
+    List<SearchItemResponseData> preservedGiftsFromDraft = DataLocal.listProductGift.where((gift) => 
+      gift.gifProduct == true && 
+      gift.gifProductByHand == true
+    ).toList();
+    print('💾 Preserving ${preservedGiftsFromDraft.length} gifts from DRAFT before clear');
+    for (var gift in preservedGiftsFromDraft) {
+      print('💾   - Draft gift: ${gift.code} (qty: ${gift.count})');
+    }
+    
+    // ⚠️ CRITICAL: Clear DataLocal.listProductGift - This may affect draft!
+    print('💾 ⚠️ CLEARING DataLocal.listProductGift (dòng 2065)');
+    print('💾   - Before clear: DataLocal.listProductGift.length = ${DataLocal.listProductGift.length}');
+    print('💾     - Gifts from order detail: ${preservedGiftsFromOrderDetail.length}');
+    print('💾     - Gifts from draft: ${preservedGiftsFromDraft.length}');
     DataLocal.listProductGift.clear();
+    print('💾   - After clear: DataLocal.listProductGift.length = ${DataLocal.listProductGift.length}');
+    print('💾   - Adding ${listProductGift.length} new gifts from order');
     DataLocal.listProductGift.addAll(listProductGift);
     
     // ✅ RESTORE gifts từ chi tiết đơn hàng sau khi add gifts mới
@@ -2026,8 +2293,35 @@ class CartBloc extends Bloc<CartEvent,CartState>{
       }
     }
     
-    print('AddProductToCartEvent: listProductGift.length = ${listProductGift.length}');
-    print('AddProductToCartEvent: DataLocal.listProductGift.length = ${DataLocal.listProductGift.length} (after restore)');
+    // ✅ RESTORE gifts từ DRAFT sau khi add gifts từ đơn cũ
+    // Đây là phần quan trọng: giữ lại gifts từ draft khi sửa đơn
+    for (var gift in preservedGiftsFromDraft) {
+      bool exists = DataLocal.listProductGift.any((g) => 
+        g.code == gift.code &&
+        g.gifProductByHand == true
+      );
+      if (!exists) {
+        DataLocal.listProductGift.add(gift);
+        print('💾 ✅ Restored gift from DRAFT: ${gift.code} (qty: ${gift.count})');
+      } else {
+        print('💾 Draft gift already exists: ${gift.code}');
+      }
+    }
+    
+    print('💾 AFTER AddProductToCartEvent:');
+    print('💾   - listProductGift.length = ${listProductGift.length}');
+    print('💾   - DataLocal.listProductGift.length = ${DataLocal.listProductGift.length} (after restore)');
+    print('💾   - listOrder.length = ${listOrder.length}');
+    
+    // ✅ Lưu preservedListOrderFromDraft vào biến tạm để restore sau trong GetListProductFromDBSuccess
+    if (preservedListOrderFromDraft.isNotEmpty) {
+      this.preservedListOrderFromDraft = preservedListOrderFromDraft;
+      print('💾   - preservedListOrderFromDraft.length = ${this.preservedListOrderFromDraft!.length} (saved for later restore)');
+    } else {
+      this.preservedListOrderFromDraft = null;
+    }
+    
+    print('💾 ========== AddProductToCartEvent COMPLETED ==========');
     emitter(AddProductToCartSuccess());
   }
 
@@ -2807,6 +3101,68 @@ class CartBloc extends Bloc<CartEvent,CartState>{
             print('💰 CKTDTT: Selected ${selectedCktdttIds.length} discounts but API response is empty, keeping current totalDiscountForOder=$totalDiscountForOder');
           }
         }
+      }
+      
+      // ✅ Tính và set ck_dac_biet sau khi apply discount
+      // Helper function để tính ck_dac_biet từ các chiết khấu đã chọn
+      int? calculateCkDacBietFromSelected() {
+        // Check CKG đã chọn
+        for (var ckgItem in listCkg) {
+          String maCk = (ckgItem.maCk ?? '').trim();
+          if (maCk.isNotEmpty && selectedCkgIds.contains(maCk)) {
+            final ckDacBietValue = ckgItem.ck_dac_biet;
+            if (ckDacBietValue != null) {
+              int? ckDacBietInt;
+              if (ckDacBietValue is int) {
+                ckDacBietInt = ckDacBietValue;
+              } else if (ckDacBietValue is String && ckDacBietValue.trim().isNotEmpty) {
+                ckDacBietInt = int.tryParse(ckDacBietValue);
+              } else if (ckDacBietValue is num) {
+                ckDacBietInt = ckDacBietValue.toInt();
+              }
+              
+              if (ckDacBietInt == 1) {
+                print('💰 ✅ Found CKG with ck_dac_biet = 1: maCk=$maCk, sttRecCk=${ckgItem.sttRecCk}');
+                return 1;
+              }
+            }
+          }
+        }
+        
+        // Check CKTDTT đã chọn
+        for (var cktdttItem in listCktdtt) {
+          String sttRecCk = (cktdttItem.sttRecCk ?? '').trim();
+          String cktdttId = sttRecCk;
+          
+          if (selectedCktdttIds.contains(cktdttId)) {
+            final ckDacBietValue = cktdttItem.ck_dac_biet;
+            if (ckDacBietValue != null) {
+              int? ckDacBietInt;
+              if (ckDacBietValue is int) {
+                ckDacBietInt = ckDacBietValue;
+              } else if (ckDacBietValue is String && ckDacBietValue.trim().isNotEmpty) {
+                ckDacBietInt = int.tryParse(ckDacBietValue);
+              } else if (ckDacBietValue is num) {
+                ckDacBietInt = ckDacBietValue.toInt();
+              }
+              
+              if (ckDacBietInt == 1) {
+                print('💰 ✅ Found CKTDTT with ck_dac_biet = 1: cktdttId=$cktdttId, sttRecCk=$sttRecCk');
+                return 1;
+              }
+            }
+          }
+        }
+        
+        return 0;
+      }
+      
+      // ✅ Set ck_dac_biet vào bloc để UI có thể sử dụng ngay
+      ck_dac_biet = calculateCkDacBietFromSelected();
+      if (ck_dac_biet == 1) {
+        print('💰 ✅ Set bloc.ck_dac_biet = 1 (after apply discount)');
+      } else {
+        print('💰 ℹ️ Set bloc.ck_dac_biet = 0 (after apply discount)');
       }
       // ✅ RESTORE CKN và CKTDTH gifts sau khi xử lý response (keyLoad == 'Second')
       if(keyLoad == 'Second'){

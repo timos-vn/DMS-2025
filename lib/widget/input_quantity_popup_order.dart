@@ -1354,70 +1354,118 @@ class _InputQuantityPopupOrderState extends State<InputQuantityPopupOrder> {
     ]);
   }
   Widget genderStore() {
-    return Const.lockStockInItem == false ?
-    (widget.listStock.isEmpty
-        ? const Align(alignment: Alignment.centerLeft,child: Text('Hết kho khả dụng',style: TextStyle(color: Colors.blueGrey,fontSize: 12),maxLines: 1,overflow: TextOverflow.ellipsis,))
-        :
-    PopupMenuButton(
-      shape: const TooltipShape(),
-      padding: EdgeInsets.zero,
-      offset: const Offset(0, 40),
-      itemBuilder: (BuildContext context) {
-        return <PopupMenuEntry<Widget>>[
-          PopupMenuItem<Widget>(
-            child: Container(
-              decoration: ShapeDecoration(
-                  color: Colors.white,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10))),
-              height: 250,
-              width: 320,
-              child: Scrollbar(
-                child: ListView.builder(
-                  padding: const EdgeInsets.only(top: 10,),
-                  itemCount: widget.listStock.length,
-                  itemBuilder: (context, index) {
-                    final trans = widget.listStock[index].tenKho.toString().trim();
-                    return ListTile(
-                      minVerticalPadding: 1,
-                      title: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Flexible(
-                            child: Text(
-                              trans.toString(),
-                              style: const TextStyle(
-                                fontSize: 12,
-                              ),
-                              maxLines: 1,overflow: TextOverflow.fade,
-                            ),
-                          ),
-                          Text(
-                              'Tồn: ${widget.listStock[index].ton13.toString().trim()}', style: const TextStyle(color: Colors.blueGrey,fontSize: 12))
-                        ],
-                      ),
-                      subtitle:const Divider(height: 1,),
-                      onTap: () {
-                        nameStore = widget.listStock[index].tenKho.toString().trim();
-                        codeStore = widget.listStock[index].maKho.toString().trim();
-                        setState(() {});
-                        // FocusScope.of(context).requestFocus(focusNodeContent);
-                        Navigator.pop(context);
-                      },
-                    );
-                  },
-                ),
+    // ✅ Kiểm tra xem có đang thêm sản phẩm tặng không (dựa vào title)
+    final isGiftProduct = widget.title.toString().contains('tặng') || widget.title.toString().contains('Tặng');
+    
+    // ✅ Nếu là sản phẩm tặng, dùng lockStockInItemGift; nếu không, dùng lockStockInItem
+    final isLocked = isGiftProduct ? Const.lockStockInItemGift : Const.lockStockInItem;
+    
+    // ✅ Luôn hiển thị thông tin kho (nếu đã chọn)
+    // Chỉ disable chức năng chọn kho khi bị khóa
+    if (isLocked == true) {
+      // Bị khóa: Chỉ hiển thị kho đã chọn (nếu có), không cho phép chọn mới
+      return nameStore.toString().trim().isNotEmpty && nameStore.toString().trim() != 'null'
+          ? Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                nameStore.toString().trim(),
+                style: const TextStyle(color: Colors.blueGrey, fontSize: 13),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-            ),
-          ),
-        ];
-      },
-      child: SizedBox(
-          height: 35,//width: double.infinity,
-          child: Align(
+            )
+          : const Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                '',
+                style: TextStyle(color: Colors.blueGrey, fontSize: 12),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            );
+    }
+    
+    // Không bị khóa: Cho phép chọn kho
+    return widget.listStock.isEmpty
+        ? const Align(
             alignment: Alignment.centerLeft,
-            child: Text(nameStore.toString().trim(),style: const TextStyle(color: Colors.blueGrey,fontSize: 13),textAlign: TextAlign.center,maxLines: 1,overflow: TextOverflow.ellipsis,),)),
-    )) : const Align(alignment: Alignment.centerLeft,child: Text('Chức năng bị hạn chế',style: TextStyle(color: Colors.blueGrey,fontSize: 9.5),maxLines: 1,overflow: TextOverflow.ellipsis,));
+            child: Text(
+              'Hết kho khả dụng',
+              style: TextStyle(color: Colors.blueGrey, fontSize: 12),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          )
+        : PopupMenuButton(
+            shape: const TooltipShape(),
+            padding: EdgeInsets.zero,
+            offset: const Offset(0, 40),
+            itemBuilder: (BuildContext context) {
+              return <PopupMenuEntry<Widget>>[
+                PopupMenuItem<Widget>(
+                  child: Container(
+                    decoration: ShapeDecoration(
+                        color: Colors.white,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10))),
+                    height: 250,
+                    width: 320,
+                    child: Scrollbar(
+                      child: ListView.builder(
+                        padding: const EdgeInsets.only(top: 10,),
+                        itemCount: widget.listStock.length,
+                        itemBuilder: (context, index) {
+                          final trans = widget.listStock[index].tenKho.toString().trim();
+                          return ListTile(
+                            minVerticalPadding: 1,
+                            title: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    trans.toString(),
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.fade,
+                                  ),
+                                ),
+                                Text(
+                                    'Tồn: ${widget.listStock[index].ton13.toString().trim()}',
+                                    style: const TextStyle(color: Colors.blueGrey, fontSize: 12))
+                              ],
+                            ),
+                            subtitle: const Divider(height: 1,),
+                            onTap: () {
+                              nameStore = widget.listStock[index].tenKho.toString().trim();
+                              codeStore = widget.listStock[index].maKho.toString().trim();
+                              setState(() {});
+                              // FocusScope.of(context).requestFocus(focusNodeContent);
+                              Navigator.pop(context);
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              ];
+            },
+            child: SizedBox(
+                height: 35, //width: double.infinity,
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    nameStore.toString().trim(),
+                    style: const TextStyle(color: Colors.blueGrey, fontSize: 13),
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                )),
+          );
   }
 
   Widget genderUnitOfCalculation() {
@@ -1484,8 +1532,29 @@ class _InputQuantityPopupOrderState extends State<InputQuantityPopupOrder> {
   }
 
   Widget genderManyUnitAllow() {
+    // Nếu cấu hình KHÔNG cho phép nhiều đơn vị tính → không hiển thị popup chọn
+    if (Const.manyUnitAllow != true) {
+      return const Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
+          '',
+          style: TextStyle(color: Colors.blueGrey, fontSize: 12),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      );
+    }
+
     return widget.listQuyDoiDonViTinh.isEmpty
-        ? const Align(alignment: Alignment.centerLeft,child: Text('',style: TextStyle(color: Colors.blueGrey,fontSize: 12),maxLines: 1,overflow: TextOverflow.ellipsis,))
+        ? const Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              '',
+              style: TextStyle(color: Colors.blueGrey, fontSize: 12),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          )
         : PopupMenuButton(
       shape: const TooltipShape(),
       padding: EdgeInsets.zero,

@@ -220,7 +220,9 @@ class OrderBloc extends Bloc<OrderEvent,OrderState>{
   void _getCountProductEvent(GetCountProductEvent event, Emitter<OrderState> emitter)async{
     emitter(OrderLoading());
     listProduct = await getListFromDb();
-    Const.numberProductInCart = listProduct.length;
+    // ✅ FIX: Chỉ tính số sản phẩm có isMark == 1 (đã được chọn/đánh dấu)
+    // Giống như cách cart_bloc tính (chỉ tính products được mark, không tính tất cả)
+    Const.numberProductInCart = listProduct.where((product) => product.isMark == 1).length;
     emitter(GetCountProductSuccess(event.firstLoad));
   }
 

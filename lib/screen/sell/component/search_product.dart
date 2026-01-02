@@ -349,8 +349,13 @@ class SearchProductScreenState extends State<SearchProductScreen> {
                           _dataListSearch[indexSelect].price = Const.isWoPrice == false ? itemSelect.price :itemSelect.woPrice;
                           _dataListSearch[indexSelect].priceAfter = Const.isWoPrice == false ?  itemSelect.priceAfter : itemSelect.woPriceAfter;
                         }
+                        
+                        // ✅ Sử dụng _dataListSearch[indexSelect] đã được cập nhật stockCode và stockName
+                        // thay vì itemSelect ban đầu
+                        print('💰 Adding gift product: code=${_dataListSearch[indexSelect].code}, stockCode=${_dataListSearch[indexSelect].stockCode}, stockName=${_dataListSearch[indexSelect].stockName}');
+                        
                         Utils.showCustomToast(context, Icons.check_circle_outline, 'Thêm sản phẩm tặng thành công');
-                        Navigator.pop(context,['Yeah',itemSelect]);
+                        Navigator.pop(context,['Yeah',_dataListSearch[indexSelect]]);
                       }
                     });
                   }

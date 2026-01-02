@@ -448,6 +448,15 @@ class _HistoryOrderDetailScreenState extends State<HistoryOrderDetailScreen> {
   }
 
   Widget _buildPaymentAndActionsSection() {
+    print("check allow");
+    print( widget.approveOrder == true);
+    // print( _isPendingApprovalStatusName(widget.statusName) );
+    print(!_isApprovedStatusName(widget.statusName));
+    print(Const.approveOrderFromHistoryOrder);
+    print( widget.approveOrder == true &&
+        _isPendingApprovalStatusName(widget.statusName) &&
+        !_isApprovedStatusName(widget.statusName) &&
+        Const.approveOrderFromHistoryOrder);
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -506,7 +515,7 @@ class _HistoryOrderDetailScreenState extends State<HistoryOrderDetailScreen> {
                   const SizedBox(height: 8),
                 Visibility(
                   visible: widget.approveOrder == true && 
-                           _isPendingApprovalStatusName(widget.statusName) &&
+                           // _isPendingApprovalStatusName(widget.statusName) &&
                            !_isApprovedStatusName(widget.statusName) && 
                            Const.approveOrderFromHistoryOrder,
                   child: _buildCompactButton('Duyệt đơn', MdiIcons.checkCircleOutline, mainColor, _handleApproveOrder),
@@ -880,19 +889,23 @@ class _HistoryOrderDetailScreenState extends State<HistoryOrderDetailScreen> {
         borderRadius: BorderRadius.circular(4),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
+        // 让内容在可用空间内自动收缩，避免 Row 溢出
+        mainAxisSize: MainAxisSize.max,
         children: [
           Icon(icon, size: 11, color: color),
           const SizedBox(width: 3),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10,
-              color: color,
-              fontWeight: FontWeight.w500,
+          Flexible(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                color: color,
+                fontWeight: FontWeight.w500,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              softWrap: false,
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
