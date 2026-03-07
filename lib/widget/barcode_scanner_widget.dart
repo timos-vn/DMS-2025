@@ -72,35 +72,91 @@ class _BarcodeScannerWidgetState extends State<BarcodeScannerWidget>
       return;
     }
     
-    debugPrint('✅ BarcodeScannerWidget: Permission granted, starting camera');
+    debugPrint('✅ BarcodeScannerWidget: Permission granted, waiting for app to stabilize...');
     
-    // Delay trước khi start camera
-    await Future.delayed(const Duration(milliseconds: 300));
+    // ✅ Delay lâu hơn để đảm bảo app đã ổn định sau khi permission dialog đóng
+    // Đặc biệt quan trọng trên iOS để tránh crash/treo
+    await Future.delayed(const Duration(milliseconds: 800));
     
-    if (mounted) {
-      startCamera();
+    if (!mounted) {
+      debugPrint('⚠️ BarcodeScannerWidget: Widget disposed during delay, skipping camera start');
+      return;
     }
+    
+    // ✅ Đợi frame tiếp theo để đảm bảo UI đã render xong
+    // Sử dụng addPostFrameCallback để đảm bảo camera chỉ start sau khi frame đã render
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        debugPrint('⚠️ BarcodeScannerWidget: Widget disposed during post-frame callback, skipping camera start');
+        return;
+      }
+      
+      // Delay thêm một chút để đảm bảo mọi thứ đã ổn định
+      Future.delayed(const Duration(milliseconds: 200), () {
+        if (!mounted) {
+          debugPrint('⚠️ BarcodeScannerWidget: Widget disposed during final delay, skipping camera start');
+          return;
+        }
+        
+        debugPrint('✅ BarcodeScannerWidget: Starting camera now...');
+        startCamera();
+      });
+    });
   }
 
   @override
   void dispose() {
+    debugPrint('🗑️ BarcodeScannerWidget: Disposing widget...');
     isImagePickerActive = false; // ✅ Reset flag khi dispose
-    cameraController.dispose();
-    lineController.dispose();
+    
+    // ✅ Stop camera trước khi dispose để tránh crash
+    try {
+      if (mounted) {
+        cameraController.stop();
+      }
+    } catch (e) {
+      debugPrint('⚠️ Error stopping camera during dispose: $e');
+    }
+    
+    // ✅ Dispose controllers với error handling
+    try {
+      cameraController.dispose();
+    } catch (e) {
+      debugPrint('⚠️ Error disposing camera controller: $e');
+    }
+    
+    try {
+      lineController.dispose();
+    } catch (e) {
+      debugPrint('⚠️ Error disposing line controller: $e');
+    }
+    
     super.dispose();
+    debugPrint('✅ BarcodeScannerWidget: Disposed successfully');
   }
 
   void startCamera() {
+    if (!mounted) {
+      debugPrint('⚠️ BarcodeScannerWidget: Cannot start camera, widget not mounted');
+      return;
+    }
+    
     try {
+      // ✅ Đảm bảo camera controller vẫn valid
+      cameraController.start();
+      debugPrint('✅ BarcodeScannerWidget: Camera started successfully');
+    } catch (e, stackTrace) {
+      debugPrint('❌ BarcodeScannerWidget: Error starting camera: $e');
+      debugPrint('Stack trace: $stackTrace');
+      
+      // ✅ Hiển thị thông báo lỗi cho user nếu widget vẫn mounted
       if (mounted) {
-        cameraController.start();
-        debugPrint('BarcodeScannerWidget: Camera started manually');
-      }
-    } catch (e) {
-      debugPrint('BarcodeScannerWidget: Error starting camera: $e');
-      // ✅ Hiển thị thông báo lỗi cho user
-      if (mounted) {
-        showMessage('Lỗi khởi động camera: ${e.toString()}');
+        // Delay một chút để tránh show message ngay sau khi permission dialog đóng
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) {
+            showMessage('Lỗi khởi động camera. Vui lòng thử lại.');
+          }
+        });
       }
     }
   }

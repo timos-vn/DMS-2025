@@ -19,7 +19,6 @@ import '../dms_event.dart';
 import '../dms_state.dart';
 import 'model/draft_ticket.dart';
 
-
 class TicketDetailScreen extends StatefulWidget {
   const TicketDetailScreen({key,
     required this.ticket,

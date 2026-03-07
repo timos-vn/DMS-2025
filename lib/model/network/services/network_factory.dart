@@ -773,8 +773,11 @@ class NetWorkFactory{
         options: Options(
             headers: {
               "Authorization": "Bearer $token",
-              "Content-Type": "multipart/form-data"
-            }),
+              // Không set Content-Type để Dio tự động set với boundary chính xác
+            },
+            sendTimeout: Duration(minutes: 5), // Tăng timeout cho upload file lớn
+            receiveTimeout: Duration(minutes: 5),
+        ),
         queryParameters: {
         "controller": controller,
         "code": code
@@ -790,14 +793,18 @@ class NetWorkFactory{
     return await requestApi(_dio!.post('/api/v1/todos/time-keeping', options: Options(headers: {"Authorization": "Bearer $token"}), data: request.toJson()));
   }
 
-  Future<Object> updateLocationAndImageTransit(FormData request, String token) async {
+  Future<Object> updateLocationAndImageTransit(FormData request, String token, {ProgressCallback? onSendProgress}) async {
     return await requestApi(_dio!.post('/api/v1/todos/image-delivery',
         options: Options(
             headers: {
               "Authorization": "Bearer $token",
-              "Content-Type": "multipart/form-data"
-            }),
-        data: request
+              // Không set Content-Type để Dio tự động set với boundary chính xác
+            },
+            sendTimeout: Duration(minutes: 10), // Tăng timeout cho upload file lớn và mạng yếu
+            receiveTimeout: Duration(minutes: 10),
+        ),
+        data: request,
+        onSendProgress: onSendProgress
     ));
   }
 
@@ -1101,7 +1108,7 @@ class NetWorkFactory{
   }
 
   Future<Object> getGiftProductList(String maNhom, String token) async {
-    return await requestApi(_dio!.get('/api/v1/order/danh-sach-nhom-hang-tang', 
+    return await requestApi(_dio!.get('/api/v1/order/danh-sach-nhom-hang-tang',
       options: Options(headers: {"Authorization": "Bearer $token"}),
       queryParameters: {"maNhom": maNhom}
     ));

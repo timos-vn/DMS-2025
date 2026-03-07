@@ -63,18 +63,21 @@ class _CustomOrderComponentState extends State<CustomOrderComponent> {
         // Loại bỏ tất cả các trạng thái khác, đặc biệt là "Duyệt"
         
         // Kiểm tra "Lập ctừ" (có thể viết là "Lập ctừ", "Lập CT", "Lập Ctừ", v.v.)
-        bool isLapCTu = statusNameLower.contains('lập') && statusNameLower.contains('ctừ');
+        // Match: "lập" và ("ctừ" hoặc "ct" hoặc "cừ")
+        bool isLapCTu = statusNameLower.contains('lập') && 
+                        (statusNameLower.contains('ctừ') || 
+                         statusNameLower.contains('ct') || 
+                         statusNameLower.contains('cừ'));
         
         // Kiểm tra "Chờ duyệt" (phải chứa cả "chờ" và "duyệt")
         bool isChoDuyet = statusNameLower.contains('chờ') && statusNameLower.contains('duyệt');
         
-        // ✅ Loại bỏ "Duyệt" đơn thuần (chỉ chứa "duyệt" mà không chứa "chờ" và không phải "Lập ctừ")
-        bool isDuyet = statusNameLower.contains('duyệt') && !statusNameLower.contains('chờ') && !isLapCTu;
-        
+        // ✅ Chỉ giữ lại "Lập ctừ" và "Chờ duyệt"
+        // Loại bỏ tất cả các trạng thái khác, đặc biệt là "Duyệt" (chứa "duyệt" nhưng không chứa "chờ" và không phải "Lập ctừ")
         bool shouldKeep = isLapCTu || isChoDuyet;
         
         if (!shouldKeep) {
-          print('🔒 ❌ Filtered out: "$statusName" (isLapCTu=$isLapCTu, isChoDuyet=$isChoDuyet, isDuyet=$isDuyet)');
+          print('🔒 ❌ Filtered out: "$statusName" (isLapCTu=$isLapCTu, isChoDuyet=$isChoDuyet)');
         } else {
           print('🔒 ✅ Kept: "$statusName"');
         }
@@ -83,6 +86,10 @@ class _CustomOrderComponentState extends State<CustomOrderComponent> {
       }).toList();
       
       print('🔒 Filtered statuses: ${filtered.length}');
+      // ✅ Log danh sách các trạng thái còn lại để debug
+      for (var status in filtered) {
+        print('🔒 ✅ Available status: "${status.statusname}"');
+      }
       return filtered;
     }
     

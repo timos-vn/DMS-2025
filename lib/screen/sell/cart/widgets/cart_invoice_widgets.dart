@@ -13,7 +13,7 @@ import '../cart_event.dart';
 import 'cart_helper_widgets.dart';
 
 /// Widget hiển thị thông tin khách hàng
-class CartCustomerInfoWidget extends StatelessWidget {
+class CartCustomerInfoWidget extends StatefulWidget {
   final CartBloc bloc;
   final TextEditingController nameCustomerController;
   final TextEditingController phoneCustomerController;
@@ -58,7 +58,89 @@ class CartCustomerInfoWidget extends StatelessWidget {
   }) : super(key: key);
 
   @override
+  State<CartCustomerInfoWidget> createState() => _CartCustomerInfoWidgetState();
+}
+
+class _CartCustomerInfoWidgetState extends State<CartCustomerInfoWidget> {
+  @override
+  void initState() {
+    super.initState();
+    print('💾 [CartCustomerInfoWidget] initState() called');
+    print('💾   - nameCustomerController.text = ${widget.nameCustomerController.text}');
+    print('💾   - phoneCustomerController.text = ${widget.phoneCustomerController.text}');
+    print('💾   - addressCustomerController.text = ${widget.addressCustomerController.text}');
+    print('💾   - DataLocal.infoCustomer.customerCode = ${DataLocal.infoCustomer.customerCode}');
+    print('💾   - DataLocal.infoCustomer.customerName = ${DataLocal.infoCustomer.customerName}');
+
+    // ✅ Listen controller changes để tự động rebuild khi text thay đổi
+    widget.nameCustomerController.addListener(_onControllerChanged);
+    widget.phoneCustomerController.addListener(_onControllerChanged);
+    widget.addressCustomerController.addListener(_onControllerChanged);
+    
+    // ✅ Đảm bảo khi init, nếu controller đang trống nhưng DataLocal.infoCustomer đã có dữ liệu
+    // (ví dụ đi từ luồng "Thông tin khách hàng" -> Đặt đơn -> Giỏ hàng),
+    // thì tự động fill lại vào các ô nhập để tab Khách hàng luôn hiển thị đúng.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      print('💾 [CartCustomerInfoWidget] addPostFrameCallback - syncing from DataLocal');
+      _syncCustomerInfoFromDataLocal();
+    });
+  }
+
+  @override
+  void dispose() {
+    widget.nameCustomerController.removeListener(_onControllerChanged);
+    widget.phoneCustomerController.removeListener(_onControllerChanged);
+    widget.addressCustomerController.removeListener(_onControllerChanged);
+    super.dispose();
+  }
+
+  void _onControllerChanged() {
+    // Rebuild khi controller thay đổi
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  void _syncCustomerInfoFromDataLocal() {
+    bool hasChanged = false;
+    
+    if ((widget.nameCustomerController.text.trim().isEmpty) &&
+        DataLocal.infoCustomer.customerName.toString().trim().isNotEmpty &&
+        DataLocal.infoCustomer.customerName.toString().trim() != 'null') {
+      widget.nameCustomerController.text =
+          DataLocal.infoCustomer.customerName.toString().trim();
+      hasChanged = true;
+    }
+
+    if ((widget.phoneCustomerController.text.trim().isEmpty) &&
+        DataLocal.infoCustomer.phone.toString().trim().isNotEmpty &&
+        DataLocal.infoCustomer.phone.toString().trim() != 'null') {
+      widget.phoneCustomerController.text =
+          DataLocal.infoCustomer.phone.toString().trim();
+      hasChanged = true;
+    }
+
+    if ((widget.addressCustomerController.text.trim().isEmpty) &&
+        DataLocal.infoCustomer.address.toString().trim().isNotEmpty &&
+        DataLocal.infoCustomer.address.toString().trim() != 'null') {
+      widget.addressCustomerController.text =
+          DataLocal.infoCustomer.address.toString().trim();
+      hasChanged = true;
+    }
+    
+    if (hasChanged && mounted) {
+      setState(() {});
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    print('💾 [CartCustomerInfoWidget] build() called');
+    // ✅ Sync lại từ DataLocal mỗi lần build (để đảm bảo luôn có data mới nhất)
+    _syncCustomerInfoFromDataLocal();
+    print('💾   - After sync: nameCustomerController.text = ${widget.nameCustomerController.text}');
+    print('💾   - After sync: phoneCustomerController.text = ${widget.phoneCustomerController.text}');
+    print('💾   - After sync: addressCustomerController.text = ${widget.addressCustomerController.text}');
     return Padding(
       padding: const EdgeInsets.only(top: 10),
       child: Container(
@@ -82,112 +164,131 @@ class CartCustomerInfoWidget extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 22),
-            GestureDetector(
-              onTap: () {
-                if (isContractCreateOrder == true) {
-                  return;
-                }
-                if ((orderFromCheckIn == false && addInfoCheckIn != true)) {
-                  PersistentNavBarNavigator.pushNewScreen(
-                    context,
-                    screen: const SearchCustomerScreen(
-                      selected: true,
-                      allowCustomerSearch: true,
-                      inputQuantity: false,
-                    ),
-                    withNavBar: false,
-                  ).then((value) {
-                    if (value != null) {
-                      DataLocal.infoCustomer = value;
-                      bloc.add(PickInfoCustomer(
-                        customerName: DataLocal.infoCustomer.customerName,
-                        phone: DataLocal.infoCustomer.phone,
-                        address: DataLocal.infoCustomer.address,
-                        codeCustomer: DataLocal.infoCustomer.customerCode,
-                      ));
+            // ✅ Sử dụng ValueListenableBuilder để tự động rebuild khi controller thay đổi
+            ValueListenableBuilder<TextEditingValue>(
+              valueListenable: widget.nameCustomerController,
+              builder: (context, value, child) {
+                return GestureDetector(
+                  onTap: () {
+                    if (widget.isContractCreateOrder == true) {
+                      return;
                     }
-                  });
-                }
-              },
-              child: Stack(
-                children: [
-                  inputWidget(
-                    title: 'Tên khách hàng',
-                    hideText: "Nguyễn Văn A",
-                    controller: nameCustomerController,
-                    focusNode: nameCustomerFocus,
-                    textInputAction: TextInputAction.done,
-                    onTapSuffix: () {},
-                    note: true,
-                    isEnable: false,
-                  ),
-                  Positioned(
-                    top: 20,
-                    right: 10,
-                    child: (orderFromCheckIn == false && addInfoCheckIn != true)
-                        ? Icon(
-                            Icons.search_outlined,
-                            color: isContractCreateOrder == true
-                                ? Colors.transparent
-                                : Colors.grey,
-                            size: 20,
-                          )
-                        : Container(),
-                  ),
-                ],
-              ),
-            ),
-            inputWidget(
-              title: "SĐT khách hàng",
-              hideText: '0963 xxx xxx ',
-              controller: phoneCustomerController,
-              focusNode: phoneCustomerFocus,
-              textInputAction: TextInputAction.done,
-              onTapSuffix: () {},
-              note: true,
-            ),
-            GestureDetector(
-              onTap: () {
-                showDialog(
-                  barrierDismissible: true,
-                  context: context,
-                  builder: (context) {
-                    return InputAddressPopup(
-                      note: addressCustomerController.text != null
-                          ? addressCustomerController.text.toString()
-                          : "",
-                      title: 'Địa chỉ KH',
-                      desc: 'Vui lòng nhập địa chỉ KH',
-                      convertMoney: false,
-                      inputNumber: false,
-                    );
+                    if ((widget.orderFromCheckIn == false && widget.addInfoCheckIn != true)) {
+                      PersistentNavBarNavigator.pushNewScreen(
+                        context,
+                        screen: const SearchCustomerScreen(
+                          selected: true,
+                          allowCustomerSearch: true,
+                          inputQuantity: false,
+                        ),
+                        withNavBar: false,
+                      ).then((value) {
+                        if (value != null) {
+                          DataLocal.infoCustomer = value;
+                          widget.bloc.add(PickInfoCustomer(
+                            customerName: DataLocal.infoCustomer.customerName,
+                            phone: DataLocal.infoCustomer.phone,
+                            address: DataLocal.infoCustomer.address,
+                            codeCustomer: DataLocal.infoCustomer.customerCode,
+                          ));
+                          widget.onStateChanged();
+                        }
+                      });
+                    }
                   },
-                ).then((note) {
-                  if (note != null) {
-                    onStateChanged();
-                    addressCustomerController.text = note;
-                  }
-                });
+                  child: Stack(
+                    children: [
+                      widget.inputWidget(
+                        title: 'Tên khách hàng',
+                        hideText: "Nguyễn Văn A",
+                        controller: widget.nameCustomerController,
+                        focusNode: widget.nameCustomerFocus,
+                        textInputAction: TextInputAction.done,
+                        onTapSuffix: () {},
+                        note: true,
+                        isEnable: false,
+                      ),
+                      Positioned(
+                        top: 20,
+                        right: 10,
+                        child: (widget.orderFromCheckIn == false && widget.addInfoCheckIn != true)
+                            ? Icon(
+                                Icons.search_outlined,
+                                color: widget.isContractCreateOrder == true
+                                    ? Colors.transparent
+                                    : Colors.grey,
+                                size: 20,
+                              )
+                            : Container(),
+                      ),
+                    ],
+                  ),
+                );
               },
-              child: Stack(
-                children: [
-                  inputWidget(
-                    title: 'Địa chỉ khách hàng',
-                    hideText: "Vui lòng nhập địa chỉ KH",
-                    controller: addressCustomerController,
-                    focusNode: addressCustomerFocus,
-                    textInputAction: TextInputAction.done,
-                    onTapSuffix: () {},
-                    note: true,
-                    isEnable: false,
+            ),
+            // ✅ Sử dụng ValueListenableBuilder để tự động rebuild khi controller thay đổi
+            ValueListenableBuilder<TextEditingValue>(
+              valueListenable: widget.phoneCustomerController,
+              builder: (context, value, child) {
+                return widget.inputWidget(
+                  title: "SĐT khách hàng",
+                  hideText: '0963 xxx xxx ',
+                  controller: widget.phoneCustomerController,
+                  focusNode: widget.phoneCustomerFocus,
+                  textInputAction: TextInputAction.done,
+                  onTapSuffix: () {},
+                  note: true,
+                );
+              },
+            ),
+            // ✅ Sử dụng ValueListenableBuilder để tự động rebuild khi controller thay đổi
+            ValueListenableBuilder<TextEditingValue>(
+              valueListenable: widget.addressCustomerController,
+              builder: (context, value, child) {
+                return GestureDetector(
+                  onTap: () {
+                    showDialog(
+                      barrierDismissible: true,
+                      context: context,
+                      builder: (context) {
+                        return InputAddressPopup(
+                          note: widget.addressCustomerController.text != null
+                              ? widget.addressCustomerController.text.toString()
+                              : "",
+                          title: 'Địa chỉ KH',
+                          desc: 'Vui lòng nhập địa chỉ KH',
+                          convertMoney: false,
+                          inputNumber: false,
+                        );
+                      },
+                    ).then((note) {
+                      if (note != null) {
+                        widget.onStateChanged();
+                        widget.addressCustomerController.text = note;
+                      }
+                    });
+                  },
+                  child: Stack(
+                    children: [
+                      widget.inputWidget(
+                        title: 'Địa chỉ khách hàng',
+                        hideText: "Vui lòng nhập địa chỉ KH",
+                        controller: widget.addressCustomerController,
+                        focusNode: widget.addressCustomerFocus,
+                        textInputAction: TextInputAction.done,
+                        onTapSuffix: () {},
+                        note: true,
+                        isEnable: false,
+                      ),
+                      const Positioned(
+                        top: 20,
+                        right: 10,
+                        child: Icon(Icons.edit, color: Colors.grey, size: 20),
+                      ),
+                    ],
                   ),
-                  const Positioned(
-                    top: 20,
-                    right: 10,
-                    child: Icon(Icons.edit, color: Colors.grey, size: 20),
-                  ),
-                ],
-              ),
+                );
+              },
             ),
           ],
         ),

@@ -1,0 +1,2 @@
+/Users/Tiennq/Documents/App-Github/Mobile/DMS-2025/android/app/.cxx/RelWithDebInfo/4d721a60/x86/CMakeFiles/edit_cache.dir
+/Users/Tiennq/Documents/App-Github/Mobile/DMS-2025/android/app/.cxx/RelWithDebInfo/4d721a60/x86/CMakeFiles/rebuild_cache.dir

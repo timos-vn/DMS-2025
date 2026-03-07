@@ -7,6 +7,7 @@ import '../../../../utils/utils.dart';
 import '../../../../widget/custom_question.dart';
 import '../../../../widget/InputDiscountPercent.dart';
 import '../cart_bloc.dart';
+import '../cart_event.dart';
 
 /// Component hiển thị danh sách sản phẩm trong giỏ hàng
 class CartProductList extends StatelessWidget {
@@ -15,7 +16,7 @@ class CartProductList extends StatelessWidget {
   final VoidCallback onAddAllHDVV;
   final VoidCallback onAddDiscountForAll;
   final VoidCallback onDeleteAll;
-  final Function(int) onEditProduct;
+  final Function(int) onEditProduct; 
   final Function(int) onDeleteProduct;
   final Function(int) onApplyVVHD;
   final Function(int, double) onApplyManualDiscount;
@@ -113,6 +114,80 @@ class CartProductList extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 20),
+                // ✅ Manual total discount (freeDiscount): icon % to input order-level discount
+                Visibility(
+                  visible: Const.freeDiscount == true && bloc.listOrder.isNotEmpty,
+                  child: InkWell(
+                    onTap: () async {
+                      final result = await showDialog(
+                        barrierDismissible: true,
+                        context: context,
+                        builder: (context) {
+                          return InputDiscountPercent(
+                            title: 'Chiết khấu tổng đơn',
+                            subTitle: 'Vui lòng nhập TLCK tổng đơn (%)',
+                            typeValues: '%',
+                            percent: bloc.manualTotalDiscountPercent,
+                          );
+                        },
+                      );
+
+                      // InputDiscountPercent thường trả về List/num, handle mềm để tránh crash
+                      double? percentValue;
+                      if (result is num) {
+                        percentValue = result.toDouble();
+                      } else if (result is List && result.isNotEmpty) {
+                        // InputDiscountPercent returns ["BACK", valueInput] or ["Close","0"]
+                        final dynamic v = result.length > 1 ? result[1] : result[0];
+                        if (v is num) {
+                          percentValue = v.toDouble();
+                        } else if (v is String) {
+                          // ✅ FIX: Khi nhấn nút "x", result là ["Close","0"], cần parse "0" thành 0.0
+                          // Nếu parse thành công hoặc là "Close", set về 0
+                          if (v == 'Close' || v == '0') {
+                            percentValue = 0.0;
+                          } else {
+                            percentValue = double.tryParse(v);
+                          }
+                        }
+                      }
+
+                      // ✅ FIX: Nếu result là null (người dùng đóng dialog bằng cách tap outside),
+                      // không làm gì cả (giữ nguyên giá trị hiện tại)
+                      // Nhưng nếu result là ["Close","0"] (nhấn nút x), cần set về 0
+                      if (percentValue == null) {
+                        // Kiểm tra xem có phải là trường hợp nhấn nút "x" không
+                        if (result is List && result.isNotEmpty && result[0] == 'Close') {
+                          percentValue = 0.0;
+                        } else {
+                          return; // Người dùng đóng dialog, không thay đổi giá trị
+                        }
+                      }
+
+                      // Clamp 0..100
+                      if (percentValue < 0) percentValue = 0;
+                      if (percentValue > 100) percentValue = 100;
+                      print("test : $percentValue");
+                      // ✅ Best-effort: apply instantly, no API
+                      bloc.add(ApplyManualTotalDiscountPercentEvent(percentValue));
+                      if(result[0] != "Close"){
+                        Utils.showCustomToast(
+                          context,
+                          Icons.check_circle_outline,
+                          percentValue > 0 ? 'Đã áp dụng CK tổng đơn: $percentValue%' : 'Đã xoá CK tổng đơn',
+                        );
+                      }
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 0, left: 20),
+                      child: Icon(
+                        Icons.percent_rounded,
+                        size: 20,
+                        color: bloc.manualTotalDiscountPercent > 0 ? Colors.orange : Colors.blueGrey,
+                      ),
+                    ),
+                  ),
+                ),
                 // Discount icon
                 Visibility(
                   visible: (bloc.hasCknDiscount ||

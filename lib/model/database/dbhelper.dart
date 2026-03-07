@@ -15,7 +15,7 @@ import '../entity/item_check_in.dart';
 import '../entity/product.dart';
 
 class DatabaseHelper {
- static const NEW_DB_VERSION = 20260102; // Thêm toàn bộ thông tin đơn hàng vào cartDraftOrder (kho, giao dịch, VV/HD, đại lý, thuế, v.v.)
+ static const NEW_DB_VERSION = 20260131; // Add manualTotalDiscountPercent to cartDraftOrder + keep full order info (kho, giao dịch, VV/HD, đại lý, thuế, v.v.)
   static final DatabaseHelper _instance = DatabaseHelper._();
   Database? _database;
 
@@ -345,6 +345,7 @@ class DatabaseHelper {
         typeDiscount TEXT,
         discountAgency REAL,
         chooseAgencyCode INTEGER,
+        manualTotalDiscountPercent REAL DEFAULT 0,
         createdAt TEXT
       )
     ''');
@@ -402,6 +403,7 @@ class DatabaseHelper {
             taxCode TEXT,
             noteSell TEXT,
             listCKVT TEXT,
+            manualTotalDiscountPercent REAL DEFAULT 0,
             createdAt TEXT
           )
         ''');
@@ -449,6 +451,16 @@ class DatabaseHelper {
         print("Added all order information columns to cartDraftOrder");
       } catch (e) {
         print("Columns might already exist in cartDraftOrder: $e");
+      }
+    }
+
+    // Migration for version 20260131 - Add manualTotalDiscountPercent (order-level manual discount)
+    if (oldVersion < 20260131) {
+      try {
+        db.execute('ALTER TABLE cartDraftOrder ADD COLUMN manualTotalDiscountPercent REAL DEFAULT 0');
+        print("Added manualTotalDiscountPercent column to cartDraftOrder");
+      } catch (e) {
+        print("manualTotalDiscountPercent might already exist in cartDraftOrder: $e");
       }
     }
     
@@ -1485,6 +1497,7 @@ class DatabaseHelper {
     String? typeDiscount,
     double? discountAgency,
     int? chooseAgencyCode,
+    double? manualTotalDiscountPercent,
   }) async {
     var client = await db;
     // Xóa draft cũ trước khi lưu mới (chỉ giữ 1 draft)
@@ -1533,6 +1546,7 @@ class DatabaseHelper {
       'typeDiscount': typeDiscount ?? '',
       'discountAgency': discountAgency ?? 0,
       'chooseAgencyCode': chooseAgencyCode ?? 0,
+      'manualTotalDiscountPercent': manualTotalDiscountPercent ?? 0,
       'createdAt': DateTime.now().toIso8601String(),
     });
   }

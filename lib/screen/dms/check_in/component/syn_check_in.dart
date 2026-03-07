@@ -102,6 +102,7 @@ class _SynCheckInScreenState extends State<SynCheckInScreen> {
             return Scaffold(
               backgroundColor: Colors.white,
               floatingActionButton:_bloc.listSynCheckIn.isEmpty ? Container() : FloatingActionButton(
+                heroTag: 'syn_checkin_fab', // ✅ Unique tag để tránh lỗi Hero
                 backgroundColor: subColor,
                 onPressed: (){
                   showDialog(

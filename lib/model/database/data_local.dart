@@ -143,6 +143,17 @@ class DataLocal{
   static String nameTax = '';
   static double valuesTax = 0;
 
+  /// Thông tin tổng tiền/chiết khấu/thanh toán của đơn hàng khi xem chi tiết (InfoPayment)
+  /// Dùng để restore chiết khấu tổng đơn khi SỬA ĐƠN (đặc biệt cho FreeDiscount)
+  static double editOrderTotalMoney = 0;      // t_tien
+  static double editOrderTotalDiscount = 0;   // t_ck_tt_nt
+  static double editOrderTotalPayment = 0;    // t_tt_nt
+  static double editOrderTotalTax = 0;        // t_thue_nt
+
+  /// Tỷ lệ chiết khấu tổng đơn nhập tay được khôi phục khi SỬA ĐƠN (FreeDiscount)
+  /// Được tính từ InfoPayment + chiết khấu dòng hiện tại trong giỏ hàng
+  static double editOrderManualTotalDiscountPercent = 0;
+
   /// Danh sách hàng đã tick chọn khuyến mãi
   static List<ObjectDiscount> listObjectDiscount = [];
   static List<SearchItemResponseData> listOrderDiscount = [];

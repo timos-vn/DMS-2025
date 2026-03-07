@@ -6,6 +6,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:path_provider/path_provider.dart';
 
 import 'package:dms/utils/const.dart';
 import 'package:geocoding/geocoding.dart';
@@ -47,6 +49,7 @@ class DetailShippingBloc extends Bloc<DetailShippingEvent,DetailShippingState>{
     on<GetLocationEvent>(_getLocationEvent);
     on<UpdateLocationAndImageEvent>(_updateLocationAndImageEvent);
   }
+  /// ✅ Chuẩn bị ảnh với compression tối ưu dựa trên kích thước file
   Future<XFile> prepareImageForUpload(File file) async {
     try {
       // ✅ Kiểm tra file có tồn tại và có thể đọc được không
@@ -56,27 +59,91 @@ class DetailShippingBloc extends Bloc<DetailShippingEvent,DetailShippingState>{
       
       // ✅ Kiểm tra file size
       final fileSize = await file.length();
-      debugPrint('📸 Original file size: ${fileSize} bytes');
+      debugPrint('📸 Original file size: ${(fileSize / 1024 / 1024).toStringAsFixed(2)} MB');
       
       if (fileSize == 0) {
         throw Exception('File is empty: ${file.path}');
       }
       
-      debugPrint('✅ Using original image without compression:');
-      debugPrint('   - File path: ${file.absolute.path}');
-      debugPrint('   - File size: ${fileSize} bytes');
+      // ✅ Nếu file < 500KB, không cần compress
+      const maxSizeWithoutCompression = 500 * 1024; // 500KB
+      if (fileSize < maxSizeWithoutCompression) {
+        debugPrint('✅ File nhỏ, không cần compress');
+        return XFile(file.path);
+      }
       
-      // ✅ Trả về file gốc trực tiếp
-      return XFile(file.path);
+      // ✅ Compress ảnh với quality phù hợp
+      final dir = await getTemporaryDirectory();
+      final targetPath = '${dir.path}/compressed_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      
+      // ✅ Điều chỉnh quality dựa trên kích thước file
+      int quality = 85; // Mặc định
+      if (fileSize > 5 * 1024 * 1024) { // > 5MB
+        quality = 60; // Compress mạnh hơn
+      } else if (fileSize > 2 * 1024 * 1024) { // > 2MB
+        quality = 70;
+      } else if (fileSize > 1 * 1024 * 1024) { // > 1MB
+        quality = 80;
+      }
+      
+      debugPrint('🔄 Compressing image with quality: $quality%');
+      
+      final result = await FlutterImageCompress.compressAndGetFile(
+        file.absolute.path,
+        targetPath,
+        quality: quality,
+        minWidth: 1920, // Giới hạn width tối đa
+        minHeight: 1080, // Giới hạn height tối đa
+      );
+      
+      if (result == null) {
+        debugPrint('⚠️ Compression failed, using original file');
+        return XFile(file.path);
+      }
+      
+      final compressedSize = await result.length();
+      final compressionRatio = ((1 - compressedSize / fileSize) * 100).toStringAsFixed(1);
+      
+      debugPrint('✅ Compression completed:');
+      debugPrint('   - Original: ${(fileSize / 1024 / 1024).toStringAsFixed(2)} MB');
+      debugPrint('   - Compressed: ${(compressedSize / 1024 / 1024).toStringAsFixed(2)} MB');
+      debugPrint('   - Saved: $compressionRatio%');
+      
+      return result;
     } catch (e) {
-      debugPrint('Error preparing image: $e');
-      debugPrint('File path: ${file.path}');
-      debugPrint('File exists: ${await file.exists()}');
-      throw Exception('Failed to prepare image: ${e.toString()}');
+      debugPrint('❌ Error preparing image: $e');
+      debugPrint('   - File path: ${file.path}');
+      debugPrint('   - File exists: ${await file.exists()}');
+      // ✅ Fallback về file gốc nếu compression lỗi
+      return XFile(file.path);
     }
+  }
+  
+  /// ✅ Tính timeout động dựa trên kích thước file và số lượng file
+  Duration calculateUploadTimeout(List<File> files) {
+    int totalSize = 0;
+    for (var file in files) {
+      totalSize += file.lengthSync();
+    }
+    
+    // ✅ Tính timeout: 1 phút cho mỗi MB + 2 phút buffer
+    final sizeInMB = totalSize / (1024 * 1024);
+    final baseTimeout = (sizeInMB * 60).round(); // 1 phút/MB
+    final timeoutSeconds = (baseTimeout + 120).clamp(60, 600); // Tối thiểu 1 phút, tối đa 10 phút
+    
+    debugPrint('⏱️ Calculated timeout: ${timeoutSeconds}s for ${sizeInMB.toStringAsFixed(2)} MB');
+    
+    return Duration(seconds: timeoutSeconds);
   }
   void _updateLocationAndImageEvent(UpdateLocationAndImageEvent event, Emitter<DetailShippingState> emitter)async{
     try {
+      // ✅ Kiểm tra token còn hay không
+      if (_accessToken == null || _accessToken!.isEmpty) {
+        debugPrint('❌ Access token is null/empty in _updateLocationAndImageEvent');
+        emitter(UploadImageFailure('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'));
+        return;
+      }
+
       // ✅ Kiểm tra có file để upload không
       if (listFileInvoice.isEmpty) {
         debugPrint('❌ No images to upload - listFileInvoice is empty');
@@ -84,105 +151,100 @@ class DetailShippingBloc extends Bloc<DetailShippingEvent,DetailShippingState>{
         return;
       }
       
-      // ✅ Kiểm tra có base64 data không (có thể null nếu chưa gen)
-      if (listFileInvoiceSave.isEmpty) {
-        debugPrint('❌ No base64 data - listFileInvoiceSave is empty');
-        emitter(UploadImageFailure('Không có dữ liệu ảnh để upload'));
-        return;
-      }
-      
-      // ✅ Kiểm tra tính nhất quán giữa file và base64 data
+      // ✅ Kiểm tra tính nhất quán giữa file và metadata (để đồng bộ với các luồng khác)
       if (listFileInvoice.length != listFileInvoiceSave.length) {
         debugPrint('❌ Data inconsistency:');
         debugPrint('   - Files count: ${listFileInvoice.length}');
-        debugPrint('   - Base64 count: ${listFileInvoiceSave.length}');
+        debugPrint('   - Metadata count: ${listFileInvoiceSave.length}');
         emitter(UploadImageFailure('Dữ liệu ảnh không nhất quán, vui lòng chụp lại'));
         return;
       }
       
-      // ✅ Gen base64 cho các file chưa có base64 (lazy loading)
-      debugPrint('🔄 Generating base64 for images that need it...');
-      for (int i = 0; i < listFileInvoiceSave.length; i++) {
-        if (listFileInvoiceSave[i].pathBase64 == null) {
-          try {
-            debugPrint('   - Generating base64 for image ${i + 1}/${listFileInvoiceSave.length}');
-            String? base64Result = Utils.base64Image(listFileInvoice[i]);
-            if (base64Result != null && base64Result.isNotEmpty) {
-              listFileInvoiceSave[i].pathBase64 = base64Result;
-              debugPrint('   - ✅ Base64 generated: ${base64Result.length} chars');
-            } else {
-              debugPrint('   - ❌ Failed to generate base64 for image ${i + 1}');
-              emitter(UploadImageFailure('Không thể tạo dữ liệu ảnh cho ảnh ${i + 1}'));
-              return;
-            }
-          } catch (e) {
-            debugPrint('   - ❌ Error generating base64 for image ${i + 1}: $e');
-            emitter(UploadImageFailure('Lỗi khi tạo dữ liệu ảnh cho ảnh ${i + 1}'));
-            return;
-          }
-        } else {
-          debugPrint('   - ✅ Base64 already exists for image ${i + 1}');
-        }
-      }
-      
-      // ✅ Log thông tin để debug
-      debugPrint('✅ Starting upload with:');
-      debugPrint('   - Files count: ${listFileInvoice.length}');
-      debugPrint('   - Base64 count: ${listFileInvoiceSave.length}');
-      for (int i = 0; i < listFileInvoice.length; i++) {
-        debugPrint('   - File ${i + 1}: ${listFileInvoice[i].path}');
-        debugPrint('   - Base64 ${i + 1}: ${listFileInvoiceSave[i].pathBase64?.length ?? 0} chars');
-      }
-      
-      // ✅ Kiểm tra lat/long null và sử dụng giá trị mặc định
-      final latValue = lat ?? '0.0';
-      final longValue = long ?? '0.0';
-      final addressValue = currentAddress ?? '';
+      // ✅ Tính timeout động dựa trên kích thước file
+      final uploadTimeout = calculateUploadTimeout(listFileInvoice);
       
       // ✅ Emit progress khi bắt đầu chuẩn bị dữ liệu
       emitter(UploadImageProgress(progress: 0.1, message: 'Đang chuẩn bị dữ liệu...'));
       
-      // ✅ Emit progress khi đang chuẩn bị ảnh
-      emitter(UploadImageProgress(progress: 0.3, message: 'Đang chuẩn bị ảnh...'));
+      // ✅ Log thông tin để debug (không gen base64 vì không cần cho multipart upload)
+      debugPrint('✅ Starting upload with:');
+      debugPrint('   - Files count: ${listFileInvoice.length}');
+      for (int i = 0; i < listFileInvoice.length; i++) {
+        final fileSize = await listFileInvoice[i].length();
+        debugPrint('   - File ${i + 1}: ${listFileInvoice[i].path} (${(fileSize / 1024 / 1024).toStringAsFixed(2)} MB)');
+      }
       
-      // ✅ Chuẩn bị tất cả ảnh gốc với error handling
-      List<MultipartFile> originalFiles = [];
+      // Kiểm tra lat/long null và sử dụng giá trị mặc định
+      final latValue = lat ?? '0.0';
+      final longValue = long ?? '0.0';
+      final addressValue = currentAddress ?? '';
+
+      // Nếu chưa lấy được GPS, không gửi toạ độ (tránh 0.0,0.0 gây khó debug)
+      if (latValue == '0.0' && longValue == '0.0') {
+        debugPrint('Invalid GPS coordinates (0.0,0.0) - aborting upload');
+        emitter(UploadImageFailure('Không lấy được vị trí GPS. Vui lòng bật GPS và thử lại.'));
+        return;
+      }
+      
+      // ✅ Emit progress khi đang chuẩn bị và compress ảnh
+      emitter(UploadImageProgress(progress: 0.2, message: 'Đang nén ảnh...'));
+      
+      // ✅ Chuẩn bị và compress tất cả ảnh với error handling
+      List<MultipartFile> preparedFiles = [];
+      int successCount = 0;
       for (int i = 0; i < listFileInvoice.length; i++) {
         try {
-          debugPrint('Preparing original image ${i + 1}/${listFileInvoice.length}');
-          XFile originalFile = await prepareImageForUpload(listFileInvoice[i]);
+          final progress = 0.2 + (i / listFileInvoice.length * 0.1);
+          emitter(UploadImageProgress(
+            progress: progress, 
+            message: 'Đang xử lý ảnh ${i + 1}/${listFileInvoice.length}...'
+          ));
+          
+          debugPrint('🔄 Preparing image ${i + 1}/${listFileInvoice.length}');
+          XFile preparedFile = await prepareImageForUpload(listFileInvoice[i]);
+          
           MultipartFile multipartFile = await MultipartFile.fromFile(
-            originalFile.path,
-            filename: originalFile.path.split('/').last,
+            preparedFile.path,
+            filename: preparedFile.path.split('/').last,
           );
-          originalFiles.add(multipartFile);
+          preparedFiles.add(multipartFile);
+          successCount++;
         } catch (e) {
-          debugPrint('Failed to prepare image ${i + 1}: $e');
+          debugPrint('⚠️ Failed to prepare image ${i + 1}: $e');
           // ✅ Bỏ qua file lỗi và tiếp tục với file khác
           continue;
         }
       }
       
       // ✅ Kiểm tra có ít nhất một file được chuẩn bị thành công không
-      if (originalFiles.isEmpty) {
+      if (preparedFiles.isEmpty) {
         emitter(UploadImageFailure('Không thể chuẩn bị được ảnh nào'));
         return;
+      }
+      
+      if (successCount < listFileInvoice.length) {
+        debugPrint('⚠️ Warning: Only $successCount/${listFileInvoice.length} images prepared successfully');
       }
       
       var formData = FormData.fromMap(
           {
             "stt_rec": event.sstRec,
-            "latLong": "$latValue,$longValue", // ✅ Sử dụng giá trị đã kiểm tra
-            "address": addressValue, // ✅ Sử dụng giá trị đã kiểm tra
-            "ListFile": originalFiles, // ✅ Sử dụng danh sách file gốc
+            "latLong": "$latValue,$longValue",
+            "address": addressValue,
+            "ListFile": preparedFiles,
           }
       );
       
       // ✅ Emit progress khi đang upload
-      emitter(UploadImageProgress(progress: 0.7, message: 'Đang upload ảnh...'));
+      emitter(UploadImageProgress(progress: 0.4, message: 'Đang upload ảnh...'));
       
-      // ✅ Gọi API với retry mechanism
-      DetailShippingState state = await _uploadWithRetry(formData, _accessToken!, emitter);
+      // ✅ Gọi API với retry mechanism và timeout động
+      DetailShippingState state = await _uploadWithRetry(
+        formData, 
+        _accessToken!, 
+        emitter,
+        timeout: uploadTimeout,
+      );
       
       // ✅ Emit progress 100% trước khi hoàn thành
       emitter(UploadImageProgress(progress: 1.0, message: 'Hoàn thành!'));
@@ -195,8 +257,17 @@ class DetailShippingBloc extends Bloc<DetailShippingEvent,DetailShippingState>{
       
     } catch (e) {
       // ✅ Xử lý lỗi và emit upload failure state
-      debugPrint('Error in _updateLocationAndImageEvent: $e');
-      emitter(UploadImageFailure('Lỗi khi upload ảnh: ${e.toString()}'));
+      debugPrint('❌ Error in _updateLocationAndImageEvent: $e');
+      String errorMessage = 'Lỗi khi upload ảnh: ${e.toString()}';
+      
+      // ✅ Cải thiện thông báo lỗi
+      if (e.toString().contains('timeout') || e.toString().contains('Timeout')) {
+        errorMessage = 'Upload quá lâu. Vui lòng kiểm tra kết nối mạng và thử lại.';
+      } else if (e.toString().contains('SocketException') || e.toString().contains('Network')) {
+        errorMessage = 'Lỗi kết nối mạng. Vui lòng kiểm tra internet và thử lại.';
+      }
+      
+      emitter(UploadImageFailure(errorMessage));
     }
   }
 
@@ -209,49 +280,109 @@ class DetailShippingBloc extends Bloc<DetailShippingEvent,DetailShippingState>{
   late StreamSubscription<Position> positionStream;
 
 
-  /// ✅ Upload với retry mechanism
-  Future<DetailShippingState> _uploadWithRetry(FormData formData, String accessToken, Emitter<DetailShippingState> emitter) async {
+  /// ✅ Upload với retry mechanism, progress tracking và adaptive timeout
+  Future<DetailShippingState> _uploadWithRetry(
+    FormData formData, 
+    String accessToken, 
+    Emitter<DetailShippingState> emitter, {
+    Duration? timeout,
+  }) async {
     const int maxRetries = 3;
-    const List<int> retryDelays = [2, 5, 10]; // seconds
+    // Exponential backoff: 2s, 4s, 8s
+    int getRetryDelay(int attempt) => (2 * (1 << attempt)).clamp(2, 30);
+    
+    // ✅ Sử dụng timeout động hoặc mặc định 8 phút
+    final uploadTimeout = timeout ?? const Duration(minutes: 8);
     
     for (int attempt = 0; attempt < maxRetries; attempt++) {
       try {
         debugPrint('🔄 Upload attempt ${attempt + 1}/$maxRetries');
+        debugPrint('   - Timeout: ${uploadTimeout.inSeconds}s');
         
         // ✅ Emit progress cho retry
         if (attempt > 0) {
           emitter(UploadImageProgress(
-            progress: 0.7 + (attempt * 0.1), 
+            progress: 0.4 + (attempt * 0.15), 
             message: 'Thử lại lần ${attempt + 1}/$maxRetries...'
           ));
         }
         
-        // ✅ Tăng timeout cho mạng yếu
+        // ✅ Tạo progress callback để track upload thực tế
+        int lastSent = 0;
+        int? totalSize;
+        
+        // ✅ Upload với timeout động và progress tracking
         final networkFactory = NetWorkFactory(context);
         final response = await networkFactory.updateLocationAndImageTransit(
           formData, 
-          accessToken
+          accessToken,
+          onSendProgress: (sent, total) {
+            lastSent = sent;
+            totalSize = total;
+            
+            // ✅ Tính progress thực tế (0.4 - 0.95)
+            if (total > 0) {
+              final realProgress = 0.4 + (sent / total * 0.55);
+              emitter(UploadImageProgress(
+                progress: realProgress.clamp(0.4, 0.95),
+                message: 'Đang upload ảnh... ${(sent / total * 100).toStringAsFixed(0)}%'
+              ));
+            }
+          }
+        ).timeout(
+          uploadTimeout,
+          onTimeout: () {
+            throw Exception('Upload timeout sau ${uploadTimeout.inSeconds}s. Vui lòng kiểm tra kết nối mạng.');
+          },
         );
         
         debugPrint('✅ Upload successful on attempt ${attempt + 1}');
+        // debugPrint('   - Total size: ${totalSize != null ? '${(totalSize / 1024 / 1024).toStringAsFixed(2)} MB' : 'unknown'}');
+        debugPrint('   - Sent: ${lastSent != 0 ? '${(lastSent / 1024 / 1024).toStringAsFixed(2)} MB' : 'unknown'}');
+        
         return _handleUpdateLocationAndImage(response);
         
       } catch (e) {
         debugPrint('❌ Upload attempt ${attempt + 1} failed: $e');
         
-        // ✅ Nếu là lần cuối, throw error
+        // ✅ Kiểm tra loại lỗi
+        String errorMessage = e.toString();
+        bool isTimeout = errorMessage.contains('timeout') || 
+                        errorMessage.contains('Timeout') ||
+                        errorMessage.contains('timed out');
+        bool isNetworkError = errorMessage.contains('SocketException') ||
+                             errorMessage.contains('Network') ||
+                             errorMessage.contains('Failed host lookup') ||
+                             errorMessage.contains('Connection refused');
+        
+        // ✅ Nếu là lần cuối, throw error với message chi tiết
         if (attempt == maxRetries - 1) {
-          throw Exception('Upload failed after $maxRetries attempts: $e');
+          if (isTimeout) {
+            throw Exception('Upload timeout sau nhiều lần thử. Vui lòng kiểm tra kết nối mạng và thử lại.');
+          } else if (isNetworkError) {
+            throw Exception('Lỗi kết nối mạng. Vui lòng kiểm tra internet và thử lại.');
+          } else {
+            throw Exception('Upload thất bại sau $maxRetries lần thử: ${e.toString()}');
+          }
         }
         
-        // ✅ Đợi trước khi retry
-        final delay = retryDelays[attempt];
+        // ✅ Đợi trước khi retry với exponential backoff
+        final delay = getRetryDelay(attempt);
         debugPrint('⏳ Waiting ${delay}s before retry...');
         
-        // ✅ Emit progress cho retry delay
+        // ✅ Emit progress cho retry delay với message phù hợp
+        String retryMessage;
+        if (isTimeout) {
+          retryMessage = 'Mạng chậm, thử lại sau ${delay}s...';
+        } else if (isNetworkError) {
+          retryMessage = 'Mất kết nối, thử lại sau ${delay}s...';
+        } else {
+          retryMessage = 'Thử lại sau ${delay}s...';
+        }
+        
         emitter(UploadImageProgress(
-          progress: 0.7 + (attempt * 0.1), 
-          message: 'Mạng yếu, thử lại sau ${delay}s...'
+          progress: 0.4 + (attempt * 0.15), 
+          message: retryMessage
         ));
         
         await Future.delayed(Duration(seconds: delay));

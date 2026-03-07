@@ -331,7 +331,7 @@ class _CustomInfoCPNState extends State<CustomInfoCPN> with TickerProviderStateM
         key:const Key('DEBUG_TOOLBAR'),
         children:<Widget>[
           GestureDetector(
-            onTap: ()=> Utils.showCustomToast(context, Icons.abc, 'SSE - FixBug-16122025'),
+            onTap: ()=> Utils.showCustomToast(context, Icons.ac_unit_rounded, 'SSE - FixBug-30 01 2026'),
               child: Text('All Right Reserved | ${DateTime.now().year}')),
         ],
       ),

@@ -1457,79 +1457,53 @@ class _OrderScreenState extends State<OrderScreen> with TickerProviderStateMixin
                                                   overflow: TextOverflow.ellipsis,
                                                 ),
                                               ),
-                                              const SizedBox(width: 10,),
-                                              Column(
-                                                children: [
-                                                  Const.isWoPrice == false ?
-                                                  (_list[index].price == _list[index].priceAfter && _list[index].price! > 0) ? Container() :
-                                                  Text(
-                                                    (currencyCode == "VND"
-                                                        ?
-                                                    Utils.formatMoneyStringToDouble(_list[index].price??0)
-                                                        :
-                                                    Utils.formatMoneyStringToDouble(_list[index].price??0)).toString().trim()
-                                                    == '0' ? 'Giá đang cập nhật' : (currencyCode == "VND"
-                                                        ?
-                                                    '${Utils.formatMoneyStringToDouble(_list[index].price??0)} ₫'
-                                                        :
-                                                    '${Utils.formatMoneyStringToDouble(_list[index].price??0)} ₫')
-                                                    ,
-                                                    textAlign: TextAlign.left,
-                                                    style: TextStyle(color: grey, fontSize: 10, decoration: (currencyCode == "VND"
-                                                        ?
-                                                    Utils.formatMoneyStringToDouble(_list[index].price??0)
-                                                        :
-                                                    Utils.formatMoneyStringToDouble(_list[index].price??0)).toString().trim() == '0' ? TextDecoration.none : TextDecoration.lineThrough),
-                                                  )
-                                                      :
-                                                  (_list[index].woPrice == _list[index].woPriceAfter && _list[index].woPrice! > 0) ? Container() : Text(
-                                                    (currencyCode == "VND"
-                                                        ?
-                                                    Utils.formatMoneyStringToDouble(_list[index].woPrice??0)
-                                                        :
-                                                    Utils.formatMoneyStringToDouble(_list[index].woPrice??0)).toString().trim()
-                                                        == '0' ? 'Giá đang cập nhật' : (currencyCode == "VND"
-                                                        ?
-                                                    '${Utils.formatMoneyStringToDouble(_list[index].woPrice??0)} ₫'
-                                                        :
-                                                    '${Utils.formatMoneyStringToDouble(_list[index].woPrice??0)} ₫')
-                                                    ,
-                                                    textAlign: TextAlign.left,
-                                                    style: TextStyle(color: grey, fontSize: 10, decoration: (currencyCode == "VND"
-                                                        ?
-                                                    Utils.formatMoneyStringToDouble(_list[index].woPrice??0)
-                                                        :
-                                                    Utils.formatMoneyStringToDouble(_list[index].woPrice??0)).toString().trim() == '0' ? TextDecoration.none : TextDecoration.lineThrough),
-                                                  ),
-                                                  const SizedBox(height: 3,),
-                                                  Const.isWoPrice == false ? Visibility(
-                                                    visible: _list[index].price! > 0,
-                                                    child: Text(
-                                                      currencyCode == "VND"
-                                                          ?
-                                                      '${Utils.formatMoneyStringToDouble(_list[index].priceAfter??0)} ₫'
-                                                          :
-                                                      '${Utils.formatMoneyStringToDouble(_list[index].priceAfter??0)} ₫',
-                                                      textAlign: TextAlign.left,
-                                                      style:const TextStyle(color: Color(
-                                                          0xff067902), fontSize: 13,fontWeight: FontWeight.w700),
-                                                    ),
-                                                  ) : Visibility(
-                                                    visible: _list[index].woPrice! > 0,
-                                                    child: Text(
-                                                      currencyCode == "VND"
-                                                          ?
-                                                      '${Utils.formatMoneyStringToDouble(_list[index].woPriceAfter??0)} ₫'
-                                                          :
-                                                      '${Utils.formatMoneyStringToDouble(_list[index].woPriceAfter??0)} ₫',
-                                                      textAlign: TextAlign.left,
-                                                      style:const TextStyle(color: Color(
-                                                          0xff067902), fontSize: 13,fontWeight: FontWeight.w700),
-                                                    ),
-                                                  ) ,
-                                                ],
-                                              ),
                                             ],
+                                          ),
+                                          const SizedBox(height: 5,),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xfff5f5f5),
+                                              borderRadius: BorderRadius.circular(8),
+                                              border: Border.all(
+                                                color: const Color(0xffe0e0e0),
+                                                width: 1,
+                                              ),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                const Icon(
+                                                  Icons.inventory_2,
+                                                  size: 12,
+                                                  color: Color(0xff666666),
+                                                ),
+                                                const SizedBox(width: 4),
+                                                const Text(
+                                                  'Mã SP:',
+                                                  textAlign: TextAlign.left,
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.w500,
+                                                    fontSize: 10,
+                                                    color: Color(0xff666666),
+                                                  ),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                                const SizedBox(width: 3),
+                                                Text(
+                                                  '${_list[index].code}',
+                                                  textAlign: TextAlign.left,
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.w600,
+                                                    fontSize: 10,
+                                                    color: Color(0xff333333),
+                                                  ),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ],
+                                            ),
                                           ),
                                           const SizedBox(height: 5,),
                                           Visibility(
@@ -1571,52 +1545,22 @@ class _OrderScreenState extends State<OrderScreen> with TickerProviderStateMixin
                                             children: [
                                               Row(
                                                 children: [
-                                                  Container(
-                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                                                    decoration: BoxDecoration(
-                                                      color: const Color(0xfff5f5f5),
-                                                      borderRadius: BorderRadius.circular(8),
-                                                      border: Border.all(
-                                                        color: const Color(0xffe0e0e0),
-                                                        width: 1,
-                                                      ),
-                                                    ),
-                                                    child: Row(
-                                                      mainAxisSize: MainAxisSize.min,
-                                                      children: [
-                                                        const Icon(
-                                                          Icons.inventory_2,
-                                                          size: 12,
-                                                          color: Color(0xff666666),
-                                                        ),
-                                                        const SizedBox(width: 4),
-                                                        const Text(
-                                                          'Mã SP:',
-                                                          textAlign: TextAlign.left,
-                                                          style: TextStyle(
-                                                            fontWeight: FontWeight.w500,
-                                                            fontSize: 10,
-                                                            color: Color(0xff666666),
-                                                          ),
-                                                          maxLines: 1,
-                                                          overflow: TextOverflow.ellipsis,
-                                                        ),
-                                                        const SizedBox(width: 3),
-                                                        Text(
-                                                          '${_list[index].code}',
-                                                          textAlign: TextAlign.left,
-                                                          style: const TextStyle(
-                                                            fontWeight: FontWeight.w600,
-                                                            fontSize: 10,
-                                                            color: Color(0xff333333),
-                                                          ),
-                                                          maxLines: 1,
-                                                          overflow: TextOverflow.ellipsis,
-                                                        ),
-                                                      ],
-                                                    ),
+                                                  Text(
+                                                    'Tồn kho:',
+                                                    style: TextStyle(color: Colors.black.withOpacity(0.7), fontSize: 11),
+                                                    textAlign: TextAlign.left,
                                                   ),
-                                                  const SizedBox(width: 8,),
+                                                  const SizedBox(
+                                                    width: 5,
+                                                  ),
+                                                  Text("${_list[index].stockAmount?.toInt()??0}",
+                                                    style:const TextStyle(color: blue, fontSize: 12),
+                                                    textAlign: TextAlign.left,
+                                                  ),
+                                                ],
+                                              ),
+                                              Row(
+                                                children: [
                                                   Visibility(
                                                     visible: _list[index].discountPercent! > 0,
                                                     child: Container(
@@ -1675,20 +1619,75 @@ class _OrderScreenState extends State<OrderScreen> with TickerProviderStateMixin
                                                   ),
                                                 ],
                                               ),
-                                              Row(
+                                              Column(
                                                 children: [
+                                                  Const.isWoPrice == false ?
+                                                  (_list[index].price == _list[index].priceAfter && _list[index].price! > 0) ? Container() :
                                                   Text(
-                                                    'Tồn kho:',
-                                                    style: TextStyle(color: Colors.black.withOpacity(0.7), fontSize: 11),
+                                                    (currencyCode == "VND"
+                                                        ?
+                                                    Utils.formatMoneyStringToDouble(_list[index].price??0)
+                                                        :
+                                                    Utils.formatMoneyStringToDouble(_list[index].price??0)).toString().trim()
+                                                        == '0' ? 'Giá đang cập nhật' : (currencyCode == "VND"
+                                                        ?
+                                                    '${Utils.formatMoneyStringToDouble(_list[index].price??0)} ₫'
+                                                        :
+                                                    '${Utils.formatMoneyStringToDouble(_list[index].price??0)} ₫')
+                                                    ,
                                                     textAlign: TextAlign.left,
-                                                  ),
-                                                  const SizedBox(
-                                                    width: 5,
-                                                  ),
-                                                  Text("${_list[index].stockAmount?.toInt()??0}",
-                                                    style:const TextStyle(color: blue, fontSize: 12),
+                                                    style: TextStyle(color: grey, fontSize: 10, decoration: (currencyCode == "VND"
+                                                        ?
+                                                    Utils.formatMoneyStringToDouble(_list[index].price??0)
+                                                        :
+                                                    Utils.formatMoneyStringToDouble(_list[index].price??0)).toString().trim() == '0' ? TextDecoration.none : TextDecoration.lineThrough),
+                                                  )
+                                                      :
+                                                  (_list[index].woPrice == _list[index].woPriceAfter && _list[index].woPrice! > 0) ? Container() : Text(
+                                                    (currencyCode == "VND"
+                                                        ?
+                                                    Utils.formatMoneyStringToDouble(_list[index].woPrice??0)
+                                                        :
+                                                    Utils.formatMoneyStringToDouble(_list[index].woPrice??0)).toString().trim()
+                                                        == '0' ? 'Giá đang cập nhật' : (currencyCode == "VND"
+                                                        ?
+                                                    '${Utils.formatMoneyStringToDouble(_list[index].woPrice??0)} ₫'
+                                                        :
+                                                    '${Utils.formatMoneyStringToDouble(_list[index].woPrice??0)} ₫')
+                                                    ,
                                                     textAlign: TextAlign.left,
+                                                    style: TextStyle(color: grey, fontSize: 10, decoration: (currencyCode == "VND"
+                                                        ?
+                                                    Utils.formatMoneyStringToDouble(_list[index].woPrice??0)
+                                                        :
+                                                    Utils.formatMoneyStringToDouble(_list[index].woPrice??0)).toString().trim() == '0' ? TextDecoration.none : TextDecoration.lineThrough),
                                                   ),
+                                                  const SizedBox(height: 3,),
+                                                  Const.isWoPrice == false ? Visibility(
+                                                    visible: _list[index].price! > 0,
+                                                    child: Text(
+                                                      currencyCode == "VND"
+                                                          ?
+                                                      '${Utils.formatMoneyStringToDouble(_list[index].priceAfter??0)} ₫'
+                                                          :
+                                                      '${Utils.formatMoneyStringToDouble(_list[index].priceAfter??0)} ₫',
+                                                      textAlign: TextAlign.left,
+                                                      style:const TextStyle(color: Color(
+                                                          0xff067902), fontSize: 13,fontWeight: FontWeight.w700),
+                                                    ),
+                                                  ) : Visibility(
+                                                    visible: _list[index].woPrice! > 0,
+                                                    child: Text(
+                                                      currencyCode == "VND"
+                                                          ?
+                                                      '${Utils.formatMoneyStringToDouble(_list[index].woPriceAfter??0)} ₫'
+                                                          :
+                                                      '${Utils.formatMoneyStringToDouble(_list[index].woPriceAfter??0)} ₫',
+                                                      textAlign: TextAlign.left,
+                                                      style:const TextStyle(color: Color(
+                                                          0xff067902), fontSize: 13,fontWeight: FontWeight.w700),
+                                                    ),
+                                                  ) ,
                                                 ],
                                               ),
                                             ],

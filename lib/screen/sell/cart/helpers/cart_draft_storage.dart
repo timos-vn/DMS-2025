@@ -13,8 +13,10 @@ class CartDraftStorage {
 
   static Future<void> saveDraft(CartBloc bloc) async {
     try {
-      // Chỉ lưu nếu có sản phẩm hoặc hàng tặng
+      // ✅ QUAN TRỌNG: Nếu không có sản phẩm, xóa draft thay vì lưu
       if (bloc.listOrder.isEmpty && DataLocal.listProductGift.isEmpty) {
+        await clearDraft();
+        print('💾 Draft cleared because no products');
         return;
       }
 
@@ -70,6 +72,7 @@ class CartDraftStorage {
         typeDiscount: bloc.typeDiscount,
         discountAgency: bloc.discountAgency,
         chooseAgencyCode: bloc.chooseAgencyCode ? 1 : 0,
+        manualTotalDiscountPercent: bloc.manualTotalDiscountPercent,
       );
     } catch (e) {
       print('Error saving draft: $e');
@@ -78,7 +81,8 @@ class CartDraftStorage {
   }
 
   /// Khôi phục draft. Trả về true nếu khôi phục thành công.
-  static Future<bool> restoreDraft(CartBloc bloc) async {
+  /// [clearDiscounts] nếu true, sẽ không restore chiết khấu (dùng cho mode add)
+  static Future<bool> restoreDraft(CartBloc bloc, {bool clearDiscounts = false}) async {
     try {
       final draft = await _dbHelper.fetchCartDraftOrder();
       if (draft == null) {
@@ -94,6 +98,7 @@ class CartDraftStorage {
       print('💾 totalMoney: ${draft['totalMoney']}');
       print('💾 totalDiscount: ${draft['totalDiscount']}');
       print('💾 totalPayment: ${draft['totalPayment']}');
+      print('💾 manualTotalDiscountPercent: ${draft['manualTotalDiscountPercent']}');
       print('💾 customerName: ${draft['customerName']}');
       print('💾 codeCustomer: ${draft['codeCustomer']}');
       print('💾 typeDeliveryName: ${draft['typeDeliveryName']}');
@@ -142,9 +147,19 @@ class CartDraftStorage {
       bloc.listOrder
         ..clear()
         ..addAll(listOrder);
-      DataLocal.listProductGift
-        ..clear()
-        ..addAll(listGift);
+      
+      // ✅ QUAN TRỌNG: Chỉ restore sản phẩm tặng nếu có sản phẩm chính trong giỏ hàng
+      // Sản phẩm tặng không nên hiển thị khi chưa có sản phẩm chính
+      if (listOrder.isNotEmpty) {
+        DataLocal.listProductGift
+          ..clear()
+          ..addAll(listGift);
+        print('💾 ✅ Restored listProductGift because listOrder is not empty');
+      } else {
+        // Nếu không có sản phẩm chính, clear hết sản phẩm tặng
+        DataLocal.listProductGift.clear();
+        print('💾 ⚠️ Cleared listProductGift because listOrder is empty (no main products)');
+      }
       
       // ✅ Cập nhật số lượng sản phẩm trong giỏ hàng để badge hiển thị đúng
       // Badge ở OrderScreen sử dụng Const.numberProductInCart
@@ -164,17 +179,91 @@ class CartDraftStorage {
       print('💾   - bloc.totalPayment = ${bloc.totalPayment}');
       print('💾   - bloc.customerName = ${bloc.customerName}');
       print('💾   - bloc.codeCustomer = ${bloc.codeCustomer}');
-      DataLocal.listOrderCalculatorDiscount
-        ..clear()
-        ..addAll(listCalc);
-      DataLocal.listObjectDiscount
-        ..clear()
-        ..addAll(listObjDiscount);
+      
+      // ✅ QUAN TRỌNG: Nếu clearDiscounts == true (mode add), không restore chiết khấu
+      if (clearDiscounts) {
+        print('💾 ⚠️ clearDiscounts=true: NOT restoring discounts from draft');
+        DataLocal.listOrderCalculatorDiscount.clear();
+        DataLocal.listObjectDiscount.clear();
+        bloc.listPromotion = '';
+        DataLocal.listCKVT = '';
+        
+        // Clear chiết khấu trên từng sản phẩm trong listOrder
+        // ✅ QUAN TRỌNG: Chỉ clear chiết khấu tự động, GIỮ LẠI chiết khấu nhập tay
+        for (var product in bloc.listOrder) {
+          if (product.gifProduct == true) continue;
+          
+          // ✅ Nếu có chiết khấu nhập tay, giữ lại và tính lại priceAfter
+          if (product.discountByHand == true && product.discountPercentByHand != null && product.discountPercentByHand! > 0) {
+            double originalPrice = product.giaSuaDoi ?? product.price ?? 0;
+            product.priceAfter = originalPrice * (1 - product.discountPercentByHand! / 100);
+            product.ckntByHand = (originalPrice * (product.count ?? 0) * product.discountPercentByHand!) / 100;
+            // Clear chiết khấu tự động nhưng giữ chiết khấu nhập tay
+            product.discountPercent = 0;
+            product.maCk = null;
+            product.sttRecCK = null;
+            product.typeCK = null;
+            product.discountMoney = null;
+            product.discountProduct = null;
+          } else {
+            // Không có chiết khấu nhập tay, reset về giá gốc
+            double originalPrice = product.giaSuaDoi ?? product.price ?? 0;
+            product.priceAfter = originalPrice;
+            product.discountPercent = 0;
+            product.discountPercentByHand = 0;
+            product.discountByHand = false;
+            product.ckntByHand = 0;
+            product.maCk = null;
+            product.sttRecCK = null;
+            product.typeCK = null;
+            product.discountMoney = null;
+            product.discountProduct = null;
+          }
+        }
+      } else {
+        DataLocal.listOrderCalculatorDiscount
+          ..clear()
+          ..addAll(listCalc);
+        DataLocal.listObjectDiscount
+          ..clear()
+          ..addAll(listObjDiscount);
+        bloc.listPromotion = draft['listPromotion'] ?? '';
+        DataLocal.listCKVT = draft['listCKVT'] ?? '';
+      }
 
+      // ✅ QUAN TRỌNG: Sync chiết khấu byhand từ listOrder vào listProductOrderAndUpdate
+      // Đảm bảo chiết khấu byhand có trong listProductOrderAndUpdate để preserve khi call API tính chiết khấu
+      if (!clearDiscounts && bloc.listOrder.isNotEmpty && bloc.listProductOrderAndUpdate.isNotEmpty) {
+        print('💾 Syncing manual discount from listOrder to listProductOrderAndUpdate...');
+        for (var item in bloc.listOrder) {
+          if (item.discountByHand == true && (item.discountPercentByHand ?? 0) > 0 && item.code != null) {
+            // Tìm sản phẩm tương ứng trong listProductOrderAndUpdate
+            for (var element in bloc.listProductOrderAndUpdate) {
+              if (element.code != null && element.code.toString().trim() == item.code!.trim()) {
+                // Sync chiết khấu byhand vào listProductOrderAndUpdate
+                element.discountByHand = 1;
+                element.discountPercentByHand = item.discountPercentByHand;
+                element.ckntByHand = item.ckntByHand ?? 0;
+                element.priceAfter = item.priceAfter;
+                print('💾 ✅ Synced manual discount for ${element.code}: discountPercentByHand=${element.discountPercentByHand}, ckntByHand=${element.ckntByHand}');
+                break;
+              }
+            }
+          }
+        }
+      }
+      
       // Restore totals
       bloc.totalMoney = (draft['totalMoney'] ?? 0).toDouble();
-      bloc.totalDiscount = (draft['totalDiscount'] ?? 0).toDouble();
-      bloc.totalPayment = (draft['totalPayment'] ?? 0).toDouble();
+      if (clearDiscounts) {
+        // Nếu clear discounts, reset tổng tiền về tổng giá gốc
+        bloc.totalDiscount = 0;
+        bloc.totalDiscountForOder = 0;
+        bloc.totalPayment = bloc.totalMoney;
+      } else {
+        bloc.totalDiscount = (draft['totalDiscount'] ?? 0).toDouble();
+        bloc.totalPayment = (draft['totalPayment'] ?? 0).toDouble();
+      }
       bloc.totalTax = (draft['totalTax'] ?? 0).toDouble();
       bloc.totalTax2 = (draft['totalTax2'] ?? 0).toDouble();
       bloc.totalMoneyProductGift = (draft['totalMoneyProductGift'] ?? 0).toDouble();
@@ -189,8 +278,6 @@ class CartDraftStorage {
 
       // Restore misc
       DataLocal.noteSell = draft['noteSell'] ?? '';
-      bloc.listPromotion = draft['listPromotion'] ?? '';
-      DataLocal.listCKVT = draft['listCKVT'] ?? '';
 
       // Restore customer info
       bloc.customerName = draft['customerName'] ?? '';
@@ -226,6 +313,11 @@ class CartDraftStorage {
       bloc.typeDiscount = draft['typeDiscount'] ?? '';
       bloc.discountAgency = (draft['discountAgency'] ?? 0).toDouble();
       bloc.chooseAgencyCode = (draft['chooseAgencyCode'] ?? 0) == 1;
+
+      // ✅ QUAN TRỌNG: Restore manualTotalDiscountPercent (chiết khấu tổng đơn bằng tay cho freeDiscount)
+      // Đảm bảo restore ngay cả khi clearDiscounts: true (vì đây là chiết khấu bằng tay, không phải chiết khấu tự động)
+      bloc.manualTotalDiscountPercent = (draft['manualTotalDiscountPercent'] ?? 0).toDouble();
+      print('💾 ✅ Restored manualTotalDiscountPercent: ${bloc.manualTotalDiscountPercent}% (even with clearDiscounts=$clearDiscounts)');
 
       return true;
     } catch (e) {

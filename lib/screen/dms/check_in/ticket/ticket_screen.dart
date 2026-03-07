@@ -176,6 +176,7 @@ class _TicketScreenState extends State<TicketScreen> {
                 child: Scaffold(
                   backgroundColor: Colors.white,
                   floatingActionButton: (widget.view == false && widget.isCheckInSuccess == false && Const.ticketCheckIn == true) ? FloatingActionButton(
+                    heroTag: 'ticket_fab', // ✅ Unique tag để tránh lỗi Hero
                     backgroundColor: subColor,
                     onPressed: (){
                       PersistentNavBarNavigator.pushNewScreen(context, screen: AddNewTicketScreen(

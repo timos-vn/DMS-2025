@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:camera/camera.dart';
 import 'package:dms/screen/personnel/proposal/proposal_bloc.dart';
@@ -54,6 +55,11 @@ class _DynamicCRUDScreenState extends State<DynamicScreen> {
   TextEditingController businessContactNameEditingController = TextEditingController();
   TextEditingController businessContactPhoneEditingController = TextEditingController();
   TextEditingController businessPurposeEditingController = TextEditingController();
+  // CheckinExplan new fields (giống BusinessTrip)
+  TextEditingController checkinAddressEditingController = TextEditingController();
+  TextEditingController checkinContactNameEditingController = TextEditingController();
+  TextEditingController checkinContactPhoneEditingController = TextEditingController();
+  TextEditingController checkinPurposeEditingController = TextEditingController();
   List<Map<String, dynamic>> fieldsConvert = [];
 
   Map<String, List<Map<String, dynamic>>> tableData = {};
@@ -93,6 +99,21 @@ class _DynamicCRUDScreenState extends State<DynamicScreen> {
   bool isDateFromSelected = false;
   bool isDateRequestSelected = false;
 
+  /// Tính số ngày nghỉ (đơn vị ngày, bước 0.5) theo ca:
+  /// - 1 = Buổi sáng
+  /// - 2 = Buổi chiều
+  /// Quy ước:
+  /// - Nếu bắt đầu buổi chiều -> trừ 0.5 ngày
+  /// - Nếu kết thúc buổi sáng -> trừ 0.5 ngày
+  double _calculateDayOffDays() {
+    final int totalDays = dateTo.difference(dateFrom).inDays + 1;
+    final int totalHalfDays = totalDays * 2;
+    final int minusStart = (isMorningFrom == 2) ? 1 : 0;
+    final int minusEnd = (isMorningTo == 1) ? 1 : 0;
+    final int halfDays = math.max(0, totalHalfDays - minusStart - minusEnd);
+    return halfDays * 0.5;
+  }
+
   Map<String, TextEditingController> controllers = {};
   GlobalKey<FormState> formKey = GlobalKey<FormState>();
 
@@ -109,6 +130,11 @@ class _DynamicCRUDScreenState extends State<DynamicScreen> {
     super.initState();
     dateFrom = dateFormat.parse(DateTime.now().toString());
     dateTo = dateFormat.parse(DateTime.now().toString());
+    // Với DayOff: dateFrom/dateTo đã có default => cho phép chọn "Đến ngày" ngay,
+    // tránh bị chặn bởi flag isDateFromSelected=false.
+    if (widget.controller.contains('DayOff')) {
+      isDateFromSelected = true;
+    }
     _bloc = ProposalBloc(context);
     _bloc.add(GetPrefsProposal());
   }
@@ -288,6 +314,7 @@ class _DynamicCRUDScreenState extends State<DynamicScreen> {
               requestOtherEditingController.text =  _bloc.formFixData.requestOther.toString().replaceAll('null', '');
               nameCustomerEditingController.text =  _bloc.formFixData.nameCustomer.toString().replaceAll('null', '');
               phoneCustomerEditingController.text =  _bloc.formFixData.phoneCustomer.toString().replaceAll('null', '');
+              // businessAddressEditingController.text =  _bloc.formFixData.diaChiDen.toString().replaceAll('null', '');
               isCheckRequest =  _bloc.formFixData.request??false;
               isCheckHQBK =  _bloc.formFixData.request??false;
               isCheckDU =  _bloc.formFixData.request??false;
@@ -295,10 +322,17 @@ class _DynamicCRUDScreenState extends State<DynamicScreen> {
               
               // Load BusinessTrip new fields
               if(widget.controller.contains('BusinessTrip')){
-                businessAddressEditingController.text = _bloc.formFixData.diaChiDen?.toString().replaceAll('null', '') ?? '';
-                businessContactNameEditingController.text = _bloc.formFixData.tenNguoiGap?.toString().replaceAll('null', '') ?? '';
-                businessContactPhoneEditingController.text = _bloc.formFixData.sdtNguoiGap?.toString().replaceAll('null', '') ?? '';
-                businessPurposeEditingController.text = _bloc.formFixData.mucDich?.toString().replaceAll('null', '') ?? '';
+                businessAddressEditingController.text = _bloc.formFixData.diaChiDen.toString().replaceAll('null', '');
+                businessContactNameEditingController.text = _bloc.formFixData.tenNguoiGap.toString().replaceAll('null', '');
+                businessContactPhoneEditingController.text = _bloc.formFixData.sdtNguoiGap.toString().replaceAll('null', '');
+                businessPurposeEditingController.text = _bloc.formFixData.mucDich.toString().replaceAll('null', '');
+              }
+              // Load CheckinExplan new fields (giống BusinessTrip)
+              if(widget.controller.contains('CheckinExplan')){
+                checkinAddressEditingController.text = _bloc.formFixData.diaChiDen.toString().replaceAll('null', '');
+                checkinContactNameEditingController.text = _bloc.formFixData.tenNguoiGap.toString().replaceAll('null', '');
+                checkinContactPhoneEditingController.text = _bloc.formFixData.sdtNguoiGap.toString().replaceAll('null', '');
+                checkinPurposeEditingController.text = _bloc.formFixData.mucDich.toString().replaceAll('null', '');
               }
             }
 
@@ -558,8 +592,7 @@ class _DynamicCRUDScreenState extends State<DynamicScreen> {
       });formValues.add({
         "variable": "so_ngay",
         "type": "Decimal",
-        "value": ((((dateTo.difference(dateFrom).inDays) + 1) * 2) -
-            (isMorningFrom == 0 ? 1 : 0) - (isMorningTo == 1 ? 1 : 0)) * 0.5,
+        "value": _calculateDayOffDays(),
       });
     }
     else if(widget.controller.contains('OverTime') && action == 1){
@@ -631,6 +664,27 @@ class _DynamicCRUDScreenState extends State<DynamicScreen> {
         "variable": "ly_do",
         "type": "Text",
         "value": descEditingController.text,
+      });
+      // New fields for CheckinExplan (giống BusinessTrip)
+      formValues.add({
+        "variable": "dia_chi_den",
+        "type": "Text",
+        "value": checkinAddressEditingController.text.toString(),
+      });
+      formValues.add({
+        "variable": "ten_nguoi_gap",
+        "type": "Text",
+        "value": checkinContactNameEditingController.text.toString(),
+      });
+      formValues.add({
+        "variable": "sdt_nguoi_gap",
+        "type": "Text",
+        "value": checkinContactPhoneEditingController.text.toString(),
+      });
+      formValues.add({
+        "variable": "muc_dich",
+        "type": "Text",
+        "value": checkinPurposeEditingController.text.toString(),
       });
       formValues.add({
         "variable": "status",
@@ -1453,10 +1507,8 @@ class _DynamicCRUDScreenState extends State<DynamicScreen> {
                       ),
                     ),
                     child: Text((
-                        ((dateTo.difference(dateFrom).inDays + 1) * 2 -
-                            (isMorningFrom == 2 ? 1 : 0) - (isMorningTo == 1 ? 1 : 0)) * 0.5
-                    )
-          .toString(),
+                        _calculateDayOffDays()
+                    ).toString(),
                         style: const TextStyle(color: Colors.black,fontSize: 12),maxLines: 1,overflow: TextOverflow.ellipsis),
                   )
               )
@@ -2000,6 +2052,250 @@ class _DynamicCRUDScreenState extends State<DynamicScreen> {
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(5),
               ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Section: Thông tin địa điểm
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.1),
+                  spreadRadius: 1,
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: kSecondaryColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.place, color: kSecondaryColor, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text(
+                      "Thông tin địa điểm",
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  maxLines: 2,
+                  controller: checkinAddressEditingController,
+                  style: const TextStyle(fontSize: 15),
+                  decoration: InputDecoration(
+                    labelText: 'Địa điểm',
+                    hintText: 'Nhập địa điểm...',
+                    hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
+                    prefixIcon: const Icon(Icons.place, size: 20),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: kSecondaryColor, width: 2),
+                    ),
+                    filled: true,
+                    fillColor: Colors.grey.shade50,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Section: Thông tin người gặp
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.1),
+                  spreadRadius: 1,
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.person, color: Colors.blue, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text(
+                      "Thông tin người gặp",
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: checkinContactNameEditingController,
+                  style: const TextStyle(fontSize: 15),
+                  decoration: InputDecoration(
+                    labelText: 'Tên & Chức vụ',
+                    hintText: 'Nhập tên & chức vụ người gặp...',
+                    hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
+                    prefixIcon: const Icon(Icons.badge, size: 20),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: kSecondaryColor, width: 2),
+                    ),
+                    filled: true,
+                    fillColor: Colors.grey.shade50,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: checkinContactPhoneEditingController,
+                  keyboardType: TextInputType.phone,
+                  maxLength: 10,
+                  style: const TextStyle(fontSize: 15),
+                  decoration: InputDecoration(
+                    labelText: 'Số điện thoại',
+                    hintText: 'Nhập số điện thoại...',
+                    hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
+                    prefixIcon: const Icon(Icons.phone, size: 20),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: kSecondaryColor, width: 2),
+                    ),
+                    filled: true,
+                    fillColor: Colors.grey.shade50,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    counterText: '',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Section: Mục đích & Nội dung
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.1),
+                  spreadRadius: 1,
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.description, color: Colors.green, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text(
+                      "Mục đích & Nội dung",
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  maxLines: 3,
+                  controller: checkinPurposeEditingController,
+                  style: const TextStyle(fontSize: 15),
+                  decoration: InputDecoration(
+                    labelText: 'Mục đích',
+                    hintText: 'Nhập mục đích...',
+                    hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
+                    prefixIcon: const Padding(
+                      padding: EdgeInsets.only(bottom: 40),
+                      child: Icon(Icons.flag, size: 20),
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: kSecondaryColor, width: 2),
+                    ),
+                    filled: true,
+                    fillColor: Colors.grey.shade50,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  ),
+                ),
+              ],
             ),
           ),
         ],

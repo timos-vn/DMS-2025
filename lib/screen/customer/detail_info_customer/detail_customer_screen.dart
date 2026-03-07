@@ -645,16 +645,18 @@ class _DetailInfoCustomerScreenState extends State<DetailInfoCustomerScreen> {
         title: 'Đặt đơn',
         icon: MdiIcons.cartOutline,
         color: mainColor,
-        onTap: () => PersistentNavBarNavigator.pushNewScreen(
-          context,
-          screen: OrderScreen(
-            nameCustomer: _bloc.detailCustomer.customerName,
-            phoneCustomer: _bloc.detailCustomer.phone,
-            addressCustomer: _bloc.detailCustomer.address,
-            codeCustomer: _bloc.detailCustomer.customerCode,
-          ),
-          withNavBar: false,
-        ),
+        onTap: () {
+          PersistentNavBarNavigator.pushNewScreen(
+            context,
+            screen: OrderScreen(
+              nameCustomer: _bloc.detailCustomer.customerName,
+              phoneCustomer: _bloc.detailCustomer.phone,
+              addressCustomer: _bloc.detailCustomer.address,
+              codeCustomer: _bloc.detailCustomer.customerCode,
+            ),
+            withNavBar: false,
+          );
+        }
       ));
     }
     

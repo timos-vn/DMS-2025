@@ -8,7 +8,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/painting.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import 'package:dms/model/entity/app_settings.dart';
@@ -62,7 +61,11 @@ class _DetailCheckInScreenState extends State<DetailCheckInScreen> with TickerPr
   late CheckInBloc _bloc;
   late TabController tabController;
   final format = DateFormat.jm();
+  int _currentTabIndex = 0; // ✅ Track tab hiện tại để chỉ render tab active
 
+  // ✅ Lưu tọa độ GPS để dùng khi check-out
+  double? _customerLat;
+  double? _customerLong;
 
   final GlobalKey<AlbumImageScreenState> _imageScreenState = GlobalKey();
 
@@ -79,14 +82,29 @@ class _DetailCheckInScreenState extends State<DetailCheckInScreen> with TickerPr
         statusBarIconBrightness: Brightness.dark,
         statusBarColor: Colors.transparent
     ));
-
+    print('GPS: ${widget.item.gps}');
     Const.selectedAlbumLock = false;
     tabController = TabController(length: listTabView.length, vsync: this);
+    tabController.addListener(() {
+      if (tabController.indexIsChanging) {
+        setState(() {
+          _currentTabIndex = tabController.index;
+        });
+      }
+    });
     _bloc = CheckInBloc(context);
+    final String gpsRaw = (widget.item.gps ?? '').toString().replaceAll('null', '').trim();
+    // ✅ Parse và lưu tọa độ GPS khách hàng
+    if (gpsRaw.contains(',') && gpsRaw.split(',').length == 2) {
+      final parts = gpsRaw.split(',');
+      _customerLat = double.tryParse(parts[0].trim());
+      _customerLong = double.tryParse(parts[1].trim());
+    }
+    // ✅ Không chặn khi GPS null - vẫn cho phép checkout bình thường
     _bloc.getUserLocation(
-        lat: widget.item.gps.toString().replaceAll('null', '').isNotEmpty ? double.parse(widget.item.gps.toString().split(',').first) : 0,
-        long: widget.item.gps.toString().replaceAll('null', '').isNotEmpty ? double.parse(widget.item.gps.toString().split(',').last) : 0,
-        isCheck: widget.isGpsFormCustomer && widget.item.gps.toString().replaceAll('null', '').isNotEmpty
+      lat: _customerLat ?? 0,
+      long: _customerLong ?? 0,
+      isCheck: widget.isGpsFormCustomer && _customerLat != null && _customerLong != null,
     );
     _bloc.add(GetPrefsCheckIn());
 
@@ -245,7 +263,7 @@ class _DetailCheckInScreenState extends State<DetailCheckInScreen> with TickerPr
                                 const Icon(Icons.alarm,color: subColor,size: 18,),
                                 const SizedBox(width: 5,),
                                 Expanded(
-                                  child: Text('Time check-in:',style: GoogleFonts.montserrat(
+                                  child: Text('Time check-in:',style: const TextStyle(
                                           color: Colors.black,
                                           fontSize: 13,),),
                                 ),
@@ -256,7 +274,7 @@ class _DetailCheckInScreenState extends State<DetailCheckInScreen> with TickerPr
                                     :
                                 Utils.parseStringDateToString(DataLocal.dateTimeStartCheckIn,Const.DATE_SV ,Const.TIME).toString())
                                     ,
-                                    style: GoogleFonts.montserrat(
+                                    style: TextStyle(
                                       color:widget.view == true ? Colors.grey :  Colors.black,
                                       fontSize: 13,)),
                               ],
@@ -267,7 +285,7 @@ class _DetailCheckInScreenState extends State<DetailCheckInScreen> with TickerPr
                                 const Icon(Icons.alarm_off,color: subColor,size: 18,),
                                 const SizedBox(width: 5,),
                                 Expanded(
-                                  child: Text('Time check-out:',style: GoogleFonts.montserrat(
+                                  child: Text('Time check-out:',style: const TextStyle(
                                     color: Colors.black,
                                     fontSize: 13,),),
                                 ),
@@ -278,7 +296,7 @@ class _DetailCheckInScreenState extends State<DetailCheckInScreen> with TickerPr
                                     //     :
                                     ((widget.tgHoanThanh.toString() != 'null' && widget.tgHoanThanh.toString() != '') ?
                                     Utils.parseDateTToString(widget.tgHoanThanh.toString(), Const.TIME) : 'Locked'),
-                                    style: GoogleFonts.montserrat(color: widget.view == true ? Colors.grey : ( _bloc.openStore == true ? Colors.black : Colors.blueGrey),
+                                    style: TextStyle(color: widget.view == true ? Colors.grey : ( _bloc.openStore == true ? Colors.black : Colors.blueGrey),
                                   fontSize: 13,decoration: _bloc.openStore == true ? TextDecoration.none : TextDecoration.lineThrough)),
                               ],
                             ),
@@ -341,51 +359,47 @@ class _DetailCheckInScreenState extends State<DetailCheckInScreen> with TickerPr
                 Expanded(
                   child: Container(
                     color: Colors.white,
-                    child: TabBarView(
-                        controller: tabController,
-                        children: List<Widget>.generate(listTabView.length, (int index) {
-                          if (index == 0) {
-                            return InventoryControlScreen(
-                              // isToday: widget.isToday,
-                              idCheckIn: widget.idCheckIn,
-                              idCustomer: widget.item.maKh.toString(),
-                              view: widget.view,
-                              isCheckInSuccess: widget.isCheckInSuccess,
-                            );
-                          }else if(index == 1){
-                            return AlbumImageScreen(
-                              key: _imageScreenState,
-                              isCheckInSuccess: widget.isCheckInSuccess,
-                              idCheckIn: widget.idCheckIn,
-                              idCustomer: widget.item.maKh.toString(),
-                              view: widget.view,
-                              // listAlbum: Const.checkInOnline == true ? _bloc.listAlbum : widget.listAlbumOffline,
-                              isSynSuccess: widget.isSynSuccess,
-                            );
-                          }
-                          else if(index == 2){
-                            return TicketScreen(
-                              isCheckInSuccess: widget.isCheckInSuccess,
-                              isSynSuccess: widget.isSynSuccess,
-                              idCustomer: widget.item.maKh.toString(),
-                              idCheckIn: widget.idCheckIn,
-                              listAlbumTicketOffLine: Const.checkInOnline == true ? _bloc.listTicket : widget.listAlbumTicketOffLine,
-                              view: widget.view,
-                            );
-                          }
-                          else{
-                            return OrderFromCheckInScreen(
-                              nameCustomer: widget.item.tenCh.toString().trim(),
-                              phoneCustomer: widget.item.dienThoai.toString(),
-                              addressCustomer: widget.item.diaChi.toString(),
-                              isCheckInSuccess: widget.isCheckInSuccess,
-                              idCheckIn: widget.idCheckIn,
-                              idCustomer: widget.item.maKh.toString(),
-                              view: widget.view,
-                              nameStore: widget.item.tieuDe.toString().trim(),
-                            );
-                          }
-                        })),
+                    child: IndexedStack(
+                      index: tabController.index,
+                      children: [
+                        // Tab 0: Kiểm tồn
+                        InventoryControlScreen(
+                          idCheckIn: widget.idCheckIn,
+                          idCustomer: widget.item.maKh.toString(),
+                          view: widget.view,
+                          isCheckInSuccess: widget.isCheckInSuccess,
+                        ),
+                        // Tab 1: Hình ảnh
+                        AlbumImageScreen(
+                          key: _imageScreenState,
+                          isCheckInSuccess: widget.isCheckInSuccess,
+                          idCheckIn: widget.idCheckIn,
+                          idCustomer: widget.item.maKh.toString(),
+                          view: widget.view,
+                          isSynSuccess: widget.isSynSuccess,
+                        ),
+                        // Tab 2: Ticket
+                        TicketScreen(
+                          isCheckInSuccess: widget.isCheckInSuccess,
+                          isSynSuccess: widget.isSynSuccess,
+                          idCustomer: widget.item.maKh.toString(),
+                          idCheckIn: widget.idCheckIn,
+                          listAlbumTicketOffLine: Const.checkInOnline == true ? _bloc.listTicket : widget.listAlbumTicketOffLine,
+                          view: widget.view,
+                        ),
+                        // Tab 3: Đặt đơn
+                        OrderFromCheckInScreen(
+                          nameCustomer: widget.item.tenCh.toString().trim(),
+                          phoneCustomer: widget.item.dienThoai.toString(),
+                          addressCustomer: widget.item.diaChi.toString(),
+                          isCheckInSuccess: widget.isCheckInSuccess,
+                          idCheckIn: widget.idCheckIn,
+                          idCustomer: widget.item.maKh.toString(),
+                          view: widget.view,
+                          nameStore: widget.item.tieuDe.toString().trim(),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 Visibility(
@@ -466,10 +480,18 @@ class _DetailCheckInScreenState extends State<DetailCheckInScreen> with TickerPr
             child: GestureDetector(
               onTap: ()async{
                 if(widget.isCheckInSuccess == false && widget.view == false){
-                  if(widget.isGpsFormCustomer && widget.item.gps.toString().replaceAll('null', '').isNotEmpty){
+                  // ✅ Nếu GPS null → vẫn check thời gian, nhưng không check khoảng cách
+                  // ✅ Nếu GPS có và isGpsFormCustomer → check cả khoảng cách và thời gian
+                  if(widget.isGpsFormCustomer && _customerLat != null && _customerLong != null && widget.item.gps.toString().replaceAll('null', '').isNotEmpty){
+                    // GPS có → check khoảng cách (trong validation sẽ check thời gian ở logic())
                     _handleCheckInWithLocationValidation();
                   }else{
-                    _bloc.add(GetImageLocalEvent());
+                    // GPS null → chỉ check thời gian trước khi lấy ảnh
+                    if(_checkMinimumTimeForCheckOut()){
+                      _bloc.add(GetImageLocalEvent());
+                    }else{
+                      Utils.showCustomToast(context, Icons.warning_amber_outlined, 'Úi, Bạn chưa đủ thời gian check-in tại 1 địa điểm');
+                    }
                   }
                 }
               },
@@ -477,7 +499,7 @@ class _DetailCheckInScreenState extends State<DetailCheckInScreen> with TickerPr
                 padding: EdgeInsets.only(top: 12),
                 child: SizedBox(
                   height: 35,
-                  width: 40,
+                  width: 40,  
                   child: Icon(Icons.exit_to_app,color: Colors.blueGrey),
                 ),
               ),
@@ -493,6 +515,33 @@ class _DetailCheckInScreenState extends State<DetailCheckInScreen> with TickerPr
   // List<ImageCheckIn> listImageCheckIn=[];
   String nameAlbum = '';
 
+  /// ✅ Kiểm tra thời gian tối thiểu được phép check-out
+  bool _checkMinimumTimeForCheckOut() {
+    // ✅ Nếu chưa có thời gian check-in → không cho checkout
+    if (DataLocal.dateTimeStartCheckIn.isEmpty) {
+      print('⚠️ dateTimeStartCheckIn is empty - cannot check out');
+      return false;
+    }
+
+    try {
+      final checkInTime = Utils.parseStringToDate(DataLocal.dateTimeStartCheckIn, Const.DATE_SV);
+      final minimumTime = checkInTime.add(Duration(minutes: widget.numberTimeCheckOut));
+      final now = DateTime.now();
+      final canCheckOut = now.isAfter(minimumTime);
+      
+      print('📅 Check-in time: $checkInTime');
+      print('⏰ Minimum time required: $minimumTime (${widget.numberTimeCheckOut} minutes)');
+      print('🕐 Current time: $now');
+      print('✅ Can check out: $canCheckOut');
+      
+      return canCheckOut;
+    } catch (e) { 
+      print('❌ Error checking minimum time: $e');
+      // ✅ Nếu lỗi parse → không cho checkout để đảm bảo an toàn
+      return false;
+    }
+  }
+
   logic(){
     if(_bloc.openStore == false){
       if(DataLocal.addImageToAlbumRequest ==true){
@@ -503,7 +552,8 @@ class _DetailCheckInScreenState extends State<DetailCheckInScreen> with TickerPr
       }
     }
     else {
-      if(true/*DateTime.now().isAfter(Utils.parseStringToDate(DataLocal.dateTimeStartCheckIn, Const.DATE_SV).add(Duration(minutes: widget.numberTimeCheckOut)))*/){
+      // ✅ Check thời gian tối thiểu được phép check-out
+      if(_checkMinimumTimeForCheckOut()){
         if(DataLocal.addImageToAlbum == true ){
           bool lock = false;
           for (var item in DataLocal.listItemAlbum) {
@@ -528,7 +578,8 @@ class _DetailCheckInScreenState extends State<DetailCheckInScreen> with TickerPr
         else{
           Utils.showCustomToast(context, Icons.warning_amber_outlined, 'Úi, Hãy thêm ảnh vào Album của bạn.');
         }
-      }else{
+      }
+      else{
         Utils.showCustomToast(context, Icons.warning_amber_outlined, 'Úi, Bạn chưa đủ thời gian check-in tại 1 địa điểm');
       }
     }
@@ -636,7 +687,7 @@ class _DetailCheckInScreenState extends State<DetailCheckInScreen> with TickerPr
   void _showLocationErrorDialogInDetail(CheckInValidationResult validation) {
     String message = validation.error ?? 'Lỗi không xác định';
     bool showRetry = validation.showRetry;
-    
+
     showDialog(
       context: context,
       builder: (BuildContext context) => AlertDialog(

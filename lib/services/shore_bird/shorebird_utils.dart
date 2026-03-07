@@ -70,14 +70,18 @@ class ShorebirdUtils {
       context: context,
       barrierDismissible: false,
       builder: (context) {
-        return UtilsWidget.dialogUpdateShorebird(
-          contentNotification: description,
-          fuc: () async {
-            await Restart.restartApp(
-              notificationTitle: "Khởi động lại ứng dụng",
-              notificationBody: "Vui lòng bấm vào đây để mở lại ứng dụng",
-            );
-          },
+        // ✅ Force dialog: không cho back để đóng dialog, bắt buộc user bấm "Đồng ý"
+        return PopScope(
+          canPop: false,
+          child: UtilsWidget.dialogUpdateShorebird(
+            contentNotification: description,
+            fuc: () async {
+              await Restart.restartApp(
+                notificationTitle: "Khởi động lại ứng dụng",
+                notificationBody: "Vui lòng bấm vào đây để mở lại ứng dụng",
+              );
+            },
+          ),
         );
       },
     );

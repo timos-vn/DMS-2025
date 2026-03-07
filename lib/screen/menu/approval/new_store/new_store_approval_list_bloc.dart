@@ -131,6 +131,21 @@ class NewStoreApprovalListBloc
     if (event.status != null) {
       _status = event.status;
     }
+    // ✅ Emit state để trigger rebuild filter bar ngay lập tức
+    // Giữ nguyên state hiện tại để UI rebuild với filter mới
+    final currentState = state;
+    if (_items.isNotEmpty) {
+      emit(NewStoreApprovalListSuccess(
+        items: List.unmodifiable(_items),
+        canLoadMore: canLoadMore,
+        isRefresh: false,
+      ));
+    } else if (currentState is NewStoreApprovalListEmpty) {
+      emit(NewStoreApprovalListEmpty());
+    } else {
+      emit(const NewStoreApprovalListLoading());
+    }
+    // Sau đó fetch lại với filter mới
     add(const NewStoreApprovalListFetch(isRefresh: true));
   }
 

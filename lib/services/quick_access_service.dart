@@ -15,8 +15,24 @@ class QuickAccessService {
   List<QuickAccessFeature> getQuickAccessFeatures() {
     try {
       final List<dynamic> savedData = _storage.read(_storageKey) ?? [];
+      // ✅ Hydrate icon/route from the canonical feature list (SearchService).
+      // This avoids "?" icons when legacy saved data stores icon codepoints
+      // that are not tree-shake safe / not in QuickAccessFeature._iconMap.
+      final available = _searchService.getAvailableQuickAccessFeatures();
+      final byId = {for (final f in available) f.id: f};
+
       final savedFeatures = savedData
           .map((data) => QuickAccessFeature.fromJson(data))
+          .map((saved) {
+            final canonical = byId[saved.id];
+            if (canonical == null) return saved;
+            return saved.copyWith(
+              // Always use canonical icon + route to ensure correct navigation/icon rendering
+              icon: canonical.icon,
+              route: canonical.route,
+              // Keep the saved title/order/enabled state
+            );
+          })
           .where((feature) => feature.isEnabled)
           .toList();
 

@@ -110,6 +110,13 @@ class _DetailShippingScreenState extends State<DetailShippingScreen> {
             Utils.showCustomToast(context, Icons.check_circle_outline, state.error.toString().trim());
           }
           else if(state is UpdateLocationAndImageSuccess){
+            // ✅ Đóng popup progress khi upload thành công
+            if (_isUploadProgressDialogShowing) {
+              Navigator.of(context).pop();
+              _isUploadProgressDialogShowing = false;
+              _currentProgress = 0.0;
+              _currentMessage = '';
+            }
             _bloc.add(ConfirmShippingEvent(
                 sstRec:  _bloc.masterItem?.sttRec,
                 status: int.parse(idStatus),
@@ -654,7 +661,7 @@ class _DetailShippingScreenState extends State<DetailShippingScreen> {
                                         ),
                                         child: Center(
                                           child: _isImageLoading 
-                                            ? Row( // ✅ Hiển thị loading indicator
+                                            ? const Row( // ✅ Hiển thị loading indicator
                                                 mainAxisAlignment: MainAxisAlignment.center,
                                                 children: [
                                                   SizedBox(
@@ -665,8 +672,8 @@ class _DetailShippingScreenState extends State<DetailShippingScreen> {
                                                       valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                                                     ),
                                                   ),
-                                                  const SizedBox(width: 8),
-                                                  const Text(
+                                                  SizedBox(width: 8),
+                                                  Text(
                                                     'Đang xử lý ảnh...',
                                                     style: TextStyle(fontSize: 14, color: white),
                                                   ),
@@ -711,6 +718,8 @@ class _DetailShippingScreenState extends State<DetailShippingScreen> {
   }
 
   void createTicket(){
+    // Mỗi lần bắt đầu upload mới thì cho phép hiển thị lại dialog progress
+    _userClosedUploadDialog = false;
     if(Const.isDeliveryPhotoRange){
       // ✅ Sử dụng method validation
       if (!_validateImageData()) {
@@ -770,22 +779,9 @@ class _DetailShippingScreenState extends State<DetailShippingScreen> {
         return false;
       }
       
-      // ✅ Kiểm tra base64 encoding có thành công không (chỉ test, không lưu)
-      String? base64Result = Utils.base64Image(file);
-      if (base64Result == null || base64Result.isEmpty) {
-        debugPrint('❌ Base64 encoding test failed');
-        return false;
-      }
-      
-      if (base64Result.length < 100) {
-        debugPrint('❌ Base64 test result too short: ${base64Result.length} chars');
-        return false;
-      }
-      
       debugPrint('✅ Image file validation passed:');
       debugPrint('   - File size: $fileSize bytes');
       debugPrint('   - Bytes length: ${bytes.length}');
-      debugPrint('   - Base64 test length: ${base64Result.length} (will be regenerated on upload)');
       
       return true;
       
@@ -799,7 +795,7 @@ class _DetailShippingScreenState extends State<DetailShippingScreen> {
   bool _validateImageData() {
     debugPrint('🔍 Validating image data:');
     debugPrint('   - Files count: ${_bloc.listFileInvoice.length}');
-    debugPrint('   - Base64 count: ${_bloc.listFileInvoiceSave.length}');
+    debugPrint('   - Metadata count: ${_bloc.listFileInvoiceSave.length}');
     
     // Kiểm tra có ảnh không
     if (_bloc.listFileInvoice.isEmpty) {
@@ -807,26 +803,10 @@ class _DetailShippingScreenState extends State<DetailShippingScreen> {
       return false;
     }
     
-    // Kiểm tra có base64 data không
-    if (_bloc.listFileInvoiceSave.isEmpty) {
-      debugPrint('❌ No base64 data found');
-      return false;
-    }
-    
-    // Kiểm tra tính nhất quán
+    // Kiểm tra tính nhất quán giữa file và metadata (để đồng bộ với các luồng khác)
     if (_bloc.listFileInvoice.length != _bloc.listFileInvoiceSave.length) {
       debugPrint('❌ Data inconsistency detected');
       return false;
-    }
-    
-    // ✅ Kiểm tra từng base64 có hợp lệ không (có thể null nếu chưa gen)
-    for (int i = 0; i < _bloc.listFileInvoiceSave.length; i++) {
-      final base64Data = _bloc.listFileInvoiceSave[i].pathBase64;
-      // ✅ Base64 có thể null nếu chưa được gen (lazy loading)
-      if (base64Data != null && base64Data.isEmpty) {
-        debugPrint('❌ Empty base64 data at index $i');
-        return false;
-      }
     }
     
     debugPrint('✅ All image data is valid');
@@ -940,14 +920,14 @@ class _DetailShippingScreenState extends State<DetailShippingScreen> {
             waitingLoad = true;
             startTimer(myState);
             
-            // ✅ Chỉ lưu file, không gen base64 ngay (tối ưu performance)
+            // ✅ Chỉ lưu file và metadata (không gen base64 vì không cần cho multipart upload)
             try {
               // ✅ Thêm file vào danh sách
               _bloc.listFileInvoice.add(file);
               
-              // ✅ Tạo placeholder cho base64 (sẽ gen khi upload)
+              // ✅ Tạo metadata để đồng bộ với các luồng khác (Cart, ConfirmOrder)
               ListImageInvoice itemImage = ListImageInvoice(
-                pathBase64: null, // ✅ Không gen base64 ngay
+                pathBase64: null, // ✅ Không gen base64 cho luồng giao hàng (dùng multipart)
                 nameImage: image.name
               );
               _bloc.listFileInvoiceSave.add(itemImage);
@@ -1045,7 +1025,7 @@ class _DetailShippingScreenState extends State<DetailShippingScreen> {
                                 child: InkWell(
                                   onTap: (){
                                     myState(() {
-                                      // ✅ Xóa file và base64 data
+                                      // ✅ Xóa file và metadata đồng bộ
                                       _bloc.listFileInvoice.removeAt(index);
                                       _bloc.listFileInvoiceSave.removeAt(index);
                                       
@@ -1057,7 +1037,7 @@ class _DetailShippingScreenState extends State<DetailShippingScreen> {
                                       
                                       debugPrint('🗑️ Image deleted:');
                                       debugPrint('   - Remaining files: ${_bloc.listFileInvoice.length}');
-                                      debugPrint('   - Remaining base64: ${_bloc.listFileInvoiceSave.length}');
+                                      debugPrint('   - Remaining metadata: ${_bloc.listFileInvoiceSave.length}');
                                     });
                                   },
                                   child: Container(
@@ -1121,27 +1101,54 @@ class _DetailShippingScreenState extends State<DetailShippingScreen> {
   double _currentProgress = 0.0; // ✅ Lưu progress hiện tại
   String _currentMessage = ''; // ✅ Lưu message hiện tại
   bool _isImageLoading = false; // ✅ Flag để track trạng thái loading ảnh
+  Timer? _autoCloseTimer; // ✅ Timer để auto-close dialog khi 100%
+  StateSetter? _uploadDialogStateSetter; // ✅ Lưu setState của dialog để cập nhật progress
+  bool _userClosedUploadDialog = false; // ✅ User đã đóng dialog thủ công
 
   /// Hiển thị dialog progress khi upload ảnh
   void _showUploadProgressDialog(BuildContext context, double progress, String message) {
+    // Nếu user đã đóng dialog thủ công, không mở lại để tránh khó chịu
+    if (_userClosedUploadDialog) {
+      _currentProgress = progress;
+      _currentMessage = message;
+      return;
+    }
     // ✅ Cập nhật progress và message hiện tại
     _currentProgress = progress;
     _currentMessage = message;
     
-    // ✅ Chỉ hiển thị dialog nếu chưa có dialog nào đang hiển thị
+    // ✅ Nếu dialog đã hiển thị, chỉ cần trigger rebuild để cập nhật progress
+    if (_isUploadProgressDialogShowing && _uploadDialogStateSetter != null) {
+      _uploadDialogStateSetter!.call(() {});
+      return;
+    }
+
+    // ✅ Nếu chưa có dialog nào đang hiển thị thì show mới
     if (!_isUploadProgressDialogShowing) {
       _isUploadProgressDialogShowing = true;
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (BuildContext context) {
+        builder: (BuildContext dialogContext) {
           return StatefulBuilder(
             builder: (context, setDialogState) {
-              // ✅ Cập nhật dialog state khi progress thay đổi
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                setDialogState(() {});
-              });
-              
+              // ✅ Lưu lại setState để các lần _showUploadProgressDialog tiếp theo có thể trigger rebuild
+              _uploadDialogStateSetter = setDialogState;
+              // ✅ Auto-close dialog sau 1.5s khi đạt 100% (chỉ một lần)
+              if (_currentProgress >= 1.0 && _autoCloseTimer == null) {
+                _autoCloseTimer = Timer(const Duration(milliseconds: 1500), () {
+                  if (Navigator.of(dialogContext).canPop() && _isUploadProgressDialogShowing) {
+                    Navigator.of(dialogContext).pop();
+                    _isUploadProgressDialogShowing = false;
+                    _currentProgress = 0.0;
+                    _currentMessage = '';
+                    _autoCloseTimer?.cancel();
+                    _autoCloseTimer = null;
+                    _uploadDialogStateSetter = null;
+                  }
+                });
+              }
+
               return AlertDialog(
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
@@ -1149,6 +1156,37 @@ class _DetailShippingScreenState extends State<DetailShippingScreen> {
                 content: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    // Hàng tiêu đề với nút đóng "X"
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const SizedBox(width: 24), // giữ cân đối layout
+                        const Text(
+                          'Đang upload ảnh',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        InkWell(
+                          onTap: () {
+                            // User đóng dialog thủ công
+                            _userClosedUploadDialog = true;
+                            _autoCloseTimer?.cancel();
+                            _autoCloseTimer = null;
+                            if (Navigator.of(dialogContext).canPop()) {
+                              Navigator.of(dialogContext).pop();
+                            }
+                          },
+                          child: const Icon(
+                            Icons.close,
+                            size: 20,
+                            color: Colors.black54,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
                     // ✅ Sử dụng AnimatedBuilder để smooth progress
                     AnimatedBuilder(
                       animation: AlwaysStoppedAnimation(_currentProgress),
@@ -1207,18 +1245,25 @@ class _DetailShippingScreenState extends State<DetailShippingScreen> {
         _isUploadProgressDialogShowing = false; // ✅ Reset flag khi dialog đóng
         _currentProgress = 0.0; // ✅ Reset progress
         _currentMessage = ''; // ✅ Reset message
+        _autoCloseTimer?.cancel(); // ✅ Cancel timer nếu có
+        _autoCloseTimer = null; // ✅ Reset timer
+        _uploadDialogStateSetter = null; // ✅ Reset setState dialog
       });
     } else {
-      // ✅ Nếu dialog đã hiển thị, chỉ cần trigger rebuild
-      // Dialog sẽ tự động cập nhật với _currentProgress và _currentMessage mới
+      // Trường hợp này hiện không dùng nữa vì đã handle ở đầu hàm bằng _uploadDialogStateSetter
     }
   }
 
   /// Hiển thị dialog retry khi upload ảnh thất bại
   void _showUploadRetryDialog(BuildContext context, String error) {
-    // Đóng progress dialog trước và reset flag
-    Navigator.of(context).pop();
+    // Đóng progress dialog trước (nếu còn mở) và reset flag
+    if (_isUploadProgressDialogShowing && Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    }
     _isUploadProgressDialogShowing = false;
+    _autoCloseTimer?.cancel();
+    _autoCloseTimer = null;
+    _uploadDialogStateSetter = null;
     
     showDialog(
       context: context,

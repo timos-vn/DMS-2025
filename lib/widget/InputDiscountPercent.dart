@@ -36,6 +36,7 @@ class _InputDiscountPercentState extends State<InputDiscountPercent> {
     contentController =  TextEditingController();
     if(widget.percent > 0){
       contentController.text = widget.percent.toString();
+      valueInput = widget.percent;
     }
   }
 
@@ -73,7 +74,7 @@ class _InputDiscountPercentState extends State<InputDiscountPercent> {
                                         style:const TextStyle(color: Colors.black, fontSize: 16, fontWeight: FontWeight.bold),
                                       ),
                                       InkWell(
-                                        onTap: ()=> Navigator.pop(context,['Close','0']),
+                                        onTap: ()=> Navigator.pop(context,['Close',valueInput]),
                                         child:const Icon(Icons.clear,color: Colors.black,),
                                       )
                                     ],
@@ -116,9 +117,10 @@ class _InputDiscountPercentState extends State<InputDiscountPercent> {
                                                       text: string,
                                                       selection: TextSelection.collapsed(offset: string.length),
                                                     );
-
                                                   }
-
+                                                  else {
+                                                    valueInput = 0;
+                                                  }
                                                 },
                                                 //textInputAction: TextInputAction.none,
                                               ),
@@ -136,12 +138,7 @@ class _InputDiscountPercentState extends State<InputDiscountPercent> {
                         padding: const EdgeInsets.only(left: 16, right: 16),
                         child: TextButton(
                           onPressed: (){
-                            if(valueInput > 0){
-                              Navigator.pop(context,["BACK",valueInput]);
-                            }
-                            else{
-                              Utils.showCustomToast(context, Icons.warning_amber_outlined, 'Úi, Bạn không được để trống hoặc giá trị bằng 0');
-                            }
+                            Navigator.pop(context,["BACK",valueInput]);
                           },
                           child: Container(
                             height: 45,

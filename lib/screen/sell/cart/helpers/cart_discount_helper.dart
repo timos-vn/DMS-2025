@@ -15,7 +15,6 @@ class CartDiscountHelper {
     required BuildContext context,
     required void Function(void Function()) setState,
   }) {
-    if (percent <= 0) return;
     if (index < 0 || index >= bloc.listOrder.length) return;
 
     final SearchItemResponseData item = bloc.listOrder[index];
@@ -26,14 +25,22 @@ class CartDiscountHelper {
         ? (item.priceAfterTax ?? item.priceAfter ?? 0)
         : (item.giaSuaDoi != 0 ? item.giaSuaDoi : item.price ?? 0);
 
-    final double discountValue = (price * quantity * percent) / 100;
+    final double discountValue = percent > 0 ? (price * quantity * percent) / 100 : 0;
 
     setState(() {
       item.discountByHand = true;
       item.discountPercentByHand = percent;
       item.ckntByHand = discountValue;
       item.priceAfter2 = price;
-      item.priceAfter = (item.giaSuaDoi - ((item.giaSuaDoi * percent) / 100));
+      if (percent > 0) {
+        item.priceAfter = (item.giaSuaDoi - ((item.giaSuaDoi * percent) / 100));
+      } else {
+        // percent == 0 => reset về giá gốc
+        item.discountPercent = 0;
+        item.ck = 0;
+        item.cknt = 0;
+        item.priceAfter = price;
+      }
     });
 
     // Persist to local cache so reload keeps manual discount

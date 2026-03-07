@@ -2,6 +2,7 @@
 
 import 'dart:typed_data';
 import 'dart:io';
+import 'dart:ui';
 import 'package:dms/model/network/response/contract_reponse.dart';
 import 'package:dms/screen/sell/cart/cart_screen.dart';
 import 'package:dms/widget/custom_question.dart';
@@ -23,7 +24,6 @@ import '../../../model/network/response/setting_options_response.dart';
 import '../../../themes/colors.dart';
 import '../../../utils/const.dart';
 import '../../../utils/utils.dart';
-import '../cart/confirm_order_screen.dart';
 import '../cart/cart_bloc.dart';
 import '../cart/cart_event.dart';
 import '../cart/cart_state.dart';
@@ -56,6 +56,8 @@ class HistoryOrderDetailScreen extends StatefulWidget {
 class _HistoryOrderDetailScreenState extends State<HistoryOrderDetailScreen> {
 
   late CartBloc _bloc;
+  final GlobalKey _pdfButtonKey = GlobalKey();
+  bool _isCopyMode = false; // ✅ Flag để phân biệt copy mode và edit mode
 
   @override
   void initState() {
@@ -85,7 +87,7 @@ class _HistoryOrderDetailScreenState extends State<HistoryOrderDetailScreen> {
             Navigator.pop(context,Const.REFRESH);
           }
           else if(state is AddProductToCartSuccess){
-            // Luôn copy danh sách khuyến mại vào DataLocal để hiển thị khi sửa đơn
+            // Luôn copy danh sách khuyến mại vào DataLocal để hiển thị khi sửa đơn hoặc copy đơn
             // Không chỉ phụ thuộc vào Const.discountSpecial
             
             // ✅ PRESERVE gifts từ chi tiết đơn hàng trước khi clear
@@ -162,30 +164,114 @@ class _HistoryOrderDetailScreenState extends State<HistoryOrderDetailScreen> {
               });
             }
             else{
+              if (_isCopyMode) {
+                // ✅ Copy đơn hàng: Navigate đến CartScreen với viewUpdateOrder: false (tạo đơn mới)
+                print('💰 Navigate to CartScreen for copying order');
+                print('💰   - listProduct.length = ${_bloc.listProduct.length}');
+                print('💰   - DataLocal.listProductGift.length = ${DataLocal.listProductGift.length}');
 
-              print('check dl: ${DataLocal.listProductGift.length}');
-              PersistentNavBarNavigator.pushNewScreen(context, screen: ConfirmScreen(
-                viewUpdateOrder: true,
-                viewDetail: false,
-                dateOrder: widget.dateOrder,
-                listIdGroupProduct: Const.listGroupProductCode,
-                itemGroupCode: Const.itemGroupCode,
-                listOrder: _bloc.listProduct,
-                orderFromCheckIn: false,
-                title:'Cập nhật đơn',
-                currencyCode: !Utils.isEmpty(widget.currencyCode.toString()) ? widget.currencyCode.toString() : Const.currencyList[0].currencyCode.toString(),
-                nameCustomer: widget.nameCustomer,
-                idCustomer: widget.codeCustomer,
-                phoneCustomer: widget.phoneCustomer,
-                addressCustomer: widget.addressCustomer,
-                codeCustomer: widget.codeCustomer,
-                sttRec: widget.sttRec,
-                description: _bloc.description, loadDataLocal: false,
-              ),withNavBar: false).then((value) {
-                DataLocal.listProductGift.clear();
-                _bloc.add(DeleteProductInCartEvent());
-                Navigator.pop(context,Const.REFRESH);
-              });
+                // ✅ Copy thông tin khách hàng từ masterDetailOrder vào đơn mới
+                // Ưu tiên: masterDetailOrder > widget parameters
+                final String finalCodeCustomer = (!Utils.isEmpty(_bloc.masterDetailOrder.maKh.toString()) &&
+                                                  _bloc.masterDetailOrder.maKh.toString().trim().isNotEmpty)
+                    ? _bloc.masterDetailOrder.maKh.toString().trim()
+                    : ((!Utils.isEmpty(widget.codeCustomer) && widget.codeCustomer.trim().isNotEmpty)
+                        ? widget.codeCustomer.trim() 
+                        : '');
+                
+                final String finalNameCustomer = (!Utils.isEmpty(_bloc.masterDetailOrder.tenKh.toString()) &&
+                                                 _bloc.masterDetailOrder.tenKh.toString().trim().isNotEmpty)
+                    ? _bloc.masterDetailOrder.tenKh.toString().trim()
+                    : ((!Utils.isEmpty(widget.nameCustomer) && widget.nameCustomer.trim().isNotEmpty)
+                        ? widget.nameCustomer.trim()
+                        : '');
+                
+                final String finalPhoneCustomer = (!Utils.isEmpty(widget.phoneCustomer) && 
+                                                  widget.phoneCustomer.trim().isNotEmpty)
+                    ? widget.phoneCustomer.trim()
+                    : '';
+                
+                final String finalAddressCustomer = (!Utils.isEmpty(widget.addressCustomer) && 
+                                                     widget.addressCustomer.trim().isNotEmpty)
+                    ? widget.addressCustomer.trim()
+                    : '';
+                
+                print('💰 Copy order - Customer info:');
+                print('💰   - codeCustomer: $finalCodeCustomer (from master: ${_bloc.masterDetailOrder.maKh})');
+                print('💰   - nameCustomer: $finalNameCustomer (from master: ${_bloc.masterDetailOrder.tenKh})');
+                print('💰   - phoneCustomer: $finalPhoneCustomer');
+                print('💰   - addressCustomer: $finalAddressCustomer');
+                
+                PersistentNavBarNavigator.pushNewScreen(context, screen: CartScreen(
+                  viewUpdateOrder: false, // ✅ Đánh dấu đang tạo đơn mới (copy)
+                  viewDetail: false,
+                  listIdGroupProduct: Const.listGroupProductCode,
+                  itemGroupCode: Const.itemGroupCode,
+                  listOrder: _bloc.listProduct, // ✅ Truyền listProduct từ CartBloc (đã được load từ lineItem)
+                  orderFromCheckIn: false,
+                  title: 'Đặt hàng', // ✅ Title là "Đặt hàng" vì đây là đơn mới
+                  currencyCode: !Utils.isEmpty(widget.currencyCode.toString()) ? widget.currencyCode.toString() : Const.currencyList[0].currencyCode.toString(),
+                  nameCustomer: finalNameCustomer, // ✅ Copy từ masterDetailOrder hoặc widget
+                  idCustomer: finalCodeCustomer, // ✅ Copy từ masterDetailOrder hoặc widget
+                  phoneCustomer: finalPhoneCustomer, // ✅ Copy từ widget (nếu có)
+                  addressCustomer: finalAddressCustomer, // ✅ Copy từ widget (nếu có)
+                  codeCustomer: finalCodeCustomer, // ✅ Copy từ masterDetailOrder hoặc widget
+                  // ✅ KHÔNG truyền sttRec vì đây là đơn hàng mới
+                  description: _bloc.description, 
+                  loadDataLocal: true, // ✅ Load từ DataLocal vì đây là đơn mới
+                  sttRectHD: null,
+                  isContractCreateOrder: false,
+                  isCopyOrder: true, // ✅ Đánh dấu đang copy đơn hàng (sẽ clear discount)
+                ),withNavBar: false).then((value) {
+                  // ✅ Cleanup sau khi đóng màn hình copy đơn
+                  _isCopyMode = false; // ✅ Reset flag
+                  DataLocal.listProductGift.clear();
+                  _bloc.add(DeleteProductInCartEvent());
+                  Navigator.pop(context,Const.REFRESH);
+                });
+              }
+              else {
+                // ✅ Sửa đơn: Navigate đến CartScreen với viewUpdateOrder: true
+                // Flow truyền dữ liệu:
+                // 1. AddProductToCartEvent đã load dữ liệu từ lineItem vào database (db.addProduct)
+                // 2. _bloc.listProduct (List<Product>) được tạo từ lineItem trong AddProductToCartEvent
+                // 3. Truyền _bloc.listProduct vào CartScreen qua listOrder parameter
+                // 4. CartScreen sẽ set listProductOrder từ listOrder, sau đó gọi GetListProductFromDB để load từ database
+                // 5. Dữ liệu cuối cùng sẽ được load từ database, không phụ thuộc vào listOrder được truyền vào
+                
+                print('💰 Navigate to CartScreen for editing order');
+                print('💰   - listProduct.length = ${_bloc.listProduct.length}');
+                print('💰   - DataLocal.listProductGift.length = ${DataLocal.listProductGift.length}');
+                print('💰   - sttRec = ${widget.sttRec}');
+                
+                PersistentNavBarNavigator.pushNewScreen(context, screen: CartScreen(
+                  viewUpdateOrder: true, // ✅ Đánh dấu đang sửa đơn
+                  viewDetail: false,
+                  dateOrder: widget.dateOrder,
+                  listIdGroupProduct: Const.listGroupProductCode,
+                  itemGroupCode: Const.itemGroupCode,
+                  listOrder: _bloc.listProduct, // ✅ Truyền listProduct từ CartBloc (đã được load từ lineItem)
+                  orderFromCheckIn: false,
+                  title:'Cập nhật đơn',
+                  currencyCode: !Utils.isEmpty(widget.currencyCode.toString()) ? widget.currencyCode.toString() : Const.currencyList[0].currencyCode.toString(),
+                  nameCustomer: widget.nameCustomer,
+                  idCustomer: widget.codeCustomer,
+                  phoneCustomer: widget.phoneCustomer,
+                  addressCustomer: widget.addressCustomer,
+                  codeCustomer: widget.codeCustomer,
+                  sttRec: widget.sttRec, // ✅ sttRec của đơn cần sửa
+                  description: _bloc.description, 
+                  loadDataLocal: false, // ✅ Không load từ DataLocal vì dữ liệu đã ở database
+                  sttRectHD: null,
+                  isContractCreateOrder: false,
+                ),withNavBar: false).then((value) {
+                  // ✅ Cleanup sau khi đóng màn hình sửa đơn
+                  _isCopyMode = false; // ✅ Reset flag
+                  DataLocal.listProductGift.clear();
+                  _bloc.add(DeleteProductInCartEvent());
+                  Navigator.pop(context,Const.REFRESH);
+                });
+              }
             }
           }else if(state is DeleteProductInCartSuccess){
             DataLocal.listOrderCalculatorDiscount.clear();
@@ -497,11 +583,16 @@ class _HistoryOrderDetailScreenState extends State<HistoryOrderDetailScreen> {
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
             child: Column(
               children: [
-                      Visibility(
-                        visible: _canEditOrCancel() && widget.hideEditAndCancelButtons != true,
-                        child: Row(
-                          children: [
-                            Expanded(
+                // Copy Order Button (always visible)
+                if (widget.hideEditAndCancelButtons != true)
+                  _buildCompactButton('Copy đơn hàng', MdiIcons.contentCopy, mainColor, _handleCopyOrder),
+                if (widget.hideEditAndCancelButtons != true)
+                  const SizedBox(height: 8),
+                Visibility(
+                  visible: _canEditOrCancel() && widget.hideEditAndCancelButtons != true,
+                  child: Row(
+                    children: [
+                      Expanded(
                         child: _buildCompactButton('Sửa', MdiIcons.pencilOutline, subColor, _handleEditOrder),
                       ),
                       const SizedBox(width: 8),
@@ -584,9 +675,10 @@ class _HistoryOrderDetailScreenState extends State<HistoryOrderDetailScreen> {
   }
 
   void _handleEditOrder() {
-                                    final status = _bloc.masterDetailOrder.status;
-                                    final canEditByCode = status == 0 || status == 1;
-                                    final canEditByName = _isPendingApprovalStatusName(widget.statusName);
+    _isCopyMode = false; // ✅ Set flag để biết đang edit mode
+    final status = _bloc.masterDetailOrder.status;
+    final canEditByCode = status == 0 || status == 1;
+    final canEditByName = _isPendingApprovalStatusName(widget.statusName);
     final isApproved = _isApprovedStatusName(widget.statusName);
 
     if(isApproved){
@@ -594,22 +686,39 @@ class _HistoryOrderDetailScreenState extends State<HistoryOrderDetailScreen> {
       return;
     }
 
-                                    if(!(canEditByCode || canEditByName)){
+    if(!(canEditByCode || canEditByName)){
       Utils.showCustomToast(context, Icons.warning_amber_outlined, 'Đơn hàng không thể sửa ở trạng thái hiện tại');
-                                      return;
-                                    }
+      return;
+    }
 
-                                    DataLocal.listObjectDiscount.clear();
-                                    DataLocal.listOrderDiscount.clear();
-                                    DataLocal.infoCustomer = ManagerCustomerResponseData();
-                                    DataLocal.transactionCode = "";
-                                    DataLocal.transaction = ListTransaction();
-                                    DataLocal.indexValuesTax = -1;
-                                    DataLocal.taxPercent = 0;
-                                    DataLocal.taxCode = '';
-                                    DataLocal.valuesTypePayment = '';
-                                    DataLocal.datePayment = '';
-                                    _bloc.add(AddProductToCartEvent());
+    DataLocal.listObjectDiscount.clear();
+    DataLocal.listOrderDiscount.clear();
+    DataLocal.infoCustomer = ManagerCustomerResponseData();
+    DataLocal.transactionCode = "";
+    DataLocal.transaction = ListTransaction();
+    DataLocal.indexValuesTax = -1;
+    DataLocal.taxPercent = 0;
+    DataLocal.taxCode = '';
+    DataLocal.valuesTypePayment = '';
+    DataLocal.datePayment = '';
+    _bloc.add(AddProductToCartEvent());
+  }
+
+  void _handleCopyOrder() {
+    _isCopyMode = true; // ✅ Set flag để biết đang copy mode
+    // ✅ Copy đơn hàng không cần check điều kiện status, có thể copy bất kỳ đơn nào
+    
+    DataLocal.listObjectDiscount.clear();
+    DataLocal.listOrderDiscount.clear();
+    DataLocal.infoCustomer = ManagerCustomerResponseData();
+    DataLocal.transactionCode = "";
+    DataLocal.transaction = ListTransaction();
+    DataLocal.indexValuesTax = -1;
+    DataLocal.taxPercent = 0;
+    DataLocal.taxCode = '';
+    DataLocal.valuesTypePayment = '';
+    DataLocal.datePayment = '';
+    _bloc.add(AddProductToCartEvent());
   }
 
   void _handleCancelOrder() {
@@ -678,7 +787,24 @@ class _HistoryOrderDetailScreenState extends State<HistoryOrderDetailScreen> {
   Widget _buildProductCard(int index) {
     final item = _bloc.lineItem[index];
     final isGift = item.kmYn == 1;
-    final hasDiscount = item.tlCk != null && item.tlCk! > 0;
+    
+    // ✅ Tính discountPercent: Nếu tlCk = 0 nhưng ckNt > 0, tính từ ckNt
+    double? calculatedDiscountPercent = item.tlCk;
+    if ((item.tlCk == null || item.tlCk == 0) && 
+        item.ckNt != null && item.ckNt! > 0 && 
+        item.price != null && item.price! > 0 && 
+        item.soLuong != null && item.soLuong! > 0) {
+      double totalOriginalPrice = item.price! * item.soLuong!;
+      if (totalOriginalPrice > 0) {
+        calculatedDiscountPercent = (item.ckNt! / totalOriginalPrice) * 100;
+        print('💰 [ORDER DETAIL] Calculated discountPercent from ckNt: ${item.ckNt} / $totalOriginalPrice * 100 = $calculatedDiscountPercent%');
+      }
+    }
+    
+    // ✅ hasDiscount: Có chiết khấu nếu tlCk > 0 HOẶC ckNt > 0 (và đã tính được discountPercent)
+    final hasDiscount = (item.tlCk != null && item.tlCk! > 0) || 
+                       (calculatedDiscountPercent != null && calculatedDiscountPercent! > 0);
+    
     final price = item.price ?? 0;
     final priceAfter = item.priceAfter ?? 0;
     final hasPriceChange = price > 0 && price != priceAfter;
@@ -738,30 +864,6 @@ class _HistoryOrderDetailScreenState extends State<HistoryOrderDetailScreen> {
                       ),
                     ),
               ),
-              // Special Badge
-              if (hasDiscount)
-                Positioned(
-                  top: -4,
-                  right: -4,
-                  child: Container(
-                    width: 24,
-                    height: 24,
-                    decoration: const BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: Text(
-                        _formatDiscountPercent(item.tlCk),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 9,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
             ],
           ),
           const SizedBox(width: 10),
@@ -795,7 +897,7 @@ class _HistoryOrderDetailScreenState extends State<HistoryOrderDetailScreen> {
                       ),
                     ),
                     const SizedBox(width: 6),
-                    // Price
+                    // Price với Badge chiết khấu đẹp
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
@@ -809,24 +911,75 @@ class _HistoryOrderDetailScreenState extends State<HistoryOrderDetailScreen> {
                               height: 1,
                             ),
                           ),
-                        if (priceAfter > 0)
-                          Text(
-                            '${Utils.formatMoneyStringToDouble(priceAfter)} ₫',
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF059669),
-                              height: 1.2,
-                            ),
-                          )
-                        else if (price == 0)
-                          Text(
-                            'Cập nhật',
-                            style: TextStyle(
-                              fontSize: 9,
-                              color: Colors.grey.shade500,
-                            ),
-                          ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            if (priceAfter > 0)
+                              Text(
+                                '${Utils.formatMoneyStringToDouble(priceAfter)} ₫',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF059669),
+                                  height: 1.2,
+                                ),
+                              )
+                            else if (price == 0)
+                              Text(
+                                'Cập nhật',
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  color: Colors.grey.shade500,
+                                ),
+                              ),
+                            // Badge chiết khấu đẹp bên cạnh giá
+                            if (hasDiscount && priceAfter > 0) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      Colors.orange.shade500,
+                                      Colors.red.shade500,
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(8),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.orange.withOpacity(0.3),
+                                      blurRadius: 3,
+                                      offset: const Offset(0, 1),
+                                    ),
+                                  ],
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.local_offer_rounded,
+                                      size: 11,
+                                      color: Colors.white,
+                                    ),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      _formatDiscountPercent(calculatedDiscountPercent),
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        height: 1.0,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
                       ],
                     ),
                   ],
@@ -925,9 +1078,18 @@ class _HistoryOrderDetailScreenState extends State<HistoryOrderDetailScreen> {
   }
 
   String _formatDiscountPercent(double? percent) {
-    if (percent == null) return '-0%';
-    final value = percent % 1 == 0 ? percent.toInt().toString() : percent.toString();
-    return '-$value%';
+    if (percent == null || percent == 0) return '-0%';
+    // ✅ Format với 2 số sau dấu phẩy
+    final formattedValue = percent.toStringAsFixed(2);
+    // Loại bỏ số 0 thừa ở cuối (ví dụ: 51.00% → 51%, 51.20% → 51.2%, 51.72% → 51.72%)
+    String cleanValue = formattedValue;
+    if (cleanValue.contains('.')) {
+      // Loại bỏ số 0 ở cuối sau dấu phẩy
+      cleanValue = cleanValue.replaceAll(RegExp(r'0+$'), '');
+      // Loại bỏ dấu phẩy nếu không còn số sau dấu phẩy
+      cleanValue = cleanValue.replaceAll(RegExp(r'\.$'), '');
+    }
+    return '-$cleanValue%';
   }
 
   bool _canEditOrCancel() {
@@ -988,17 +1150,33 @@ class _HistoryOrderDetailScreenState extends State<HistoryOrderDetailScreen> {
       
       if (!mounted) return;
       
+      // Get position of PDF button for iOS share sheet
+      Rect? sharePositionOrigin;
+      RenderBox? renderBox = _pdfButtonKey.currentContext?.findRenderObject() as RenderBox?;
+      
+      if (renderBox != null && renderBox.hasSize) {
+        final position = renderBox.localToGlobal(Offset.zero);
+        sharePositionOrigin = Rect.fromLTWH(
+          position.dx,
+          position.dy,
+          renderBox.size.width,
+          renderBox.size.height,
+        );
+      }
+      
       // Share PDF
       await Share.shareXFiles(
         [XFile(filePath)],
         text: 'Chi tiết đơn hàng ${widget.sttRec ?? ''}',
         subject: 'Đơn hàng ${widget.sttRec ?? ''}',
+        sharePositionOrigin: sharePositionOrigin,
       );
       
       if (!mounted) return;
       Utils.showCustomToast(context, Icons.check_circle_outline, 'PDF đã được tạo và sẵn sàng chia sẻ');
     } catch (e) {
       if (!mounted) return;
+      print(e.toString());
       Utils.showCustomToast(context, Icons.error_outline, 'Lỗi khi tạo PDF: $e');
     }
   }
@@ -1515,6 +1693,7 @@ class _HistoryOrderDetailScreenState extends State<HistoryOrderDetailScreen> {
                 Visibility(
                   visible: Const.downFileFromDetailOrder == true,
                   child: Material(
+                    key: _pdfButtonKey,
                     color: Colors.transparent,
                     child: InkWell(
                       onTap: _generateAndSharePDF,

@@ -874,14 +874,174 @@ class SearchProductScreenState extends State<SearchProductScreen> {
                                         children: [
                                           Expanded(
                                             child: Text(
-                                              '[${_dataListSearch[index].code.toString().trim()}] ${_dataListSearch[index].name}',
+                                              '${_dataListSearch[index].name}',
                                               textAlign: TextAlign.left,
                                               style: const TextStyle(fontWeight: FontWeight.bold,fontSize: 12),
                                               maxLines: 4,
                                               overflow: TextOverflow.ellipsis,
                                             ),
                                           ),
-                                          const SizedBox(width: 10,),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8,),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xfff5f5f5),
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(
+                                            color: const Color(0xffe0e0e0),
+                                            width: 1,
+                                          ),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(
+                                              Icons.inventory_2,
+                                              size: 12,
+                                              color: Color(0xff666666),
+                                            ),
+                                            const SizedBox(width: 4),
+                                            const Text(
+                                              'Mã SP:',
+                                              textAlign: TextAlign.left,
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.w500,
+                                                fontSize: 10,
+                                                color: Color(0xff666666),
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            const SizedBox(width: 3),
+                                            Text(
+                                              '${_dataListSearch[index].code}',
+                                              textAlign: TextAlign.left,
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 10,
+                                                color: Color(0xff333333),
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8,),
+                                      Visibility(
+                                        visible: (_dataListSearch[index].thueSuat ?? 0.0) > 0,
+                                        child: Container(
+                                          margin: const EdgeInsets.only(bottom: 5),
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xffdc2626).withOpacity(0.1),
+                                            borderRadius: BorderRadius.circular(12),
+                                            border: Border.all(
+                                              color: const Color(0xffdc2626).withOpacity(0.3),
+                                              width: 1,
+                                            ),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const Icon(
+                                                Icons.account_balance,
+                                                size: 14,
+                                                color: Color(0xffdc2626),
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                'Thuế: ${_formatTaxRate(_dataListSearch[index].thueSuat ?? 0)}%',
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.w600,
+                                                  fontSize: 11,
+                                                  color: Color(0xffdc2626),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Text(
+                                                'Tồn:',
+                                                style: TextStyle(color: Colors.black.withOpacity(0.7), fontSize: 11),
+                                                textAlign: TextAlign.left,
+                                              ),
+                                              const SizedBox(
+                                                width: 4,
+                                              ),
+                                              Text("${_dataListSearch[index].stockAmount?.toInt()??0}",
+                                                style:const TextStyle(color: blue, fontSize: 12, fontWeight: FontWeight.w600),
+                                                textAlign: TextAlign.left,
+                                              ),
+                                            ],
+                                          ),
+                                          Flexible(
+                                            child: Visibility(
+                                              visible: _dataListSearch[index].discountPercent! > 0,
+                                              child: Container(
+                                                decoration: BoxDecoration(
+                                                  gradient: const LinearGradient(
+                                                    colors: [Color(0xffe53e3e), Color(0xffc53030)],
+                                                    begin: Alignment.topLeft,
+                                                    end: Alignment.bottomRight,
+                                                  ),
+                                                  borderRadius: BorderRadius.circular(12),
+                                                  boxShadow: [
+                                                    BoxShadow(
+                                                      color: const Color(0xffe53e3e).withOpacity(0.3),
+                                                      blurRadius: 4,
+                                                      offset: const Offset(0, 2),
+                                                    ),
+                                                  ],
+                                                ),
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                child: Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    const Icon(
+                                                      Icons.local_offer,
+                                                      size: 12,
+                                                      color: Colors.white,
+                                                    ),
+                                                    const SizedBox(width: 4),
+                                                    const Text(
+                                                      'SALE',
+                                                      textAlign: TextAlign.left,
+                                                      style: TextStyle(
+                                                        fontWeight: FontWeight.w700,
+                                                        fontSize: 9,
+                                                        color: Colors.white,
+                                                        letterSpacing: 0.5,
+                                                      ),
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                    const SizedBox(width: 3),
+                                                    Text(
+                                                      '${Utils.formatNumber(_dataListSearch[index].discountPercent!)}%',
+                                                      textAlign: TextAlign.left,
+                                                      style: const TextStyle(
+                                                        fontWeight: FontWeight.w700,
+                                                        fontSize: 9,
+                                                        color: Colors.white,
+                                                      ),
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          ),
                                           Column(
                                             children: [
                                               // price: Const.isWoPrice == false ? _dataListSearch[index].price : _dataListSearch[index].woPrice,
@@ -954,121 +1114,6 @@ class SearchProductScreenState extends State<SearchProductScreen> {
                                                   style: const TextStyle(color: Color(
                                                       0xff067902), fontSize: 13,fontWeight: FontWeight.w700),
                                                 ),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 5,),
-                                      Visibility(
-                                        visible: (_dataListSearch[index].thueSuat ?? 0.0) > 0,
-                                        child: Container(
-                                          margin: const EdgeInsets.only(bottom: 5),
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xffdc2626).withOpacity(0.1),
-                                            borderRadius: BorderRadius.circular(12),
-                                            border: Border.all(
-                                              color: const Color(0xffdc2626).withOpacity(0.3),
-                                              width: 1,
-                                            ),
-                                          ),
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              const Icon(
-                                                Icons.account_balance,
-                                                size: 14,
-                                                color: Color(0xffdc2626),
-                                              ),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                'Thuế: ${_formatTaxRate(_dataListSearch[index].thueSuat ?? 0)}%',
-                                                style: const TextStyle(
-                                                  fontWeight: FontWeight.w600,
-                                                  fontSize: 11,
-                                                  color: Color(0xffdc2626),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Flexible(
-                                            child: Visibility(
-                                              visible: _dataListSearch[index].discountPercent! > 0,
-                                              child: Container(
-                                                decoration: BoxDecoration(
-                                                  gradient: const LinearGradient(
-                                                    colors: [Color(0xffe53e3e), Color(0xffc53030)],
-                                                    begin: Alignment.topLeft,
-                                                    end: Alignment.bottomRight,
-                                                  ),
-                                                  borderRadius: BorderRadius.circular(12),
-                                                  boxShadow: [
-                                                    BoxShadow(
-                                                      color: const Color(0xffe53e3e).withOpacity(0.3),
-                                                      blurRadius: 4,
-                                                      offset: const Offset(0, 2),
-                                                    ),
-                                                  ],
-                                                ),
-                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                                child: Row(
-                                                  mainAxisSize: MainAxisSize.min,
-                                                  children: [
-                                                    const Icon(
-                                                      Icons.local_offer,
-                                                      size: 12,
-                                                      color: Colors.white,
-                                                    ),
-                                                    const SizedBox(width: 4),
-                                                    const Text(
-                                                      'SALE',
-                                                      textAlign: TextAlign.left,
-                                                      style: TextStyle(
-                                                        fontWeight: FontWeight.w700,
-                                                        fontSize: 9,
-                                                        color: Colors.white,
-                                                        letterSpacing: 0.5,
-                                                      ),
-                                                      maxLines: 1,
-                                                      overflow: TextOverflow.ellipsis,
-                                                    ),
-                                                    const SizedBox(width: 3),
-                                                    Text(
-                                                      '${Utils.formatNumber(_dataListSearch[index].discountPercent!)}%',
-                                                      textAlign: TextAlign.left,
-                                                      style: const TextStyle(
-                                                        fontWeight: FontWeight.w700,
-                                                        fontSize: 9,
-                                                        color: Colors.white,
-                                                      ),
-                                                      maxLines: 1,
-                                                      overflow: TextOverflow.ellipsis,
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                          Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Text(
-                                                'Tồn:',
-                                                style: TextStyle(color: Colors.black.withOpacity(0.7), fontSize: 11),
-                                                textAlign: TextAlign.left,
-                                              ),
-                                              const SizedBox(
-                                                width: 4,
-                                              ),
-                                              Text("${_dataListSearch[index].stockAmount?.toInt()??0}",
-                                                style:const TextStyle(color: blue, fontSize: 12, fontWeight: FontWeight.w600),
-                                                textAlign: TextAlign.left,
                                               ),
                                             ],
                                           ),

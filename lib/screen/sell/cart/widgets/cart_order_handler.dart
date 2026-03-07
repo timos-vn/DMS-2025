@@ -19,6 +19,11 @@ class CartOrderHandler {
   final String? dateOrder;
   final bool? isContractCreateOrder;
   final String? sttRectHD;
+  // Fallback info từ màn trước (CartScreen) nếu bloc bị mất codeCustomer
+  final String? fallbackCodeCustomer;
+  final String? fallbackNameCustomer;
+  final String? fallbackPhoneCustomer;
+  final String? fallbackAddressCustomer;
   final TextEditingController nameCompanyController;
   final TextEditingController mstController;
   final TextEditingController addressCompanyController;
@@ -34,6 +39,10 @@ class CartOrderHandler {
     this.dateOrder,
     this.isContractCreateOrder,
     this.sttRectHD,
+    this.fallbackCodeCustomer,
+    this.fallbackNameCustomer,
+    this.fallbackPhoneCustomer,
+    this.fallbackAddressCustomer,
     required this.nameCompanyController,
     required this.mstController,
     required this.addressCompanyController,
@@ -43,27 +52,38 @@ class CartOrderHandler {
 
   /// Tạo đơn hàng mới hoặc cập nhật đơn hàng
   void createOrder() {
-    print('💾 CartOrderHandler.createOrder() called');
-    print('💾   - bloc.codeCustomer = ${bloc.codeCustomer}');
-    print('💾   - bloc.customerName = ${bloc.customerName}');
-    print('💾   - bloc.listProductOrderAndUpdate.length = ${bloc.listProductOrderAndUpdate.length}');
-    
     if (Utils.isEmpty(bloc.listProductOrderAndUpdate)) {
-      print('💾 ❌ listProductOrderAndUpdate is empty');
       return;
     }
 
-    // ✅ Kiểm tra codeCustomer với nhiều điều kiện
     final codeCustomerStr = bloc.codeCustomer?.toString().trim() ?? '';
     final codeCustomerValid = codeCustomerStr.isNotEmpty && 
                               codeCustomerStr != 'null' && 
                               codeCustomerStr != '';
-    
-    print('💾   - codeCustomerStr = "$codeCustomerStr"');
-    print('💾   - codeCustomerValid = $codeCustomerValid');
-    
+
     if (!codeCustomerValid) {
-      print('💾 ❌ codeCustomer is invalid, showing error');
+      final fallbackCode = DataLocal.infoCustomer.customerCode?.toString().trim() ?? '';
+      final fallbackName = DataLocal.infoCustomer.customerName?.toString().trim() ?? '';
+      final fallbackCodeFromWidget = fallbackCodeCustomer?.toString().trim() ?? '';
+      final fallbackNameFromWidget = fallbackNameCustomer?.toString().trim() ?? '';
+      if (fallbackCode.isNotEmpty && fallbackCode != 'null') {
+        bloc.codeCustomer = fallbackCode;
+        if (fallbackName.isNotEmpty && fallbackName != 'null') {
+          bloc.customerName = fallbackName;
+        }
+      } else if (fallbackCodeFromWidget.isNotEmpty && fallbackCodeFromWidget != 'null') {
+        bloc.codeCustomer = fallbackCodeFromWidget;
+        if (fallbackNameFromWidget.isNotEmpty && fallbackNameFromWidget != 'null') {
+          bloc.customerName = fallbackNameFromWidget;
+        }
+      }
+    }
+    
+    final codeCustomerAfterFallback = bloc.codeCustomer?.toString().trim() ?? '';
+    final codeCustomerValidAfterFallback = codeCustomerAfterFallback.isNotEmpty &&
+                                           codeCustomerAfterFallback != 'null';
+    
+    if (!codeCustomerValidAfterFallback) {
       Utils.showCustomToast(
         context,
         Icons.warning_amber_outlined,
@@ -71,8 +91,6 @@ class CartOrderHandler {
       );
       return;
     }
-    
-    print('💾 ✅ Validation passed, proceeding to create order');
 
     // Kiểm tra sttRectHD khi isContractCreateOrder = true
     if (isContractCreateOrder == true &&

@@ -25,6 +25,8 @@ class DiscountVoucherSelectionSheet extends StatefulWidget {
   final void Function(String ckgId, ListCk ckgItem)? onRemoveCkg;
   final void Function(String cktdttId, ListCkTongDon cktdttItem)? onSelectCktdtt;
   final void Function(String cktdttId, ListCkTongDon cktdttItem)? onRemoveCktdtt;
+  final void Function(String hhId, ListCk hhItem)? onSelectHH;
+  final void Function(String hhId, ListCk hhItem)? onRemoveHH;
   final void Function(String groupKey, List<ListCkMatHang> items, double totalQuantity)?
       onSelectCktdthGroup;
   final void Function(String groupKey)? onRemoveCktdthGroup;
@@ -48,6 +50,8 @@ class DiscountVoucherSelectionSheet extends StatefulWidget {
     this.onRemoveCkg,
     this.onSelectCktdtt,
     this.onRemoveCktdtt,
+    this.onSelectHH,
+    this.onRemoveHH,
     this.onSelectCktdthGroup,
     this.onRemoveCktdthGroup,
   }) : super(key: key);
@@ -110,6 +114,38 @@ class DiscountVoucherSelectionSheetState extends State<DiscountVoucherSelectionS
     _selectedCknGroups = Set.from(widget.selectedCknGroups);
     _selectedCktdttIds = Set.from(widget.selectedCktdttIds);
     _selectedCktdthGroups = Set.from(widget.selectedCktdthGroups);
+    
+    print('💰 DiscountVoucherSelectionSheet initState:');
+    print('   - widget.selectedCkgIds: ${widget.selectedCkgIds}');
+    print('   - _selectedCkgIds (after convert): $_selectedCkgIds');
+    print('   - widget.selectedHHIds: ${widget.selectedHHIds}');
+    print('   - _selectedHHIds: $_selectedHHIds');
+    print('   - widget.selectedCktdttIds: ${widget.selectedCktdttIds}');
+    print('   - _selectedCktdttIds: $_selectedCktdttIds');
+  }
+  
+  @override
+  void didUpdateWidget(DiscountVoucherSelectionSheet oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // ✅ Update local state khi widget prop thay đổi (khi restore chạy)
+    if (widget.selectedCkgIds != oldWidget.selectedCkgIds) {
+      _selectedCkgIds = widget.selectedCkgIds.map(_convertToMaCk).where((id) => id.isNotEmpty).toSet();
+      print('💰 Updated _selectedCkgIds from widget: $_selectedCkgIds');
+    }
+    if (widget.selectedHHIds != oldWidget.selectedHHIds) {
+      _selectedHHIds = Set.from(widget.selectedHHIds);
+      print('💰 Updated _selectedHHIds from widget: $_selectedHHIds');
+    }
+    if (widget.selectedCktdttIds != oldWidget.selectedCktdttIds) {
+      _selectedCktdttIds = Set.from(widget.selectedCktdttIds);
+      print('💰 Updated _selectedCktdttIds from widget: $_selectedCktdttIds');
+    }
+    if (widget.selectedCknGroups != oldWidget.selectedCknGroups) {
+      _selectedCknGroups = Set.from(widget.selectedCknGroups);
+    }
+    if (widget.selectedCktdthGroups != oldWidget.selectedCktdthGroups) {
+      _selectedCktdthGroups = Set.from(widget.selectedCktdthGroups);
+    }
   }
   
   @override
@@ -412,8 +448,10 @@ class DiscountVoucherSelectionSheetState extends State<DiscountVoucherSelectionS
             setState(() {
               if (value == true) {
                 _selectedHHIds.add(hhId);
+                widget.onSelectHH?.call(hhId, hhItem);
               } else {
                 _selectedHHIds.remove(hhId);
+                widget.onRemoveHH?.call(hhId, hhItem);
               }
             });
           },

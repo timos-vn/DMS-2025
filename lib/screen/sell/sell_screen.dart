@@ -220,6 +220,7 @@ class _SellScreenState extends State<SellScreen> with TickerProviderStateMixin{
                   buildTitle('Đặt đơn'),
                   buildButton(title: 'Tạo đơn hàng mới',icons:  MdiIcons.cartOutline,lock:  Const.createNewOrder == true ? false : true, onTap: (){
                     if(Const.createNewOrder == true){
+                      // Tạo đơn hàng mới: không bắt buộc chọn khách hàng trước.
                       PersistentNavBarNavigator.pushNewScreen(context, screen: const OrderScreen(),withNavBar: false);
                     }else{
                       Utils.showUpgradeAccount(context);
@@ -252,7 +253,7 @@ class _SellScreenState extends State<SellScreen> with TickerProviderStateMixin{
                       Utils.showUpgradeAccount(context);
                     }
                   },),
-                  buildButton(title: 'Phiếu giữ hàng',icons: EneftyIcons.save_2_outline,lock: Const.infoProduction == true ? false : true,onTap: (){
+                  buildButton(title: 'Phiếu giữ hàng',icons: EneftyIcons.save_2_outline,lock: Const.historyKeepCardList == true ? false : true,onTap: (){
                     if(Const.historyKeepCardList == true){
                       PersistentNavBarNavigator.pushNewScreen(context, screen: HistoryItemHolderScreen(userId: _bloc.userCode.toString(),),withNavBar: true);
                     }else{

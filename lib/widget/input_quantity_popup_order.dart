@@ -277,88 +277,304 @@ class _InputQuantityPopupOrderState extends State<InputQuantityPopupOrder> {
                             SizedBox(
                               height: 170,
                               child: Card(
-                              semanticContainer: true,
-                              margin: const EdgeInsets.only(left: 10,right: 10),
-                              child: Column(
-                                children: [
-                                  Expanded(
-                                    child: Row(
-                                      children: [
-                                        Container(
-                                          width: 100,
-                                          height: 110,
-                                          decoration: const BoxDecoration(
-                                              borderRadius:BorderRadius.all( Radius.circular(6),),
-                                          ),
-                                          child: const Icon(EneftyIcons.image_outline,size: 50,weight: 0.6,)
-                                          //Image.network('https://i.pinimg.com/564x/49/77/91/4977919321475b060fcdd89504cee992.jpg',fit: BoxFit.contain,),
-                                        ),
-                                        Expanded(
-                                          child: Padding(
-                                            padding: const EdgeInsets.only(top: 0,right: 6),
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.center,
-                                              mainAxisAlignment: MainAxisAlignment.center,
-                                              children: [
-                                                Container(
-                                                color: Colors.white,
-                                                height: 30,
-                                                padding: const EdgeInsets.only(right: 6),
-                                                child: TextField(
-                                                  autofocus: false,
-                                                  enabled: Const.editNameProduction == true ? true : false,
-                                                  textAlign: TextAlign.left,
-                                                  textAlignVertical: TextAlignVertical.top,
-                                                  style: const TextStyle(color: subColor, fontSize: 14, fontWeight: FontWeight.w600,overflow: TextOverflow.ellipsis),
-                                                  maxLines: 1,
-                                                  controller: nameProductController,
-                                                  keyboardType: TextInputType.text,
-                                                  textInputAction: TextInputAction.done,
-                                                  onChanged: (string){
-                                                    if(string != '' ){
-                                                      nameProductionEdited = string;
-                                                    }
-                                                  },
-                                                  decoration: InputDecoration(
-                                                      border: InputBorder.none,
-                                                      filled: true,
-                                                      fillColor: transparent,
-                                                      hintText: "Vui lòng nhập tên sản phẩm",
-                                                      hintStyle: const TextStyle(color: accent),
-                                                      suffixIcon: Icon(FluentIcons.edit_12_filled,size: 15,color: Const.editNameProduction == true ? Colors.grey : Colors.transparent,),
-                                                      suffixIconConstraints: const BoxConstraints(maxWidth: 20),
-                                                      contentPadding: const EdgeInsets.only(
-                                                          bottom: 12, right: 20,left: 0)
-                                                  ),
-                                                ),
+                                semanticContainer: true,
+                                margin: const EdgeInsets.only(left: 10,right: 10),
+                                child: Column(
+                                  children: [
+                                    Expanded(
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                              width: 100,
+                                              height: 110,
+                                              decoration: const BoxDecoration(
+                                                borderRadius:BorderRadius.all( Radius.circular(6),),
                                               ),
-                                                const SizedBox(height: 5,),
-                                                Row(
-                                                  crossAxisAlignment: CrossAxisAlignment.center,
-                                                  children: [
-                                                    const Icon(FluentIcons.cart_16_filled),
-                                                    const SizedBox(width: 5,),
-                                                    Expanded(
-                                                      flex: 3,
-                                                      child: SizedBox(
-                                                        height: 25,
-                                                        child: genderStore(),
+                                              child: const Icon(EneftyIcons.image_outline,size: 50,weight: 0.6,)
+                                            //Image.network('https://i.pinimg.com/564x/49/77/91/4977919321475b060fcdd89504cee992.jpg',fit: BoxFit.contain,),
+                                          ),
+                                          Expanded(
+                                            child: Padding(
+                                              padding: const EdgeInsets.only(top: 0,right: 6),
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.center,
+                                                mainAxisAlignment: MainAxisAlignment.center,
+                                                children: [
+                                                  Container(
+                                                    color: Colors.white,
+                                                    height: 30,
+                                                    padding: const EdgeInsets.only(right: 6),
+                                                    child: TextField(
+                                                      autofocus: false,
+                                                      enabled: Const.editNameProduction == true ? true : false,
+                                                      textAlign: TextAlign.left,
+                                                      textAlignVertical: TextAlignVertical.top,
+                                                      style: const TextStyle(color: subColor, fontSize: 14, fontWeight: FontWeight.w600,overflow: TextOverflow.ellipsis),
+                                                      maxLines: 1,
+                                                      controller: nameProductController,
+                                                      keyboardType: TextInputType.text,
+                                                      textInputAction: TextInputAction.done,
+                                                      onChanged: (string){
+                                                        if(string != '' ){
+                                                          nameProductionEdited = string;
+                                                        }
+                                                      },
+                                                      decoration: InputDecoration(
+                                                          border: InputBorder.none,
+                                                          filled: true,
+                                                          fillColor: transparent,
+                                                          hintText: "Vui lòng nhập tên sản phẩm",
+                                                          hintStyle: const TextStyle(color: accent),
+                                                          suffixIcon: Icon(FluentIcons.edit_12_filled,size: 15,color: Const.editNameProduction == true ? Colors.grey : Colors.transparent,),
+                                                          suffixIconConstraints: const BoxConstraints(maxWidth: 20),
+                                                          contentPadding: const EdgeInsets.only(
+                                                              bottom: 12, right: 20,left: 0)
                                                       ),
                                                     ),
-                                                    Expanded(
-                                                      flex: 4,
-                                                      child: Row(
-                                                        children: [
-                                                          const SizedBox(width: 10,),
-                                                          Container(
-                                                            height: 13,
-                                                            width: 1.5,
-                                                            color: Colors.grey,
+                                                  ),
+                                                  const SizedBox(height: 5,),
+                                                  Row(
+                                                    crossAxisAlignment: CrossAxisAlignment.center,
+                                                    children: [
+                                                      const Icon(FluentIcons.cart_16_filled),
+                                                      const SizedBox(width: 5,),
+                                                      Expanded(
+                                                        flex: 3,
+                                                        child: SizedBox(
+                                                          height: 25,
+                                                          child: genderStore(),
+                                                        ),
+                                                      ),
+                                                      Expanded(
+                                                        flex: 4,
+                                                        child: Row(
+                                                          children: [
+                                                            const SizedBox(width: 10,),
+                                                            Container(
+                                                              height: 13,
+                                                              width: 1.5,
+                                                              color: Colors.grey,
+                                                            ),
+                                                            const SizedBox(width: 10,),
+                                                            Expanded(
+                                                              child: Container(
+                                                                width: double.infinity,height: 25,
+                                                                decoration: BoxDecoration(
+                                                                    borderRadius: BorderRadius.circular(16),
+                                                                    color: Colors.white
+                                                                ),
+                                                                child: Row(
+                                                                  mainAxisAlignment: MainAxisAlignment.start,
+                                                                  children: [
+                                                                    const Text(
+                                                                      '\$',
+                                                                      style:TextStyle(color: Colors.black, fontSize: 14,fontWeight: FontWeight.bold),
+                                                                    ),
+                                                                    Expanded(
+                                                                      child: Container(
+                                                                        color: Colors.white,
+                                                                        padding: const EdgeInsets.only(right: 6),
+                                                                        child: TextField(
+                                                                          autofocus: false,
+                                                                          enabled: canEditPrice,
+                                                                          textAlign: TextAlign.left,
+                                                                          textAlignVertical: TextAlignVertical.top,
+                                                                          style: const TextStyle(color: Colors.black, fontSize: 14,fontWeight: FontWeight.bold),
+                                                                          controller: priceController,
+                                                                          keyboardType: TextInputType.number,
+                                                                          textInputAction: TextInputAction.done,
+                                                                          onChanged: (string){
+                                                                            if(string != '' ){
+                                                                              if(string.contains(',')){
+                                                                                priceInput = double.parse(string.replaceAll(',', ''));
+                                                                              }else{
+                                                                                priceInput = double.parse(string);
+                                                                              }
+                                                                              string = _formatNumber(string.replaceAll(',', '').replaceAll('.', ''));
+                                                                              priceController.value = TextEditingValue(
+                                                                                text: string,
+                                                                                selection: TextSelection.collapsed(offset: string.length),
+                                                                              );
+                                                                              double qty = 0;
+                                                                              qty = double.parse(contentController.text.toString().isNotEmpty == true ? contentController.text.toString() : '1');
+                                                                              priceTotalController.text = Utils.formatMoneyStringToDouble(qty * priceInput ).toString();
+                                                                            }
+                                                                            else{
+                                                                              double qty = 0;
+                                                                              qty = double.parse(contentController.text.toString().isNotEmpty == true ? contentController.text.toString() : '1');
+                                                                              priceTotalController.text = Utils.formatMoneyStringToDouble(qty * widget.price).toString();
+                                                                            }
+                                                                            if(widget.listStock.isNotEmpty){
+                                                                              if(priceInput <= double.parse(widget.listStock[0].priceMin.toString())){
+                                                                                Utils.showCustomToast(context, Icons.warning_amber, 'Lưu ý: Giá của bạn đang dưới hoặc bằng với giá Min');
+                                                                              }
+                                                                            }
+                                                                          },
+                                                                          decoration: InputDecoration(
+                                                                              border: InputBorder.none,
+                                                                              filled: true,
+                                                                              fillColor: transparent,
+                                                                              hintText: "0",
+                                                                              hintStyle: const TextStyle(color: accent),
+                                                                              suffixIcon: Icon(FluentIcons.edit_12_filled,size: 15,color: canEditPrice ? Colors.grey : Colors.transparent,),
+                                                                              suffixIconConstraints: const BoxConstraints(maxWidth: 20),
+                                                                              contentPadding: const EdgeInsets.only(
+                                                                                  bottom: 14, top: 0,right: 0)
+                                                                          ),
+                                                                        ),
+                                                                      ),
+                                                                    ),
+                                                                  ],
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      )
+                                                    ],
+                                                  ),
+                                                  const SizedBox(height: 3,),
+                                                  Visibility(
+                                                    visible: (Const.giaGui == true || Const.typeProduction == true) && widget.isCreateItemHolder != true,
+                                                    child: Row(
+                                                      crossAxisAlignment: CrossAxisAlignment.center,
+                                                      children: [
+                                                        const Icon(FluentIcons.clipboard_task_list_ltr_20_filled),
+                                                        const SizedBox(width: 5,),
+                                                        Visibility(
+                                                          visible: Const.typeProduction == true && widget.isCreateItemHolder != true,
+                                                          child: Expanded(
+                                                            flex: 3,
+                                                            child: SizedBox(
+                                                                height: 25,
+                                                                child: genderTypes()
+                                                            ),
                                                           ),
-                                                          const SizedBox(width: 10,),
+                                                        ),
+                                                        Visibility(
+                                                          visible: Const.giaGui == true && widget.isCreateItemHolder != true,
+                                                          child: Expanded(
+                                                            flex: 4,
+                                                            child: Row(
+                                                              children: [
+                                                                const SizedBox(width: 10,),
+                                                                Container(
+                                                                  height: 13,
+                                                                  width: 1.5,
+                                                                  color: Colors.grey,
+                                                                ),
+                                                                const SizedBox(width: 10,),
+                                                                Visibility(
+                                                                  visible: giaGuiController.text.isNotEmpty && giaGuiController.text != '',
+                                                                  child: const Text(
+                                                                    '\$',
+                                                                    style:TextStyle(color: Colors.black, fontSize: 14,fontWeight: FontWeight.bold),
+                                                                  ),
+                                                                ),
+                                                                Expanded(
+                                                                  child: Container(
+                                                                    color: Colors.white, padding: const EdgeInsets.only(right: 6),
+                                                                    width: double.infinity,height: 25,
+                                                                    child: TextField(
+                                                                      autofocus: false,
+                                                                      textAlign: TextAlign.left,
+                                                                      textAlignVertical: TextAlignVertical.center,
+                                                                      style: const TextStyle(color: Colors.black, fontSize: 14,fontWeight: FontWeight.bold),
+                                                                      controller: giaGuiController,
+                                                                      keyboardType: TextInputType.number,
+                                                                      textInputAction: TextInputAction.done,
+                                                                      onChanged: (string){
+                                                                        setState(() {
+                                                                          if(string != '' ){
+                                                                            if(string.contains(',')){
+                                                                              giaGui = double.parse(string.replaceAll(',', ''));
+                                                                            }else{
+                                                                              giaGui = double.parse(string);
+                                                                            }
+                                                                            string = _formatNumber(string.replaceAll(',', ''));
+                                                                            giaGuiController.value = TextEditingValue(
+                                                                              text: string,
+                                                                              selection: TextSelection.collapsed(offset: string.length),
+                                                                            );
+                                                                          }
+                                                                        });
+                                                                      },
+                                                                      decoration: const InputDecoration(
+                                                                          border: InputBorder.none,
+                                                                          filled: true,
+                                                                          fillColor: transparent,
+                                                                          hintText: "Giá thu",
+                                                                          hintStyle: TextStyle(color: Colors.blueGrey,fontSize: 12,fontWeight: FontWeight.normal),
+                                                                          suffixIconConstraints: BoxConstraints(maxWidth: 20),
+                                                                          suffixIcon: Icon(FluentIcons.edit_12_filled,size: 15,),
+                                                                          contentPadding: EdgeInsets.only(
+                                                                              bottom: 16, top: 0)
+                                                                      ),
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                              ],
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                  Visibility(
+                                                    visible: widget.isCreateItemHolder == true,
+                                                    child: SizedBox(
+                                                      height: 25,
+                                                      width: double.infinity,
+                                                      child: Row(
+                                                        crossAxisAlignment: CrossAxisAlignment.center,
+                                                        children: [
+                                                          const Icon(FluentIcons.building_shop_16_filled),
+                                                          const SizedBox(width: 5,),
+                                                          Expanded(
+                                                            child: InkWell(
+                                                              onTap: (){
+                                                                showDialog(
+                                                                    context: context,
+                                                                    builder: (context) => const FilterScreen(controller: 'dmdvcs_lookup',
+                                                                      listItem: null,show: false,)).then((value){
+                                                                  if(value != null){
+                                                                    setState(() {
+                                                                      codeUnit = value[0];
+                                                                      nameUnit = value[1];
+                                                                    });
+                                                                  }
+                                                                });
+                                                              },
+                                                              child: Row(
+                                                                children: [
+                                                                  Expanded(
+                                                                    child: Text(
+                                                                      nameUnit.isNotEmpty ? nameUnit : 'Vui lòng chọn đơn vị',
+                                                                      style: const TextStyle(color: Colors.blueGrey,fontSize: 12,fontWeight: FontWeight.normal),
+                                                                    ),
+                                                                  ),
+                                                                  const Icon(EneftyIcons.search_normal_outline,size: 15,color: accent,),
+                                                                  const SizedBox(width: 5,),
+                                                                ],
+                                                              ),
+                                                            ),
+                                                          )
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  Visibility(
+                                                    visible: Const.manyUnitAllow == false,
+                                                    child: Padding(
+                                                      padding: const EdgeInsets.only(top: 5),
+                                                      child: Row(
+                                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                                        children: [
                                                           Expanded(
                                                             child: Container(
-                                                              width: double.infinity,height: 25,
+                                                              height: 35,
+                                                              width: 100,
+                                                              padding: const EdgeInsets.symmetric(horizontal: 10),
                                                               decoration: BoxDecoration(
                                                                   borderRadius: BorderRadius.circular(16),
                                                                   color: Colors.white
@@ -372,54 +588,34 @@ class _InputQuantityPopupOrderState extends State<InputQuantityPopupOrder> {
                                                                   ),
                                                                   Expanded(
                                                                     child: Container(
-                                                                      color: Colors.white,
-                                                                      padding: const EdgeInsets.only(right: 6),
+                                                                      color: Colors.transparent,
+                                                                      width: 40,
                                                                       child: TextField(
                                                                         autofocus: false,
-                                                                        enabled: canEditPrice,
+                                                                        enabled: false,
                                                                         textAlign: TextAlign.left,
                                                                         textAlignVertical: TextAlignVertical.top,
                                                                         style: const TextStyle(color: Colors.black, fontSize: 14,fontWeight: FontWeight.bold),
-                                                                        controller: priceController,
+                                                                        controller: priceTotalController,
                                                                         keyboardType: TextInputType.number,
                                                                         textInputAction: TextInputAction.done,
                                                                         onChanged: (string){
                                                                           if(string != '' ){
-                                                                            if(string.contains(',')){
-                                                                              priceInput = double.parse(string.replaceAll(',', ''));
-                                                                            }else{
-                                                                              priceInput = double.parse(string);
-                                                                            }
-                                                                            string = _formatNumber(string.replaceAll(',', '').replaceAll('.', ''));
-                                                                            priceController.value = TextEditingValue(
+                                                                            string = _formatNumber(string.replaceAll(',', ''));
+                                                                            priceTotalController.value = TextEditingValue(
                                                                               text: string,
                                                                               selection: TextSelection.collapsed(offset: string.length),
                                                                             );
-                                                                            double qty = 0;
-                                                                            qty = double.parse(contentController.text.toString().isNotEmpty == true ? contentController.text.toString() : '1');
-                                                                            priceTotalController.text = Utils.formatMoneyStringToDouble(qty * priceInput ).toString();
-                                                                          }
-                                                                          else{
-                                                                            double qty = 0;
-                                                                            qty = double.parse(contentController.text.toString().isNotEmpty == true ? contentController.text.toString() : '1');
-                                                                            priceTotalController.text = Utils.formatMoneyStringToDouble(qty * widget.price).toString();
-                                                                          }
-                                                                          if(widget.listStock.isNotEmpty){
-                                                                            if(priceInput <= double.parse(widget.listStock[0].priceMin.toString())){
-                                                                              Utils.showCustomToast(context, Icons.warning_amber, 'Lưu ý: Giá của bạn đang dưới hoặc bằng với giá Min');
-                                                                            }
                                                                           }
                                                                         },
-                                                                        decoration: InputDecoration(
+                                                                        decoration: const InputDecoration(
                                                                             border: InputBorder.none,
                                                                             filled: true,
                                                                             fillColor: transparent,
                                                                             hintText: "0",
-                                                                            hintStyle: const TextStyle(color: accent),
-                                                                            suffixIcon: Icon(FluentIcons.edit_12_filled,size: 15,color: canEditPrice ? Colors.grey : Colors.transparent,),
-                                                                            suffixIconConstraints: const BoxConstraints(maxWidth: 20),
-                                                                            contentPadding: const EdgeInsets.only(
-                                                                                bottom: 14, top: 0,right: 0)
+                                                                            hintStyle: TextStyle(color: accent),
+                                                                            contentPadding: EdgeInsets.only(
+                                                                                bottom: 14, top: 0)
                                                                         ),
                                                                       ),
                                                                     ),
@@ -428,500 +624,304 @@ class _InputQuantityPopupOrderState extends State<InputQuantityPopupOrder> {
                                                               ),
                                                             ),
                                                           ),
-                                                        ],
-                                                      ),
-                                                    )
-                                                  ],
-                                                ),
-                                                const SizedBox(height: 3,),
-                                                Visibility(
-                                                  visible: (Const.giaGui == true || Const.typeProduction == true) && widget.isCreateItemHolder != true,
-                                                  child: Row(
-                                                    crossAxisAlignment: CrossAxisAlignment.center,
-                                                    children: [
-                                                      const Icon(FluentIcons.clipboard_task_list_ltr_20_filled),
-                                                      const SizedBox(width: 5,),
-                                                      Visibility(
-                                                        visible: Const.typeProduction == true && widget.isCreateItemHolder != true,
-                                                        child: Expanded(
-                                                          flex: 3,
-                                                          child: SizedBox(
-                                                              height: 25,
-                                                              child: genderTypes()
-                                                          ),
-                                                        ),
-                                                      ),
-                                                      Visibility(
-                                                        visible: Const.giaGui == true && widget.isCreateItemHolder != true,
-                                                        child: Expanded(
-                                                          flex: 4,
-                                                          child: Row(
-                                                            children: [
-                                                              const SizedBox(width: 10,),
-                                                              Container(
-                                                                height: 13,
-                                                                width: 1.5,
-                                                                color: Colors.grey,
-                                                              ),
-                                                              const SizedBox(width: 10,),
-                                                              Visibility(
-                                                                visible: giaGuiController.text.isNotEmpty && giaGuiController.text != '',
-                                                                child: const Text(
-                                                                  '\$',
-                                                                  style:TextStyle(color: Colors.black, fontSize: 14,fontWeight: FontWeight.bold),
-                                                                ),
-                                                              ),
-                                                              Expanded(
-                                                                child: Container(
-                                                                  color: Colors.white, padding: const EdgeInsets.only(right: 6),
-                                                                  width: double.infinity,height: 25,
+                                                          Container(
+                                                            height: 35,
+                                                            // width: 100,
+                                                            padding: const EdgeInsets.symmetric(horizontal: 0),
+                                                            decoration: BoxDecoration(
+                                                                borderRadius: BorderRadius.circular(16),
+                                                                color: grey_100
+                                                            ),
+                                                            child: Row(
+                                                              mainAxisAlignment: MainAxisAlignment.spaceAround,
+                                                              children: [
+                                                                InkWell(
+                                                                    onTap: (){
+                                                                      double qty = 0;
+                                                                      qty = double.parse(contentController.text.toString().isNotEmpty == true ? contentController.text.toString() : '1');
+                                                                      if(qty > 1){
+                                                                        setState(() {
+                                                                          qty = qty - 1;
+                                                                          contentController.text = qty.toString();
+                                                                          valueInput = double.parse(contentController.text);
+                                                                          priceTotalController.text = Utils.formatMoneyStringToDouble(qty * priceInput).toString();
+                                                                        });
+                                                                      }
+                                                                    },
+                                                                    child: const SizedBox(
+                                                                        height: 35,width: 25,
+                                                                        child: Icon(FluentIcons.subtract_12_filled,size: 15,))),
+                                                                Container(
+                                                                  color: Colors.transparent,
+                                                                  width: 45,
                                                                   child: TextField(
                                                                     autofocus: false,
-                                                                    textAlign: TextAlign.left,
-                                                                    textAlignVertical: TextAlignVertical.center,
-                                                                    style: const TextStyle(color: Colors.black, fontSize: 14,fontWeight: FontWeight.bold),
-                                                                    controller: giaGuiController,
-                                                                    keyboardType: TextInputType.number,
+                                                                    textAlign: TextAlign.center,
+                                                                    textAlignVertical: TextAlignVertical.top,
+                                                                    style: const TextStyle(fontSize: 14, color: accent),
+                                                                    controller: contentController,
+                                                                    keyboardType: const TextInputType.numberWithOptions(signed: true, decimal: true),
+                                                                    inputFormatters: [
+                                                                      FilteringTextInputFormatter.allow(RegExp('[0-9.]')),
+                                                                    ],
                                                                     textInputAction: TextInputAction.done,
-                                                                    onChanged: (string){
-                                                                      setState(() {
-                                                                        if(string != '' ){
-                                                                          if(string.contains(',')){
-                                                                            giaGui = double.parse(string.replaceAll(',', ''));
-                                                                          }else{
-                                                                            giaGui = double.parse(string);
-                                                                          }
-                                                                          string = _formatNumber(string.replaceAll(',', ''));
-                                                                          giaGuiController.value = TextEditingValue(
-                                                                            text: string,
-                                                                            selection: TextSelection.collapsed(offset: string.length),
-                                                                          );
-                                                                        }
-                                                                      });
+                                                                    onChanged: (text){
+                                                                      double qty = 0;
+                                                                      if(contentController.text.toString().isNotEmpty && contentController.text.toString() != 'null'){
+                                                                        qty = double.parse(contentController.text.toString().isNotEmpty == true ? contentController.text.toString() : '1');
+                                                                        setState(() {
+                                                                          valueInput = double.parse(contentController.text);
+                                                                          priceTotalController.text = Utils.formatMoneyStringToDouble(qty * priceInput).toString();
+                                                                        });
+                                                                      }
+                                                                      else{
+                                                                        setState(() {
+                                                                          valueInput = 1;
+                                                                          priceTotalController.text = Utils.formatMoneyStringToDouble(qty * priceInput).toString();
+                                                                        });
+                                                                      }
                                                                     },
                                                                     decoration: const InputDecoration(
                                                                         border: InputBorder.none,
                                                                         filled: true,
                                                                         fillColor: transparent,
-                                                                        hintText: "Giá thu",
-                                                                        hintStyle: TextStyle(color: Colors.blueGrey,fontSize: 12,fontWeight: FontWeight.normal),
-                                                                        suffixIconConstraints: BoxConstraints(maxWidth: 20),
-                                                                        suffixIcon: Icon(FluentIcons.edit_12_filled,size: 15,),
+                                                                        hintText: "1",
+                                                                        hintStyle: TextStyle(color: accent),
                                                                         contentPadding: EdgeInsets.only(
-                                                                            bottom: 16, top: 0)
+                                                                            bottom: 12, top: 0)
                                                                     ),
                                                                   ),
                                                                 ),
-                                                              ),
-                                                            ],
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                                Visibility(
-                                                  visible: widget.isCreateItemHolder == true,
-                                                  child: SizedBox(
-                                                    height: 25,
-                                                    width: double.infinity,
-                                                    child: Row(
-                                                      crossAxisAlignment: CrossAxisAlignment.center,
-                                                      children: [
-                                                        const Icon(FluentIcons.building_shop_16_filled),
-                                                        const SizedBox(width: 5,),
-                                                        Expanded(
-                                                          child: InkWell(
-                                                            onTap: (){
-                                                              showDialog(
-                                                                  context: context,
-                                                                  builder: (context) => const FilterScreen(controller: 'dmdvcs_lookup',
-                                                                    listItem: null,show: false,)).then((value){
-                                                                if(value != null){
-                                                                  setState(() {
-                                                                    codeUnit = value[0];
-                                                                    nameUnit = value[1];
-                                                                  });
-                                                                }
-                                                              });
-                                                            },
-                                                            child: Row(
-                                                              children: [
-                                                                Expanded(
-                                                                  child: Text(
-                                                                    nameUnit.isNotEmpty ? nameUnit : 'Vui lòng chọn đơn vị',
-                                                                    style: const TextStyle(color: Colors.blueGrey,fontSize: 12,fontWeight: FontWeight.normal),
-                                                                  ),
+                                                                SizedBox(
+                                                                  // width: 70,height: 30,
+                                                                  child: genderUnitOfCalculation(),
                                                                 ),
-                                                                const Icon(EneftyIcons.search_normal_outline,size: 15,color: accent,),
-                                                                const SizedBox(width: 5,),
-                                                              ],
-                                                            ),
-                                                          ),
-                                                        )
-                                                      ],
-                                                    ),
-                                                  ),
-                                                ),
-                                                Visibility(
-                                                  visible: Const.manyUnitAllow == false,
-                                                  child: Padding(
-                                                    padding: const EdgeInsets.only(top: 5),
-                                                    child: Row(
-                                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                                      children: [
-                                                        Expanded(
-                                                          child: Container(
-                                                            height: 35,
-                                                            width: 100,
-                                                            padding: const EdgeInsets.symmetric(horizontal: 10),
-                                                            decoration: BoxDecoration(
-                                                                borderRadius: BorderRadius.circular(16),
-                                                                color: Colors.white
-                                                            ),
-                                                            child: Row(
-                                                              mainAxisAlignment: MainAxisAlignment.start,
-                                                              children: [
-                                                                const Text(
-                                                                  '\$',
-                                                                  style:TextStyle(color: Colors.black, fontSize: 14,fontWeight: FontWeight.bold),
-                                                                ),
-                                                                Expanded(
-                                                                  child: Container(
-                                                                    color: Colors.transparent,
-                                                                    width: 40,
-                                                                    child: TextField(
-                                                                      autofocus: false,
-                                                                      enabled: false,
-                                                                      textAlign: TextAlign.left,
-                                                                      textAlignVertical: TextAlignVertical.top,
-                                                                      style: const TextStyle(color: Colors.black, fontSize: 14,fontWeight: FontWeight.bold),
-                                                                      controller: priceTotalController,
-                                                                      keyboardType: TextInputType.number,
-                                                                      textInputAction: TextInputAction.done,
-                                                                      onChanged: (string){
-                                                                        if(string != '' ){
-                                                                          string = _formatNumber(string.replaceAll(',', ''));
-                                                                          priceTotalController.value = TextEditingValue(
-                                                                            text: string,
-                                                                            selection: TextSelection.collapsed(offset: string.length),
-                                                                          );
-                                                                        }
-                                                                      },
-                                                                      decoration: const InputDecoration(
-                                                                          border: InputBorder.none,
-                                                                          filled: true,
-                                                                          fillColor: transparent,
-                                                                          hintText: "0",
-                                                                          hintStyle: TextStyle(color: accent),
-                                                                          contentPadding: EdgeInsets.only(
-                                                                              bottom: 14, top: 0)
-                                                                      ),
-                                                                    ),
-                                                                  ),
-                                                                ),
-                                                              ],
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          height: 35,
-                                                          // width: 100,
-                                                          padding: const EdgeInsets.symmetric(horizontal: 0),
-                                                          decoration: BoxDecoration(
-                                                            borderRadius: BorderRadius.circular(16),
-                                                            color: grey_100
-                                                          ),
-                                                          child: Row(
-                                                            mainAxisAlignment: MainAxisAlignment.spaceAround,
-                                                            children: [
-                                                              InkWell(
-                                                                  onTap: (){
-                                                                    double qty = 0;
-                                                                    qty = double.parse(contentController.text.toString().isNotEmpty == true ? contentController.text.toString() : '1');
-                                                                    if(qty > 1){
+                                                                InkWell(
+                                                                    onTap: (){
+                                                                      double qty = 0;
+                                                                      qty = double.parse(contentController.text.toString().isNotEmpty == true ? contentController.text.toString() : '1');
                                                                       setState(() {
-                                                                        qty = qty - 1;
+                                                                        qty = qty + 1;
                                                                         contentController.text = qty.toString();
                                                                         valueInput = double.parse(contentController.text);
                                                                         priceTotalController.text = Utils.formatMoneyStringToDouble(qty * priceInput).toString();
                                                                       });
-                                                                    }
-                                                                  },
-                                                                  child: const SizedBox(
-                                                                      height: 35,width: 25,
-                                                                      child: Icon(FluentIcons.subtract_12_filled,size: 15,))),
-                                                              Container(
+                                                                    },
+                                                                    child: const SizedBox(width: 25,
+                                                                        height: 35,child: Icon(FluentIcons.add_12_filled,size: 15))),
+                                                              ],
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          )
+                                        ],
+                                      ),
+                                    ),
+                                    Visibility(
+                                      visible: Const.manyUnitAllow == true,
+                                      child: Padding(
+                                        padding: const EdgeInsets.only(bottom: 12),
+                                        child: Container(
+                                          height: 35,
+                                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                                          decoration: BoxDecoration(
+                                              borderRadius: BorderRadius.circular(16),
+                                              color: Colors.white
+                                          ),
+                                          child: Row(
+                                            mainAxisAlignment: MainAxisAlignment.start,
+                                            children: [
+                                              Expanded(
+                                                child:  Row(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Expanded(
+                                                      child: Container(
+                                                        height: 35,
+                                                        width: 100,
+                                                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                                                        decoration: BoxDecoration(
+                                                            borderRadius: BorderRadius.circular(16),
+                                                            color: Colors.white
+                                                        ),
+                                                        child: Row(
+                                                          mainAxisAlignment: MainAxisAlignment.start,
+                                                          children: [
+                                                            const Text(
+                                                              '\$',
+                                                              style:TextStyle(color: Colors.black, fontSize: 14,fontWeight: FontWeight.bold),
+                                                            ),
+                                                            Expanded(
+                                                              child: Container(
                                                                 color: Colors.transparent,
-                                                                width: 45,
+                                                                width: 40,
                                                                 child: TextField(
                                                                   autofocus: false,
-                                                                  textAlign: TextAlign.center,
+                                                                  enabled: false,
+                                                                  textAlign: TextAlign.left,
                                                                   textAlignVertical: TextAlignVertical.top,
-                                                                  style: const TextStyle(fontSize: 14, color: accent),
-                                                                  controller: contentController,
-                                                                  keyboardType: const TextInputType.numberWithOptions(signed: true, decimal: true),
-                                                                  inputFormatters: [
-                                                                    FilteringTextInputFormatter.allow(RegExp('[0-9.]')),
-                                                                  ],
+                                                                  style: const TextStyle(color: Colors.black, fontSize: 14,fontWeight: FontWeight.bold),
+                                                                  controller: priceTotalController,
+                                                                  keyboardType: TextInputType.number,
                                                                   textInputAction: TextInputAction.done,
-                                                                  onChanged: (text){
-                                                                    double qty = 0;
-                                                                    if(contentController.text.toString().isNotEmpty && contentController.text.toString() != 'null'){
-                                                                      qty = double.parse(contentController.text.toString().isNotEmpty == true ? contentController.text.toString() : '1');
-                                                                      setState(() {
-                                                                        valueInput = double.parse(contentController.text);
-                                                                        priceTotalController.text = Utils.formatMoneyStringToDouble(qty * priceInput).toString();
-                                                                      });
-                                                                    }
-                                                                    else{
-                                                                      setState(() {
-                                                                        valueInput = 1;
-                                                                        priceTotalController.text = Utils.formatMoneyStringToDouble(qty * priceInput).toString();
-                                                                      });
+                                                                  onChanged: (string){
+                                                                    if(string != '' ){
+                                                                      string = _formatNumber(string.replaceAll(',', ''));
+                                                                      priceTotalController.value = TextEditingValue(
+                                                                        text: string,
+                                                                        selection: TextSelection.collapsed(offset: string.length),
+                                                                      );
                                                                     }
                                                                   },
                                                                   decoration: const InputDecoration(
                                                                       border: InputBorder.none,
                                                                       filled: true,
                                                                       fillColor: transparent,
-                                                                      hintText: "1",
+                                                                      hintText: "0",
                                                                       hintStyle: TextStyle(color: accent),
                                                                       contentPadding: EdgeInsets.only(
-                                                                          bottom: 12, top: 0)
+                                                                          bottom: 14, top: 0)
                                                                   ),
                                                                 ),
                                                               ),
-                                                              SizedBox(
-                                                                // width: 70,height: 30,
-                                                                child: genderUnitOfCalculation(),
-                                                              ),
-                                                              InkWell(
-                                                                  onTap: (){
-                                                                    double qty = 0;
-                                                                    qty = double.parse(contentController.text.toString().isNotEmpty == true ? contentController.text.toString() : '1');
-                                                                    setState(() {
-                                                                      qty = qty + 1;
-                                                                      contentController.text = qty.toString();
-                                                                      valueInput = double.parse(contentController.text);
-                                                                      priceTotalController.text = Utils.formatMoneyStringToDouble(qty * priceInput).toString();
-                                                                    });
-                                                                  },
-                                                                  child: const SizedBox(width: 25,
-                                                                      height: 35,child: Icon(FluentIcons.add_12_filled,size: 15))),
-                                                            ],
-                                                          ),
+                                                            ),
+                                                          ],
                                                         ),
-                                                      ],
+                                                      ),
                                                     ),
-                                                  ),
-                                                ),
-                                            ],
-                                        ),
-                                          ),
-                                        )
-                                      ],
-                                    ),
-                                  ),
-                                  Visibility(
-                                    visible: Const.manyUnitAllow == true,
-                                    child: Padding(
-                                      padding: const EdgeInsets.only(bottom: 12),
-                                      child: Container(
-                                        height: 35,
-                                        padding: const EdgeInsets.symmetric(horizontal: 10),
-                                        decoration: BoxDecoration(
-                                            borderRadius: BorderRadius.circular(16),
-                                            color: Colors.white
-                                        ),
-                                        child: Row(
-                                          mainAxisAlignment: MainAxisAlignment.start,
-                                          children: [
-                                            Expanded(
-                                              child:  Row(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  Expanded(
-                                                    child: Container(
+                                                    Container(
                                                       height: 35,
-                                                      width: 100,
-                                                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                                                      // width: 100,
+                                                      padding: const EdgeInsets.symmetric(horizontal: 0),
                                                       decoration: BoxDecoration(
                                                           borderRadius: BorderRadius.circular(16),
-                                                          color: Colors.white
+                                                          color: grey_100
                                                       ),
                                                       child: Row(
-                                                        mainAxisAlignment: MainAxisAlignment.start,
+                                                        mainAxisAlignment: MainAxisAlignment.spaceAround,
                                                         children: [
-                                                          const Text(
-                                                            '\$',
-                                                            style:TextStyle(color: Colors.black, fontSize: 14,fontWeight: FontWeight.bold),
-                                                          ),
-                                                          Expanded(
-                                                            child: Container(
-                                                              color: Colors.transparent,
-                                                              width: 40,
-                                                              child: TextField(
-                                                                autofocus: false,
-                                                                enabled: false,
-                                                                textAlign: TextAlign.left,
-                                                                textAlignVertical: TextAlignVertical.top,
-                                                                style: const TextStyle(color: Colors.black, fontSize: 14,fontWeight: FontWeight.bold),
-                                                                controller: priceTotalController,
-                                                                keyboardType: TextInputType.number,
-                                                                textInputAction: TextInputAction.done,
-                                                                onChanged: (string){
-                                                                  if(string != '' ){
-                                                                    string = _formatNumber(string.replaceAll(',', ''));
-                                                                    priceTotalController.value = TextEditingValue(
-                                                                      text: string,
-                                                                      selection: TextSelection.collapsed(offset: string.length),
-                                                                    );
-                                                                  }
-                                                                },
-                                                                decoration: const InputDecoration(
-                                                                    border: InputBorder.none,
-                                                                    filled: true,
-                                                                    fillColor: transparent,
-                                                                    hintText: "0",
-                                                                    hintStyle: TextStyle(color: accent),
-                                                                    contentPadding: EdgeInsets.only(
-                                                                        bottom: 14, top: 0)
-                                                                ),
+                                                          InkWell(
+                                                              onTap: (){
+                                                                double qty = 0;
+                                                                qty = double.parse(contentController.text.toString().isNotEmpty == true ? contentController.text.toString() : '1');
+                                                                if(qty > 1){
+                                                                  setState(() {
+                                                                    qty = qty - 1;
+                                                                    contentController.text = qty.toString();
+                                                                    valueInput = double.parse(contentController.text);
+                                                                    priceTotalController.text = Utils.formatMoneyStringToDouble(qty * priceInput).toString();
+                                                                  });
+                                                                }
+                                                              },
+                                                              child: const SizedBox(
+                                                                  height: 35,width: 25,
+                                                                  child: Icon(FluentIcons.subtract_12_filled,size: 15,))),
+                                                          Container(
+                                                            color: Colors.transparent,
+                                                            width: 45,
+                                                            child: TextField(
+                                                              autofocus: false,
+                                                              textAlign: TextAlign.center,
+                                                              textAlignVertical: TextAlignVertical.top,
+                                                              style: const TextStyle(fontSize: 14, color: accent),
+                                                              controller: contentController,
+                                                              keyboardType: const TextInputType.numberWithOptions(signed: true, decimal: true),
+                                                              inputFormatters: [
+                                                                FilteringTextInputFormatter.allow(RegExp('[0-9.]')),
+                                                              ],
+                                                              textInputAction: TextInputAction.done,
+                                                              onChanged: (text){
+                                                                double qty = 0;
+                                                                if(contentController.text.toString().isNotEmpty && contentController.text.toString() != 'null'){
+                                                                  qty = double.parse(contentController.text.toString().isNotEmpty == true ? contentController.text.toString() : '1');
+                                                                  setState(() {
+                                                                    valueInput = double.parse(contentController.text);
+                                                                    priceTotalController.text = Utils.formatMoneyStringToDouble(qty * priceInput).toString();
+                                                                  });
+                                                                }
+                                                                else{
+                                                                  setState(() {
+                                                                    valueInput = 1;
+                                                                    priceTotalController.text = Utils.formatMoneyStringToDouble(qty * priceInput).toString();
+                                                                  });
+                                                                }
+                                                              },
+                                                              decoration: const InputDecoration(
+                                                                  border: InputBorder.none,
+                                                                  filled: true,
+                                                                  fillColor: transparent,
+                                                                  hintText: "1",
+                                                                  hintStyle: TextStyle(color: accent),
+                                                                  contentPadding: EdgeInsets.only(
+                                                                      bottom: 12, top: 0)
                                                               ),
                                                             ),
                                                           ),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  Container(
-                                                    height: 35,
-                                                    // width: 100,
-                                                    padding: const EdgeInsets.symmetric(horizontal: 0),
-                                                    decoration: BoxDecoration(
-                                                        borderRadius: BorderRadius.circular(16),
-                                                        color: grey_100
-                                                    ),
-                                                    child: Row(
-                                                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                                                      children: [
-                                                        InkWell(
-                                                            onTap: (){
-                                                              double qty = 0;
-                                                              qty = double.parse(contentController.text.toString().isNotEmpty == true ? contentController.text.toString() : '1');
-                                                              if(qty > 1){
+                                                          SizedBox(
+                                                            // width: 70,height: 30,
+                                                            child:  genderManyUnitAllow(),
+                                                          ),
+                                                          InkWell(
+                                                              onTap: (){
+                                                                double qty = 0;
+                                                                qty = double.parse(contentController.text.toString().isNotEmpty == true ? contentController.text.toString() : '1');
                                                                 setState(() {
-                                                                  qty = qty - 1;
+                                                                  qty = qty + 1;
                                                                   contentController.text = qty.toString();
                                                                   valueInput = double.parse(contentController.text);
                                                                   priceTotalController.text = Utils.formatMoneyStringToDouble(qty * priceInput).toString();
                                                                 });
-                                                              }
-                                                            },
-                                                            child: const SizedBox(
-                                                                height: 35,width: 25,
-                                                                child: Icon(FluentIcons.subtract_12_filled,size: 15,))),
-                                                        Container(
-                                                          color: Colors.transparent,
-                                                          width: 45,
-                                                          child: TextField(
-                                                            autofocus: false,
-                                                            textAlign: TextAlign.center,
-                                                            textAlignVertical: TextAlignVertical.top,
-                                                            style: const TextStyle(fontSize: 14, color: accent),
-                                                            controller: contentController,
-                                                            keyboardType: const TextInputType.numberWithOptions(signed: true, decimal: true),
-                                                            inputFormatters: [
-                                                              FilteringTextInputFormatter.allow(RegExp('[0-9.]')),
-                                                            ],
-                                                            textInputAction: TextInputAction.done,
-                                                            onChanged: (text){
-                                                              double qty = 0;
-                                                              if(contentController.text.toString().isNotEmpty && contentController.text.toString() != 'null'){
-                                                                qty = double.parse(contentController.text.toString().isNotEmpty == true ? contentController.text.toString() : '1');
-                                                                setState(() {
-                                                                  valueInput = double.parse(contentController.text);
-                                                                  priceTotalController.text = Utils.formatMoneyStringToDouble(qty * priceInput).toString();
-                                                                });
-                                                              }
-                                                              else{
-                                                                setState(() {
-                                                                  valueInput = 1;
-                                                                  priceTotalController.text = Utils.formatMoneyStringToDouble(qty * priceInput).toString();
-                                                                });
-                                                              }
-                                                            },
-                                                            decoration: const InputDecoration(
-                                                                border: InputBorder.none,
-                                                                filled: true,
-                                                                fillColor: transparent,
-                                                                hintText: "1",
-                                                                hintStyle: TextStyle(color: accent),
-                                                                contentPadding: EdgeInsets.only(
-                                                                    bottom: 12, top: 0)
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        SizedBox(
-                                                          // width: 70,height: 30,
-                                                          child:  genderManyUnitAllow(),
-                                                        ),
-                                                        InkWell(
-                                                            onTap: (){
-                                                              double qty = 0;
-                                                              qty = double.parse(contentController.text.toString().isNotEmpty == true ? contentController.text.toString() : '1');
-                                                              setState(() {
-                                                                qty = qty + 1;
-                                                                contentController.text = qty.toString();
-                                                                valueInput = double.parse(contentController.text);
-                                                                priceTotalController.text = Utils.formatMoneyStringToDouble(qty * priceInput).toString();
-                                                              });
-                                                            },
-                                                            child: const SizedBox(width: 25,
-                                                                height: 35,child: Icon(FluentIcons.add_12_filled,size: 15))),
-                                                      ],
+                                                              },
+                                                              child: const SizedBox(width: 25,
+                                                                  height: 35,child: Icon(FluentIcons.add_12_filled,size: 15))),
+                                                        ],
+                                                      ),
                                                     ),
-                                                  ),
-                                                ],
+                                                  ],
+                                                ),
                                               ),
-                                            ),
-                                          ],
+                                            ],
+                                          ),
                                         ),
                                       ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
-                            ),
                             Visibility(
-                                visible:  Const.isBaoGia,
-                                child: Column(
-                                    children: [
-                                      Row(
+                              visible:  Const.isBaoGia,
+                              child: Column(
+                                  children: [
+                                    Row(
                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children:[
-                                            Expanded(child: Text('Thuế: ${widget.tenThue}'.toString(),style:  TextStyle(color: mainColor,fontSize: 13,fontStyle: FontStyle.italic),)),
-                                            const SizedBox(width: 10,),
-                                             Text(widget.thueSuat.toString(),style:  TextStyle(color: mainColor,fontSize: 13,fontStyle: FontStyle.italic),),
-                                          ]
-                                      ),
-                                      customSelect('Nhân viên kinh doanh',false,onTap: (){
-                                        PersistentNavBarNavigator.pushNewScreen(context, screen: const SearchItem(customerID: '',typeSearch: 3, title: 'Nhân viên kinh doanh',)).then((value) {
-                                          if(value != null){
-                                            setState(() {
-                                              idNVKD = value[0];
-                                              nameNVKD = value[1];
-                                            });
-                                          }
-                                        });
-                                      },values: nameNVKD.toString()),
-                                      customSelect('Nước sản xuất',true,controller: nuocsxController,onTap: (){}),
-                                      customSelect('Quy cách',true,controller: quycachController,onTap: (){}),
-                                      const SizedBox(height: 16,)
-                                    ]
-                                ),
+                                        children:[
+                                          Expanded(child: Text('Thuế: ${widget.tenThue}'.toString(),style:  TextStyle(color: mainColor,fontSize: 13,fontStyle: FontStyle.italic),)),
+                                          const SizedBox(width: 10,),
+                                          Text(widget.thueSuat.toString(),style:  TextStyle(color: mainColor,fontSize: 13,fontStyle: FontStyle.italic),),
+                                        ]
+                                    ),
+                                    customSelect('Nhân viên kinh doanh',false,onTap: (){
+                                      PersistentNavBarNavigator.pushNewScreen(context, screen: const SearchItem(customerID: '',typeSearch: 3, title: 'Nhân viên kinh doanh',)).then((value) {
+                                        if(value != null){
+                                          setState(() {
+                                            idNVKD = value[0];
+                                            nameNVKD = value[1];
+                                          });
+                                        }
+                                      });
+                                    },values: nameNVKD.toString()),
+                                    customSelect('Nước sản xuất',true,controller: nuocsxController,onTap: (){}),
+                                    customSelect('Quy cách',true,controller: quycachController,onTap: (){}),
+                                    const SizedBox(height: 16,)
+                                  ]
+                              ),
                             ),
 
                             Visibility(
@@ -1532,8 +1532,22 @@ class _InputQuantityPopupOrderState extends State<InputQuantityPopupOrder> {
   }
 
   Widget genderManyUnitAllow() {
+    print('checl: ${Const.manyUnitAllow}');
     // Nếu cấu hình KHÔNG cho phép nhiều đơn vị tính → không hiển thị popup chọn
-    if (Const.manyUnitAllow != true) {
+    if (Const.manyUnitAllow == true) {
+      return widget.listQuyDoiDonViTinh.isEmpty
+          ? const Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
+          '',
+          style: TextStyle(color: Colors.blueGrey, fontSize: 12),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      )
+          : gen1();
+    }
+    else{
       return const Align(
         alignment: Alignment.centerLeft,
         child: Text(
@@ -1545,17 +1559,10 @@ class _InputQuantityPopupOrderState extends State<InputQuantityPopupOrder> {
       );
     }
 
-    return widget.listQuyDoiDonViTinh.isEmpty
-        ? const Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              '',
-              style: TextStyle(color: Colors.blueGrey, fontSize: 12),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          )
-        : PopupMenuButton(
+  }
+
+  Widget gen1(){
+    return PopupMenuButton(
       shape: const TooltipShape(),
       padding: EdgeInsets.zero,
       offset: const Offset(0, 40),

@@ -361,6 +361,7 @@ class AlbumImageScreenState extends State<AlbumImageScreen>with WidgetsBindingOb
                   backgroundColor: Colors.white,
                   floatingActionButton: (widget.view == false && widget.isCheckInSuccess == false && Const.imageCheckIn == true)//(widget.isToday == true && widget.view == false)
                       ? FloatingActionButton(
+                    heroTag: 'album_fab', // ✅ Unique tag để tránh lỗi Hero
                     backgroundColor: subColor,
                     onPressed: (){
                       setState(() {});

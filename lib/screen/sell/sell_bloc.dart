@@ -313,7 +313,7 @@ class SellBloc extends Bloc<SellEvent,SellState>{
         : InitialSellState()) ;
     if (isRefresh) {
       for (int i = 1; i <= _currentPage; i++) {
-        SellState state = await handleCallApi(i,event.status,event.dateFrom,event.dateTo,event.userId,event.typeLetterId);
+        SellState state = await handleCallApi(i,event.status,event.dateFrom,event.dateTo,event.userId,event.typeLetterId, event.firstElement);
         if (state is! GetListHistoryOrderSuccess) return;
       }
       return;
@@ -322,7 +322,7 @@ class SellBloc extends Bloc<SellEvent,SellState>{
       isScroll = false;
       _currentPage++;
     }
-    SellState state = await handleCallApi(_currentPage,event.status,event.dateFrom,event.dateTo,event.userId,event.typeLetterId);
+    SellState state = await handleCallApi(_currentPage,event.status,event.dateFrom,event.dateTo,event.userId,event.typeLetterId, event.firstElement);
     emitter(state);
   }
 
@@ -357,7 +357,7 @@ class SellBloc extends Bloc<SellEvent,SellState>{
     return state;
   }
 
-  Future<SellState> handleCallApi(int pageIndex,int status, DateTime dateFrom,DateTime dateTo, String userId, String letterTypeId) async {
+  Future<SellState> handleCallApi(int pageIndex,int status, DateTime dateFrom,DateTime dateTo, String userId, String letterTypeId, String? firstElement) async {
     ListHistoryOrderRequest request = ListHistoryOrderRequest(
         letterTypeId: letterTypeId,
         userCode: userId,
@@ -365,7 +365,7 @@ class SellBloc extends Bloc<SellEvent,SellState>{
         status: status.toString(),
         dateFrom:Utils.parseDateToString(dateFrom, Const.DATE_SV_FORMAT_2).toString(),
         dateTo: Utils.parseDateToString(dateTo, Const.DATE_SV_FORMAT_2).toString(),
-        firstElement: '',
+        firstElement: firstElement ?? '',
         lastElement: '',
         totalRec: 0,
         timeFilter: ''

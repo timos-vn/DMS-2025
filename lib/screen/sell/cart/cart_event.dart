@@ -227,6 +227,21 @@ class AddNote extends CartEvent{
   String toString() => 'AddNote {note: $note}';
 }
 
+// Áp dụng chiết khấu tổng đơn nhập tay (local, không gọi API)
+class ApplyManualTotalDiscountEvent extends CartEvent {
+  @override
+  String toString() => 'ApplyManualTotalDiscountEvent{}';
+}
+
+// ✅ Apply manual total discount percent (order-level). Local only.
+class ApplyManualTotalDiscountPercentEvent extends CartEvent {
+  final double percent;
+  ApplyManualTotalDiscountPercentEvent(this.percent);
+
+  @override
+  String toString() => 'ApplyManualTotalDiscountPercentEvent{percent: $percent}';
+}
+
 class DeleteAllProductFromDB extends CartEvent {
 
   @override

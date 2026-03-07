@@ -10,6 +10,7 @@ class CartBottomTotal extends StatelessWidget {
   final VoidCallback onNextPressed;
   final VoidCallback onCreateOrderPressed;
   final bool isProcessing;
+  final bool? viewUpdateOrder;
 
   const CartBottomTotal({
     Key? key,
@@ -18,6 +19,7 @@ class CartBottomTotal extends StatelessWidget {
     required this.onNextPressed,
     required this.onCreateOrderPressed,
     required this.isProcessing,
+    this.viewUpdateOrder,
   }) : super(key: key);
 
   @override
@@ -65,7 +67,9 @@ class CartBottomTotal extends StatelessWidget {
                 ),
                 child: Center(
                   child: Text(
-                    tabController.index == 2 ? 'Đặt hàng' : 'Tiếp tục',
+                    tabController.index == 2 
+                      ? (viewUpdateOrder == true ? 'Cập nhật' : 'Đặt hàng')
+                      : 'Tiếp tục',
                     style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,

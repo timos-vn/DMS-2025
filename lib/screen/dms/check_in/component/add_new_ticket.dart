@@ -111,6 +111,7 @@ class _AddNewTicketScreenState extends State<AddNewTicketScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       floatingActionButton: FloatingActionButton(
+        heroTag: 'add_ticket_fab', // ✅ Unique tag để tránh lỗi Hero
         backgroundColor: subColor,
         onPressed: ()async{
           if(_noteController.text.isNotEmpty){

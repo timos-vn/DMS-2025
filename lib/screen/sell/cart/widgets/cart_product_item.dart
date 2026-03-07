@@ -47,7 +47,7 @@ class _CartProductItemWidgetState extends State<CartProductItemWidget> {
     final productItem = widget.bloc.listOrder[widget.index];
     
     return Slidable(
-      key: const ValueKey(1),
+      key: ValueKey('product_${productItem.code}_${productItem.sttRec0}_${widget.index}'),
       startActionPane: ActionPane(
         motion: const ScrollMotion(),
         dragDismissible: false,
@@ -510,11 +510,22 @@ class _CartProductItemWidgetState extends State<CartProductItemWidget> {
                                                   ? productItem.discountPercentByHand
                                                   : (productItem.discountPercent ?? 0);
                                               
+                                              // ✅ QUAN TRỌNG: Trong edit mode, giaSuaDoi = priceAfter (giá sau chiết khấu)
+                                              // Nên phải dùng productItem.price (giá gốc) để hiển thị "Giá bán"
+                                              bool isEditMode = (productItem.maCk != null && productItem.maCk.toString().trim().isNotEmpty) ||
+                                                               (productItem.giaSuaDoi != null && productItem.price != null && 
+                                                                productItem.giaSuaDoi! > 0 && productItem.price! > 0 && 
+                                                                productItem.giaSuaDoi != productItem.price);
+                                              
+                                              final displayPriceForLabel = isEditMode 
+                                                  ? (productItem.price ?? 0)  // EDIT MODE: Dùng price (giá gốc)
+                                                  : (productItem.giaSuaDoi ?? 0);  // CREATE MODE: Dùng giaSuaDoi
+                                              
                                               return Text.rich(
                                                 TextSpan(
                                                   children: [
                                                     TextSpan(
-                                                      text: 'Giá bán: \$${Utils.formatMoneyStringToDouble(productItem.giaSuaDoi)}',
+                                                      text: 'Giá bán: \$${Utils.formatMoneyStringToDouble(displayPriceForLabel)}',
                                                       style: const TextStyle(color: Colors.blueGrey, fontSize: 12, overflow: TextOverflow.ellipsis),
                                                     ),
                                                     if (discountPercent > 0)
@@ -577,7 +588,7 @@ class _CartProductItemWidgetState extends State<CartProductItemWidget> {
                             children: [
                               Expanded(
                                 child: Container(
-                                  height: 35,
+
                                   padding: const EdgeInsets.only(left: 5),
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(16),
@@ -585,48 +596,77 @@ class _CartProductItemWidgetState extends State<CartProductItemWidget> {
                                   ),
                                   child: Row(
                                     mainAxisAlignment: MainAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Visibility(
                                         visible: productItem.gifProduct != true && productItem.gifProductByHand != true,
-                                        child: Row(
-                                          children: [
+                                        child: Flexible(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            // mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Builder(
+                                                builder: (context) {
+                                                  final discountPercent = productItem.discountPercentByHand > 0
+                                                      ? productItem.discountPercentByHand
+                                                      : (productItem.discountPercent ?? 0);
+
+                                                  // ✅ QUAN TRỌNG: Trong edit mode, giaSuaDoi = priceAfter (giá sau chiết khấu)
+                                                  // Nên phải dùng productItem.price (giá gốc) làm originalPrice
+                                                  bool isEditMode = (productItem.maCk != null && productItem.maCk.toString().trim().isNotEmpty) ||
+                                                      (productItem.giaSuaDoi != null && productItem.price != null &&
+                                                          productItem.giaSuaDoi! > 0 && productItem.price! > 0 &&
+                                                          productItem.giaSuaDoi != productItem.price);
+
+                                                  final originalPrice = isEditMode
+                                                      ? (productItem.price ?? 0)  // EDIT MODE: Dùng price (giá gốc)
+                                                      : (productItem.giaSuaDoi ?? 0);  // CREATE MODE: Dùng giaSuaDoi
+
+                                                  final priceAfter = productItem.priceAfter ?? 0;
+
+                                                  final hasDiscount = discountPercent > 0 || (priceAfter > 0 && priceAfter != originalPrice);
+
+                                                  if (!hasDiscount || originalPrice == 0) {
+                                                    return Container();
+                                                  }
+
+                                                  return Padding(
+                                                    padding: const EdgeInsets.only(top: 5),
+                                                    child: Text(
+                                                      '\$ ${Utils.formatMoneyStringToDouble(originalPrice * (productItem.count ?? 0))} ',
+                                                      textAlign: TextAlign.left,
+                                                      style: const TextStyle(
+                                                        color: Colors.black87,
+                                                        fontSize: 11,
+                                                        decoration: TextDecoration.lineThrough,
+                                                      ),
+                                                    ),
+                                                  );
+                                                },
+                                              ),
+
                                             Builder(
                                               builder: (context) {
                                                 final discountPercent = productItem.discountPercentByHand > 0
                                                     ? productItem.discountPercentByHand
                                                     : (productItem.discountPercent ?? 0);
-                                                final originalPrice = productItem.giaSuaDoi ?? 0;
+
+                                                // ✅ QUAN TRỌNG: Trong edit mode, giaSuaDoi = priceAfter (giá sau chiết khấu)
+                                                // Nên phải dùng productItem.price (giá gốc) làm originalPrice
+                                                bool isEditMode = (productItem.maCk != null && productItem.maCk.toString().trim().isNotEmpty) ||
+                                                                 (productItem.giaSuaDoi != null && productItem.price != null &&
+                                                                  productItem.giaSuaDoi! > 0 && productItem.price! > 0 &&
+                                                                  productItem.giaSuaDoi != productItem.price);
+
+                                                final originalPrice = isEditMode
+                                                    ? (productItem.price ?? 0)  // EDIT MODE: Dùng price (giá gốc)
+                                                    : (productItem.giaSuaDoi ?? 0);  // CREATE MODE: Dùng giaSuaDoi
+
                                                 final priceAfter = productItem.priceAfter ?? 0;
-                                                
-                                                final hasDiscount = discountPercent > 0 || (priceAfter > 0 && priceAfter != originalPrice);
-                                                
-                                                if (!hasDiscount || originalPrice == 0) {
-                                                  return Container();
-                                                }
-                                                
-                                                return Text(
-                                                  '\$ ${Utils.formatMoneyStringToDouble(originalPrice * (productItem.count ?? 0))} ',
-                                                  textAlign: TextAlign.left,
-                                                  style: const TextStyle(
-                                                    color: Colors.grey,
-                                                    fontSize: 10,
-                                                    decoration: TextDecoration.lineThrough,
-                                                  ),
-                                                );
-                                              },
-                                            ),
-                                            const SizedBox(width: 5),
-                                            Builder(
-                                              builder: (context) {
-                                                final discountPercent = productItem.discountPercentByHand > 0
-                                                    ? productItem.discountPercentByHand
-                                                    : (productItem.discountPercent ?? 0);
-                                                final originalPrice = productItem.giaSuaDoi ?? 0;
-                                                final priceAfter = productItem.priceAfter ?? 0;
-                                                
+
                                                 double displayPrice;
                                                 final hasDiscount = discountPercent > 0 || (priceAfter > 0 && priceAfter != originalPrice);
-                                                
+
                                                 if (hasDiscount) {
                                                   if (priceAfter > 0 && priceAfter != originalPrice) {
                                                     displayPrice = priceAfter;
@@ -639,21 +679,25 @@ class _CartProductItemWidgetState extends State<CartProductItemWidget> {
                                                 } else {
                                                   displayPrice = originalPrice;
                                                 }
-                                                
-                                                return Text(
-                                                  displayPrice == 0 && originalPrice == 0
-                                                      ? 'Giá đang cập nhật'
-                                                      : '\$ ${Utils.formatMoneyStringToDouble(displayPrice * (productItem.count ?? 0))}',
-                                                  textAlign: TextAlign.left,
-                                                  style: const TextStyle(
-                                                    color: Colors.black,
-                                                    fontSize: 14,
-                                                    fontWeight: FontWeight.bold,
+
+                                                return Padding(
+                                                  padding: const EdgeInsets.only(top: 5),
+                                                  child: Text(
+                                                    displayPrice == 0 && originalPrice == 0
+                                                        ? 'Giá đang cập nhật'
+                                                        : '\$ ${Utils.formatMoneyStringToDouble(displayPrice * (productItem.count ?? 0))}',
+                                                    textAlign: TextAlign.left,
+                                                    style: const TextStyle(
+                                                      color: Colors.black,
+                                                      fontSize: 14,
+                                                      fontWeight: FontWeight.bold,
+                                                    ),
                                                   ),
                                                 );
                                               },
                                             ),
                                           ],
+                                        ),
                                         ),
                                       ),
                                     ],
@@ -666,29 +710,29 @@ class _CartProductItemWidgetState extends State<CartProductItemWidget> {
                                 isShowInfo: widget.isContractCreateOrder == true ? true : false,
                                 contractQuantity: widget.isContractCreateOrder == true
                                     ? () {
-                                        double currentCount = productItem.count ?? 0;
-                                        
-                                        double totalAvailableForMaVt2 = 0;
-                                        for (var item in widget.bloc.listOrder) {
-                                          if (item.maVt2 == productItem.maVt2) {
-                                            double itemAvailable = item.availableQuantity ?? item.so_luong_kd;
-                                            if (itemAvailable > totalAvailableForMaVt2) {
-                                              totalAvailableForMaVt2 = itemAvailable;
-                                            }
-                                          }
-                                        }
-                                        
-                                        double totalOrderedForMaVt2 = 0;
-                                        for (var item in widget.bloc.listOrder) {
-                                          if (item.maVt2 == productItem.maVt2) {
-                                            totalOrderedForMaVt2 += item.count ?? 0;
-                                          }
-                                        }
-                                        
-                                        double remainingAvailable = (totalAvailableForMaVt2 - totalOrderedForMaVt2).clamp(0, totalAvailableForMaVt2);
-                                        
-                                        return '${Utils.formatQuantity(currentCount)}/${Utils.formatQuantity(remainingAvailable)}';
-                                      }()
+                                  double currentCount = productItem.count ?? 0;
+
+                                  double totalAvailableForMaVt2 = 0;
+                                  for (var item in widget.bloc.listOrder) {
+                                    if (item.maVt2 == productItem.maVt2) {
+                                      double itemAvailable = item.availableQuantity ?? item.so_luong_kd;
+                                      if (itemAvailable > totalAvailableForMaVt2) {
+                                        totalAvailableForMaVt2 = itemAvailable;
+                                      }
+                                    }
+                                  }
+
+                                  double totalOrderedForMaVt2 = 0;
+                                  for (var item in widget.bloc.listOrder) {
+                                    if (item.maVt2 == productItem.maVt2) {
+                                      totalOrderedForMaVt2 += item.count ?? 0;
+                                    }
+                                  }
+
+                                  double remainingAvailable = (totalAvailableForMaVt2 - totalOrderedForMaVt2).clamp(0, totalAvailableForMaVt2);
+
+                                  return '${Utils.formatQuantity(currentCount)}/${Utils.formatQuantity(remainingAvailable)}';
+                                }()
                                     : null,
                               ),
                             ],

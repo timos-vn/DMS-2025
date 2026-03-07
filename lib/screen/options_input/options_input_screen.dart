@@ -115,7 +115,7 @@ class _OptionsFilterDateState extends State<OptionsFilterDate> {
                     color: subColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(
+                  child: const Icon(
                     Icons.filter_list_rounded,
                     color: subColor,
                     size: 24,

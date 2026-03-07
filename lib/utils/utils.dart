@@ -291,11 +291,11 @@ class Utils{
     );
   }
 
-  static Future<DateTime?> dateTimePickerCustom(BuildContext context) async {
-    DateTime? dateTime = DateTime.now();
+  static Future<DateTime?> dateTimePickerCustom(BuildContext context, {DateTime? initialDate}) async {
+    DateTime? dateTime = initialDate ?? DateTime.now();
     dateTime = await showOmniDateTimePicker(
       context: context,
-      initialDate: DateTime.now(),
+      initialDate: initialDate ?? DateTime.now(),
       firstDate: DateTime(1600).subtract(const Duration(days: 3652)),
       lastDate: DateTime.now().add(
         const Duration(days: 3652),

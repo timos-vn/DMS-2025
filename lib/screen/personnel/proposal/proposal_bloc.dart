@@ -72,7 +72,14 @@ class ProposalBloc extends Bloc<ProposalEvent, ProposalState> {
           "files": await Future.wait(
               listFileImage.map((file) async {
                 XFile compress = await compressImage(file);
-                return await MultipartFile.fromFile(compress.path,filename: compress.path);
+                // Đọc file thành bytes để đảm bảo length chính xác
+                File compressedFile = File(compress.path);
+                List<int> fileBytes = await compressedFile.readAsBytes();
+                // Tạo MultipartFile từ bytes với length chính xác
+                return MultipartFile.fromBytes(
+                  fileBytes,
+                  filename: compress.path.split('/').last, // Chỉ lấy tên file, không lấy full path
+                );
               })
           ),
         }

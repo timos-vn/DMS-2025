@@ -65,7 +65,9 @@ class _NewStoreApprovalListScreenState extends State<NewStoreApprovalListScreen>
         appBar: _buildAppBar(),
         body: Column(
           children: [
-            _buildFilterBar(context),
+            BlocBuilder<NewStoreApprovalListBloc, NewStoreApprovalListState>(
+              builder: (context, state) => _buildFilterBar(context),
+            ),
             Expanded(
               child: BlocConsumer<NewStoreApprovalListBloc,
                   NewStoreApprovalListState>(
@@ -256,7 +258,10 @@ class _NewStoreApprovalListScreenState extends State<NewStoreApprovalListScreen>
                   label: 'Từ ngày',
                   value: dateFromText,
                   onTap: () async {
-                    final selected = await Utils.dateTimePickerCustom(context);
+                    final selected = await Utils.dateTimePickerCustom(
+                      context,
+                      initialDate: _bloc.dateFrom,
+                    );
                     if (selected != null) {
                       _bloc.add(NewStoreApprovalListUpdateFilter(
                         dateFrom: selected,
@@ -272,7 +277,10 @@ class _NewStoreApprovalListScreenState extends State<NewStoreApprovalListScreen>
                   label: 'Đến ngày',
                   value: dateToText,
                   onTap: () async {
-                    final selected = await Utils.dateTimePickerCustom(context);
+                    final selected = await Utils.dateTimePickerCustom(
+                      context,
+                      initialDate: _bloc.dateTo,
+                    );
                     if (selected != null) {
                       _bloc.add(NewStoreApprovalListUpdateFilter(
                         dateTo: selected,

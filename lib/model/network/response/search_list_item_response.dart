@@ -72,6 +72,7 @@ class SearchItemResponseData {
   double? residualValue = 0;
   String? unit;
   String? unitProduct;
+  String? dsCKLineItem;
   String? maCk;
   String? maCkOld;
   bool? allowDvt;
@@ -127,8 +128,8 @@ class SearchItemResponseData {
     this.woPriceAfter,this.totalMoneyDiscount,this.totalMoneyProduct,this.valuesTax,
     this.discountPercent, this.imageUrl, this.priceAfter, this.stockAmount,this.count,this.countMax = 0,this.isMark,this.taxPercent,this.priceOk,
     this.discountMoney,this.discountProduct,this.budgetForItem,this.budgetForProduct,this.residualValueProduct,this.residualValue,this.priceAfter2,
-    this.unit,this.unitProduct,this.maCk, this.maCkOld, this.allowDvt, this.contentDvt,this.kColorFormatAlphaB,this.listDiscount,this.maVtGoc,this.listDiscountProduct,
-    this.ck = 0,this.cknt, this.sttRecCK,this.typeCK, this.gifProduct, this.gifProductByHand, this.discountByHand,this.discountPercentByHand = 0,
+    this.unit,this.unitProduct,this.dsCKLineItem,this.maCk, this.maCkOld, this.allowDvt, this.contentDvt,this.kColorFormatAlphaB,this.listDiscount,this.maVtGoc,this.listDiscountProduct,
+    this.ck = 0,this.cknt, this.sttRecCK,this.typeCK, this.gifProduct, this.gifProductByHand, this.discountByHand,this.discountPercentByHand = 0,this.ckntByHand = 0,
     this.stockCode, this.stockName, this.chooseVuViec, this.idHd, this.idVv,this.nameVv,this.nameHd, this.idHdForVv,this.sctGoc,
     this.isCheBien, this.isSanXuat, this.giaSuaDoi = 0, this.giaGui = 0, this.priceMin = 0, this.codeUnit, this.nameUnit, this.note, this.jsonOtherInfo,
     this.isChecked, this.heSo,this.idNVKD,this.nameNVKD,this.nuocsx,this.quycach,this.maThue,this.tenThue,this.thueSuat = 0, this.maVt2, this.so_luong_kd = 0,
@@ -176,6 +177,10 @@ class SearchItemResponseData {
     sttRecCK = json['sttRecCK'];
     gifProduct = json['gifProduct'] ?? json['gif_product'] ?? false;
     gifProductByHand = json['gifProductByHand'] ?? json['gif_product_by_hand'] ?? false;
+    // ✅ QUAN TRỌNG: Restore chiết khấu nhập tay từ draft
+    discountByHand = json['discountByHand'] ?? json['discount_by_hand'] ?? false;
+    discountPercentByHand = _parseDouble(json['discountPercentByHand'] ?? json['discount_percent_by_hand']) ?? 0;
+    ckntByHand = _parseDouble(json['ckntByHand'] ?? json['cknt_by_hand']) ?? 0;
     stockCode = json['stockCode'] ?? json['codeStock'] ?? json['stock_code'];
     stockName = json['stockName'] ?? json['nameStock'] ?? json['stock_name'];
     allowDvt = json['nhieu_dvt'];
@@ -226,6 +231,10 @@ class SearchItemResponseData {
     data['sttRecCK'] = sttRecCK;
     data['gifProduct'] = gifProduct;
     data['gifProductByHand'] = gifProductByHand;
+    // ✅ QUAN TRỌNG: Lưu chiết khấu nhập tay vào draft
+    data['discountByHand'] = discountByHand;
+    data['discountPercentByHand'] = discountPercentByHand;
+    data['ckntByHand'] = ckntByHand;
     data['stockCode'] = stockCode;
     data['stockName'] = stockName;
     data['gia_sua_doi'] = giaSuaDoi;

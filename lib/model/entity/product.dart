@@ -184,11 +184,7 @@ class Product extends Equatable {
     data['residualValueProduct'] = residualValueProduct;
     data['residualValue'] = residualValue;
     data['unit'] = unit;
-    if(dsCKLineItem!=null){
-      data['dsCKLineItem'] = dsCKLineItem;
-    }else {
-      data['dsCKLineItem'] = [];
-    }
+    data['dsCKLineItem'] = dsCKLineItem ?? '';
     data['budgetForProduct'] = budgetForProduct;
     data['unitProduct'] = unitProduct;
     data['nhieu_dvt'] = allowDvt;

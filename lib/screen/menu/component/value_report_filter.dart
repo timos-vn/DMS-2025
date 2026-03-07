@@ -128,13 +128,14 @@ class _ValueReportFilterState extends State<ValueReportFilter> {
                   }
                   ///Datetime
                   else if (int.parse(widget.listRPLayout[index].type.toString()) == 3) {
-                    if (widget.listRPLayout[index].field == 'DateFrom') {
+                    if (widget.listRPLayout[index].field == 'DateFrom' || widget.listRPLayout[index].field == 'DateStart') {
                       return dateTimeFrom(context,index);
                     }
-                    if (widget.listRPLayout[index].field == 'DateTo') {
+                    if (widget.listRPLayout[index].field == 'DateTo' || widget.listRPLayout[index].field == 'DateEnd') {
                       return dateTimeTo(context,index);
                     }
-                    if(widget.listRPLayout[index].field != 'DateFrom' && widget.listRPLayout[index].field != 'DateTo'){
+                    if(widget.listRPLayout[index].field != 'DateFrom' && widget.listRPLayout[index].field != 'DateTo'
+                    && widget.listRPLayout[index].field != 'DateStart' && widget.listRPLayout[index].field != 'DateEnd'){
                       return dateTimeOther(context,index);
                     }
                   }

@@ -114,9 +114,16 @@ class CartBillInfo extends StatelessWidget {
               'Voucher:',
               '',
               1,
-              bloc.codeDiscountTD.isEmpty
-                  ? 'FreeShip'
-                  : "${bloc.codeDiscountTD.toString().trim()} ${(bloc.totalDiscountForOder ?? 0) == 0 ? '0 ₫' : '- ${Utils.formatMoneyStringToDouble(bloc.totalDiscountForOder ?? 0)} ₫'}",
+              (() {
+                final double voucherValue = bloc.totalDiscountForOder ?? 0;
+                final String code = bloc.codeDiscountTD.trim();
+                if (voucherValue > 0) {
+                  final valueText = '- ${Utils.formatMoneyStringToDouble(voucherValue)} ₫';
+                  return code.isNotEmpty ? '$code $valueText' : valueText;
+                }
+                // Hiển thị 0 ₫ nếu chưa có chiết khấu tổng đơn
+                return '0 ₫';
+              })(),
             ),
           ),
           Padding(
@@ -209,6 +216,17 @@ class CartBillInfo extends StatelessWidget {
             print('   - Const.stockList.length = ${Const.stockList.length}');
           }
           
+          // ✅ Đảm bảo customerId không rỗng/null
+          // Ưu tiên: DataLocal.infoCustomer.customerCode > bloc.codeCustomer
+          final finalCustomerId = (DataLocal.infoCustomer.customerCode.toString().trim().isNotEmpty &&
+                  DataLocal.infoCustomer.customerCode.toString().trim() != 'null')
+              ? DataLocal.infoCustomer.customerCode.toString().trim()
+              : (bloc.codeCustomer?.toString().trim() ?? '');
+          if (finalCustomerId.isEmpty) {
+            print('⚠️ Warning: customerId is empty/null in CartBillInfo, skip apply-discount-v2');
+            return;
+          }
+          
           bloc.add(GetListItemApplyDiscountEvent(
             listCKVT: DataLocal.listCKVT,
             listPromotion: bloc.listPromotion,
@@ -217,7 +235,7 @@ class CartBillInfo extends StatelessWidget {
             listPrice: listPrice,
             listMoney: listMoney,
             warehouseId: finalWarehouseId,
-            customerId: bloc.codeCustomer.toString(),
+            customerId: finalCustomerId,
             keyLoad: 'Second',
           ));
         }

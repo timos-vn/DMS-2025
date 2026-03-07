@@ -4,8 +4,8 @@ import 'dart:async';
 import 'dart:io';
 
 // import 'package:date_time_picker/date_time_picker.dart';
-import 'package:dms/model/entity/entity.dart';
 import 'package:dms/model/network/response/apply_discount_response.dart';
+import 'package:dms/model/network/response/gift_product_list_response.dart';
 import 'package:dms/screen/sell/component/search_vv_hd.dart';
 import 'package:dms/widget/InputDiscountPercent.dart';
 import 'package:dms/widget/custom_camera.dart';
@@ -16,6 +16,8 @@ import 'package:dms/widget/input_quantity_popup_order.dart';
 import 'package:dms/widget/pending_action.dart';
 import 'package:dms/widget/text_field_widget2.dart';
 import 'package:dms/widget/view_desc_discount.dart';
+import 'package:dms/widget/ckn_gift_product_selection_dialog.dart';
+import 'package:dms/screen/sell/cart/widgets/discount_voucher_selection_sheet.dart';
 import 'package:dotted_border/dotted_border.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -46,6 +48,7 @@ import '../component/search_product.dart';
 import 'cart_bloc.dart';
 import 'cart_state.dart';
 import 'cart_event.dart';
+import 'helpers/cart_draft_storage.dart';
 import 'widgets/tax_selection_sheet.dart';
 
 
@@ -84,6 +87,8 @@ class ConfirmScreen extends StatefulWidget {
 class _ConfirmScreenState extends State<ConfirmScreen>with TickerProviderStateMixin{
 
   late CartBloc _bloc;
+  // ✅ Flag để đánh dấu đã đặt đơn thành công (ngăn không cho save draft sau đó)
+  bool _orderCreatedSuccessfully = false;
   String? dateTransfer;
   String? timeTransfer;
 
@@ -137,6 +142,18 @@ class _ConfirmScreenState extends State<ConfirmScreen>with TickerProviderStateMi
   late int indexSelectGift;
   bool gift = false;
   bool lockChooseStore = false;
+
+  // CKN flow state
+  String? _pendingDiscountName;
+  double? _pendingMaxQuantity;
+  List<ListCkMatHang>? _pendingDiscountItems;
+  String? _pendingDiscountType; // 'CKN' or 'CKTDTH'
+  String? _pendingCknGroupKey;
+  String? _pendingCktdthGroupKey;
+  GlobalKey<DiscountVoucherSelectionSheetState>? _discountSheetKey;
+  
+  // ✅ Flag để re-apply HH gifts sau khi API reload
+  bool _needReapplyHHAfterReload = false;
 
   @override
   void dispose() {
@@ -283,6 +300,32 @@ class _ConfirmScreenState extends State<ConfirmScreen>with TickerProviderStateMi
           _bloc.add(UpdateListOrder());
         }
         else if(state is ApplyDiscountSuccess){
+          // ✅ FIX: Re-apply HH gifts after API reload (từ CKG check/uncheck)
+          if(state.keyLoad == 'Second' && _needReapplyHHAfterReload) {
+            print('💰 Re-applying HH gifts after API reload');
+            _applyAllHH(_bloc.selectedHHIds);
+            _needReapplyHHAfterReload = false;
+            
+            // ✅ Đảm bảo totalProductGift được cập nhật đúng (bao gồm CKN, CKTDTH, HH, manual gifts)
+            _bloc.totalProductGift = 0;
+            for (var gift in DataLocal.listProductGift) {
+              _bloc.totalProductGift += gift.count ?? 0;
+            }
+            print('💰 Updated totalProductGift after API reload: ${_bloc.totalProductGift} (from ${DataLocal.listProductGift.length} gifts)');
+            
+            // Force UI rebuild
+            setState(() {});
+          }
+          
+          // ✅ Đảm bảo totalProductGift được cập nhật đúng khi keyLoad == 'Second' (kể cả khi không có _needReapplyHHAfterReload)
+          if(state.keyLoad == 'Second') {
+            _bloc.totalProductGift = 0;
+            for (var gift in DataLocal.listProductGift) {
+              _bloc.totalProductGift += gift.count ?? 0;
+            }
+            print('💰 Updated totalProductGift after API response: ${_bloc.totalProductGift} (from ${DataLocal.listProductGift.length} gifts)');
+          }
+          
           if(widget.viewUpdateOrder == true){
             _bloc.totalProductGift = 0;
             print('💰 ConfirmScreen: After ApplyDiscountSuccess, DataLocal.listProductGift.length=${DataLocal.listProductGift.length}');
@@ -360,56 +403,65 @@ class _ConfirmScreenState extends State<ConfirmScreen>with TickerProviderStateMi
           }
         }
         else if(state is CreateOrderSuccess){
-          Const.numberProductInCart = 0;
-          Const.listKeyGroupCheck = '';
-          Const.listKeyGroup = '';
-          DataLocal.listObjectDiscount.clear();
-          DataLocal.listOrderDiscount.clear();
-          DataLocal.infoCustomer = ManagerCustomerResponseData();
-          DataLocal.transactionCode = "";
-          DataLocal.transaction = ListTransaction();
-          DataLocal.indexValuesTax = -1;
-          DataLocal.taxPercent = 0;
-          DataLocal.taxCode = '';
-          DataLocal.valuesTypePayment = '';
-          DataLocal.datePayment = '';
+          // ✅ QUAN TRỌNG: Đánh dấu đã đặt đơn thành công (ngăn không cho save draft sau đó)
+          _orderCreatedSuccessfully = true;
+          
+          // ✅ QUAN TRỌNG: Làm sạch toàn bộ dữ liệu đơn hàng
+          _clearAllOrderData();
+          
+          // ✅ QUAN TRỌNG: Xóa draft ngay sau khi đặt đơn thành công
+          // Vì đơn đã được tạo thành công, không cần giữ draft nữa
+          CartDraftStorage.clearDraft().then((_) {
+            print('💾 ✅ Draft đã được xóa sau khi đặt đơn thành công (confirm_order_screen)');
+          }).catchError((e) {
+            print('💾 ❌ Lỗi khi xóa draft: $e');
+          });
+          
+          // Xóa sản phẩm từ database
           _bloc.add(DeleteAllProductFromDB());
+          
           Utils.showCustomToast(context, Icons.check_circle_outline, widget.title.toString().contains('Đặt hàng') ? 'Yeah, Tạo đơn thành công' : 'Yeah, Cập nhật đơn thành công');
         }
         else if(state is CreateOrderFromCheckInSuccess){
-          DataLocal.listOrderProductIsChange = false;
-          DataLocal.listOrderCalculatorDiscount.clear();
-          DataLocal.listProductGift.clear();
-          Const.listKeyGroupCheck = '';
-          Const.listKeyGroup = '';
-          DataLocal.listObjectDiscount.clear();
-          DataLocal.listOrderDiscount.clear();
-          DataLocal.infoCustomer = ManagerCustomerResponseData();
-          DataLocal.transactionCode = "";
-          DataLocal.transaction = ListTransaction();
-          DataLocal.indexValuesTax = -1;
-          DataLocal.taxPercent = 0;
-          DataLocal.taxCode = '';
-          DataLocal.valuesTypePayment = '';
-          DataLocal.datePayment = '';
+          // ✅ QUAN TRỌNG: Đánh dấu đã đặt đơn thành công (ngăn không cho save draft sau đó)
+          _orderCreatedSuccessfully = true;
+          
+          // ✅ QUAN TRỌNG: Làm sạch toàn bộ dữ liệu đơn hàng
+          _clearAllOrderData();
+          
+          // ✅ QUAN TRỌNG: Xóa draft ngay sau khi đặt đơn thành công
+          // Vì đơn đã được tạo thành công, không cần giữ draft nữa
+          CartDraftStorage.clearDraft().then((_) {
+            print('💾 ✅ Draft đã được xóa sau khi đặt đơn thành công (CheckIn - confirm_order_screen)');
+          }).catchError((e) {
+            print('💾 ❌ Lỗi khi xóa draft: $e');
+          });
+          
           Utils.showCustomToast(context, Icons.check_circle_outline, widget.title.toString().contains('Đặt hàng') ? 'Yeah, Tạo đơn thành công' : 'Yeah, Cập nhật đơn thành công');
           Navigator.of(context).pop(Const.REFRESH);
         }
         else if(state is DeleteAllProductFromDBSuccess){
-          DataLocal.listOrderCalculatorDiscount.clear();
-          DataLocal.listProductGift.clear();
-          Const.listKeyGroupCheck = '';
-          Const.listKeyGroup = '';
-          DataLocal.listObjectDiscount.clear();
-          DataLocal.listOrderDiscount.clear();
-          DataLocal.infoCustomer = ManagerCustomerResponseData();
-          DataLocal.transactionCode = "";
-          DataLocal.transaction = ListTransaction();
-          DataLocal.indexValuesTax = -1;
-          DataLocal.taxPercent = 0;
-          DataLocal.taxCode = '';
-          DataLocal.valuesTypePayment = '';
-          DataLocal.datePayment = '';
+          // ✅ QUAN TRỌNG: Nếu đã đặt đơn thành công, dữ liệu đã được clear trong CreateOrderSuccess
+          // Chỉ clear lại nếu chưa đặt đơn thành công (trường hợp xóa sản phẩm thủ công)
+          if (!_orderCreatedSuccessfully) {
+            DataLocal.listOrderCalculatorDiscount.clear();
+            DataLocal.listProductGift.clear();
+            Const.listKeyGroupCheck = '';
+            Const.listKeyGroup = '';
+            DataLocal.listObjectDiscount.clear();
+            DataLocal.listOrderDiscount.clear();
+            DataLocal.infoCustomer = ManagerCustomerResponseData();
+            DataLocal.transactionCode = "";
+            DataLocal.transaction = ListTransaction();
+            DataLocal.indexValuesTax = -1;
+            DataLocal.taxPercent = 0;
+            DataLocal.taxCode = '';
+            DataLocal.valuesTypePayment = '';
+            DataLocal.datePayment = '';
+            print('💾 ✅ Data cleared in DeleteAllProductFromDBSuccess (manual delete)');
+          } else {
+            print('💾 ⚠️ Skip clear in DeleteAllProductFromDBSuccess: Order already created successfully, data already cleared');
+          }
           Utils.showCustomToast(context, Icons.check_circle_outline, widget.title.toString().contains('Đặt hàng') ? 'Yeah, Tạo đơn thành công' : 'Yeah, Cập nhật đơn thành công');
           Navigator.of(context).pop(Const.REFRESH);
         }
@@ -741,6 +793,17 @@ class _ConfirmScreenState extends State<ConfirmScreen>with TickerProviderStateMi
       _bloc.checkAllProduct = false;
     }
     if(listItem.isNotEmpty){
+      // ✅ Đảm bảo customerId không rỗng/null
+      // Ưu tiên: widget.codeCustomer > DataLocal.infoCustomer.customerCode > _bloc.codeCustomer
+      final finalCustomerId = ((widget.codeCustomer != null &&
+                  widget.codeCustomer.toString().trim().isNotEmpty &&
+                  widget.codeCustomer.toString().trim() != 'null')
+              ? widget.codeCustomer.toString().trim()
+              : ((DataLocal.infoCustomer.customerCode.toString().trim().isNotEmpty &&
+                      DataLocal.infoCustomer.customerCode.toString().trim() != 'null')
+                  ? DataLocal.infoCustomer.customerCode.toString().trim()
+                  : (_bloc.codeCustomer?.toString().trim() ?? '')));
+
       // ✅ Đảm bảo warehouseId không rỗng
       // Ưu tiên: _bloc.storeCode > codeStore > widget.codeStore > Const.stockList[0].stockCode
       final finalWarehouseId = (!Utils.isEmpty(_bloc.storeCode.toString()) && _bloc.storeCode.toString().trim().isNotEmpty)
@@ -758,6 +821,14 @@ class _ConfirmScreenState extends State<ConfirmScreen>with TickerProviderStateMi
         print('   - widget.codeStore = ${widget.codeStore}');
         print('   - Const.stockList.length = ${Const.stockList.length}');
       }
+
+      if (finalCustomerId.isEmpty) {
+        print('⚠️ Warning: customerId is empty/null in ConfirmScreen, skip apply-discount-v2');
+        print('   - widget.codeCustomer = ${widget.codeCustomer}');
+        print('   - DataLocal.infoCustomer.customerCode = ${DataLocal.infoCustomer.customerCode}');
+        print('   - _bloc.codeCustomer = ${_bloc.codeCustomer}');
+        return;
+      }
       
       _bloc.add(GetListItemApplyDiscountEvent(
         listCKVT: DataLocal.listCKVT,
@@ -767,7 +838,7 @@ class _ConfirmScreenState extends State<ConfirmScreen>with TickerProviderStateMi
         listPrice: listPrice,
         listMoney: listMoney,
         warehouseId: finalWarehouseId,
-        customerId: _bloc.codeCustomer.toString(),
+        customerId: finalCustomerId,
         keyLoad: (key == '' && key.isEmpty) ? 'First' : key,
       ));
     }
@@ -1106,7 +1177,8 @@ class _ConfirmScreenState extends State<ConfirmScreen>with TickerProviderStateMi
       }
     }
     else{
-      Utils.showCustomToast(context, Icons.warning_amber_outlined, 'Úi, Giỏ hàng của bạn đâu có gì?');
+      Utils.showCustomToast(context, Icons.warning_amber_outlined, 'Úi, '
+          'Giỏ hàng của bạn đâu có gì?');
     }
   }
 
@@ -3020,6 +3092,23 @@ class _ConfirmScreenState extends State<ConfirmScreen>with TickerProviderStateMi
                         print('   - widget.codeStore = ${widget.codeStore}');
                         print('   - Const.stockList.length = ${Const.stockList.length}');
                       }
+
+                      // ✅ Đảm bảo customerId không rỗng/null
+                      final finalCustomerId = ((widget.codeCustomer != null &&
+                                  widget.codeCustomer.toString().trim().isNotEmpty &&
+                                  widget.codeCustomer.toString().trim() != 'null')
+                              ? widget.codeCustomer.toString().trim()
+                              : ((DataLocal.infoCustomer.customerCode.toString().trim().isNotEmpty &&
+                                      DataLocal.infoCustomer.customerCode.toString().trim() != 'null')
+                                  ? DataLocal.infoCustomer.customerCode.toString().trim()
+                                  : (_bloc.codeCustomer?.toString().trim() ?? '')));
+                      if (finalCustomerId.isEmpty) {
+                        print('⚠️ Warning: customerId is empty/null in ConfirmScreen (voucher), skip apply-discount-v2');
+                        print('   - widget.codeCustomer = ${widget.codeCustomer}');
+                        print('   - DataLocal.infoCustomer.customerCode = ${DataLocal.infoCustomer.customerCode}');
+                        print('   - _bloc.codeCustomer = ${_bloc.codeCustomer}');
+                        return;
+                      }
                       
                       _bloc.add(GetListItemApplyDiscountEvent(
                           listCKVT: DataLocal.listCKVT,
@@ -3029,7 +3118,7 @@ class _ConfirmScreenState extends State<ConfirmScreen>with TickerProviderStateMi
                           listPrice: listPrice,
                           listMoney: listMoney,
                           warehouseId: finalWarehouseId,
-                          customerId: _bloc.codeCustomer.toString(),
+                          customerId: finalCustomerId,
                           keyLoad: 'Second'
                       ));
                     }
@@ -3704,6 +3793,24 @@ class _ConfirmScreenState extends State<ConfirmScreen>with TickerProviderStateMi
             ),
           ),
           const SizedBox(width: 10,),
+          // Nút chọn chương trình chiết khấu
+          InkWell(
+            onTap: () {
+              if(widget.viewDetail == false && widget.orderFromCheckIn == false) {
+                _showDiscountFlow();
+              }
+            },
+            child: SizedBox(
+              width: 40,
+              height: 50,
+              child: Icon(
+                Icons.card_giftcard,
+                size: 25,
+                color: widget.orderFromCheckIn == false ? Colors.white : Colors.transparent,
+              ),
+            ),
+          ),
+          const SizedBox(width: 5,),
           InkWell(
             onTap: (){
               if(widget.viewDetail == false && widget.orderFromCheckIn == false){
@@ -3773,5 +3880,1589 @@ class _ConfirmScreenState extends State<ConfirmScreen>with TickerProviderStateMi
             _bloc.add(PickTypeOrderName(DataLocal.typeOrder.tenGd.toString(),Const.listTransactionsTAH.indexOf(DataLocal.typeOrder),DataLocal.typeOrder.maGd.toString()));
           }),
     );
+  }
+
+  // Sync listOrder to listProductOrderAndUpdate for UI update
+  /// ✅ Hàm helper để làm sạch toàn bộ dữ liệu đơn hàng sau khi đặt đơn thành công
+  void _clearAllOrderData() {
+    print('🧹 Clearing all order data after successful order creation...');
+    
+    // 1. Clear danh sách sản phẩm
+    _bloc.listOrder.clear();
+    _bloc.listItemOrder.clear();
+    _bloc.listProductOrder.clear();
+    _bloc.listProductOrderAndUpdate.clear();
+    
+    // 2. Clear sản phẩm tặng
+    DataLocal.listProductGift.clear();
+    _bloc.totalProductGift = 0;
+    
+    // 3. Clear tổng tiền và chiết khấu
+    _bloc.totalMoney = 0;
+    _bloc.totalMoneyOld = 0;
+    _bloc.totalDiscount = 0;
+    _bloc.totalDiscountOld = 0;
+    _bloc.totalDiscountOldByHand = 0;
+    _bloc.totalDiscountByHand = 0;
+    _bloc.totalTax = 0;
+    _bloc.totalTax2 = 0;
+    _bloc.valuesTax = 0;
+    _bloc.totalPayment = 0;
+    _bloc.totalPaymentOld = 0;
+    _bloc.totalMoneyProductGift = 0;
+    _bloc.manualTotalDiscountPercent = 0;
+    
+    // 4. Clear thông tin chiết khấu
+    DataLocal.listOrderCalculatorDiscount.clear();
+    DataLocal.listObjectDiscount.clear();
+    DataLocal.listOrderDiscount.clear();
+    DataLocal.listCKVT = '';
+    _bloc.listPromotion = '';
+    
+    // 5. Clear discount selections
+    _bloc.selectedCknProductCode = null;
+    _bloc.selectedCknSttRecCk = null;
+    _bloc.selectedDiscountGroup = null;
+    _bloc.selectedCknGroups.clear();
+    _bloc.listCkn.clear();
+    _bloc.hasCknDiscount = false;
+    _bloc.selectedCkgIds.clear();
+    _bloc.listCkg.clear();
+    _bloc.hasCkgDiscount = false;
+    _bloc.selectedHHIds.clear();
+    _bloc.listHH.clear();
+    _bloc.hasHHDiscount = false;
+    _bloc.selectedCktdttIds.clear();
+    _bloc.listCktdtt.clear();
+    _bloc.hasCktdttDiscount = false;
+    _bloc.selectedCktdthGroups.clear();
+    _bloc.listCktdth.clear();
+    _bloc.hasCktdthDiscount = false;
+    
+    // 6. Clear thông tin khách hàng
+    _bloc.customerName = null;
+    _bloc.codeCustomer = null;
+    _bloc.phoneCustomer = null;
+    _bloc.addressCustomer = null;
+    DataLocal.infoCustomer = ManagerCustomerResponseData();
+    nameCustomerController.clear();
+    phoneCustomerController.clear();
+    addressCustomerController.clear();
+    
+    // 7. Clear thông tin thanh toán và thuế
+    DataLocal.transactionCode = "";
+    DataLocal.transaction = ListTransaction();
+    DataLocal.indexValuesTax = -1;
+    DataLocal.taxPercent = 0;
+    DataLocal.taxCode = '';
+    DataLocal.valuesTypePayment = '';
+    DataLocal.datePayment = '';
+    DataLocal.noteSell = '';
+    
+    // 8. Clear thông tin VV/HD
+    _bloc.idVv = '';
+    _bloc.nameVv = 'Chọn Chương trình bán hàng';
+    _bloc.idHd = '';
+    _bloc.nameHd = '';
+    _bloc.idHdForVv = '';
+    
+    // 9. Clear thông tin đại lý
+    _bloc.codeAgency = '';
+    _bloc.nameAgency = '';
+    _bloc.typeDiscount = '';
+    _bloc.discountAgency = 0;
+    _bloc.chooseAgencyCode = false;
+    
+    // 10. Clear thông tin cửa hàng và giao hàng
+    _bloc.storeCode = '';
+    _bloc.storeIndex = 0;
+    _bloc.typeDeliveryIndex = 0;
+    _bloc.typeDeliveryName = '';
+    _bloc.typeDeliveryCode = '';
+    _bloc.transactionIndex = 0;
+    _bloc.typeOrderIndex = 0;
+    _bloc.typePaymentIndex = 0;
+    _bloc.taxIndex = 0;
+    
+    // 11. Clear các list discount
+    _bloc.listCkTongDon.clear();
+    _bloc.listCkMatHang.clear();
+    _bloc.listDiscount.clear();
+    
+    // 12. Clear các biến khác
+    Const.numberProductInCart = 0;
+    Const.listKeyGroupCheck = '';
+    Const.listKeyGroup = '';
+    DataLocal.listOrderProductIsChange = false;
+    
+    print('🧹 ✅ All order data cleared successfully');
+  }
+
+  void _syncListOrderToUI() {
+    print('💰 Syncing ${_bloc.listOrder.length} items to UI data');
+    
+    // Clear and rebuild listProductOrderAndUpdate from listOrder
+    _bloc.listProductOrderAndUpdate.clear();
+    
+    for (var element in _bloc.listOrder) {
+      Product production = Product(
+        code: element.code,
+        name: element.name,
+        name2: element.name2,
+        dvt: element.dvt,
+        description: element.descript,
+        price: element.price,
+        priceMin: element.priceMin,
+        priceAfterTax: element.priceAfterTax,
+        taxPercent: element.taxPercent,
+        valuesTax: element.valuesTax,
+        applyPriceAfterTax: element.applyPriceAfterTax == true ? 1 : 0,
+        discountByHand: element.discountByHand == true ? 1 : 0,
+        discountPercentByHand: element.discountPercentByHand,
+        ckntByHand: element.ckntByHand,
+        giaSuaDoi: element.giaSuaDoi,
+        priceOk: element.priceOk,
+        woPrice: element.woPrice,
+        woPriceAfter: element.woPriceAfter,
+        discountPercent: element.discountPercent,
+        priceAfter: element.priceAfter,
+        imageUrl: element.imageUrl ?? '',
+        count: element.count,
+        countMax: element.countMax,
+        so_luong_kd: element.so_luong_kd,
+        maVt2: element.maVt2,
+        sttRec0: element.sttRec0,
+        isMark: 1,
+        discountMoney: element.discountMoney ?? '0',
+        discountProduct: element.discountProduct ?? '0',
+        budgetForItem: element.budgetForItem ?? '',
+        budgetForProduct: element.budgetForProduct ?? '',
+        residualValueProduct: element.residualValueProduct ?? 0,
+        residualValue: element.residualValue ?? 0,
+        unit: element.unit ?? '',
+        unitProduct: element.unitProduct ?? '',
+        dsCKLineItem: element.maCk.toString(),
+        allowDvt: element.allowDvt == true ? 0 : 1,
+        contentDvt: element.contentDvt ?? '',
+        kColorFormatAlphaB: element.kColorFormatAlphaB?.value,
+        codeStock: element.stockCode,
+        nameStock: element.stockName,
+        stockAmount: element.stockAmount,
+        heSo: element.heSo.toString(),
+        idNVKD: element.idNVKD,
+        nameNVKD: element.nameNVKD,
+        nuocsx: element.nuocsx,
+        quycach: element.quycach,
+        maThue: element.maThue,
+        tenThue: element.tenThue,
+        thueSuat: element.thueSuat,
+      );
+      
+      _bloc.listProductOrderAndUpdate.add(production);
+      
+      // Also save to DB for persistence
+      _bloc.db.updateProduct(production, production.codeStock.toString(), false);
+    }
+    
+    print('💰 Synced ${_bloc.listProductOrderAndUpdate.length} items to UI');
+  }
+
+  // ========== DISCOUNT FLOW - START ==========
+  
+  // Main discount flow - Show voucher selection bottom sheet (E-commerce style)
+  void _showDiscountFlow() async {
+    // ❗️Không gọi API khi chỉ mở sheet – chỉ upload khi user nhấn "Áp dụng"
+
+    // ✅ RESTORE selectedCkgIds, selectedHHIds, selectedCktdttIds từ ma_ck trong listOrder (khi sửa đơn từ chi tiết)
+    // Chỉ restore nếu chưa có selection (tránh overwrite khi user đã chọn)
+    if (widget.viewUpdateOrder == true && _bloc.listOrder.isNotEmpty) {
+      bool needRestoreCkg = _bloc.selectedCkgIds.isEmpty;
+      bool needRestoreHH = _bloc.selectedHHIds.isEmpty;
+      bool needRestoreCktdtt = _bloc.selectedCktdttIds.isEmpty;
+      
+      if (needRestoreCkg || needRestoreHH || needRestoreCktdtt) {
+        print('💰 Restoring discount selections from listOrder ma_ck...');
+        Set<String> restoredCkgIds = <String>{};
+        Set<String> restoredHHIds = <String>{};
+        Set<String> restoredCktdttIds = <String>{};
+        
+        // Duyệt qua tất cả sản phẩm trong listOrder
+        for (var product in _bloc.listOrder) {
+          if (product.maCk != null && product.maCk.toString().trim().isNotEmpty) {
+            String maCk = product.maCk.toString().trim();
+            
+            // ✅ Check CKG (chỉ restore nếu chưa có selection)
+            if (needRestoreCkg && product.gifProduct != true) {
+              for (var ckgItem in _bloc.listCkg) {
+                String ckgMaCk = (ckgItem.maCk ?? '').trim();
+                if (ckgMaCk == maCk) {
+                  restoredCkgIds.add(maCk);
+                  print('💰 Found CKG match: maCk=$maCk, product=${product.code}, tenCk=${ckgItem.tenCk}');
+                  break;
+                }
+              }
+            }
+            
+            // ✅ Check HH (gift products) - từ DataLocal.listProductGift
+            // ✅ LOGIC RÕ RÀNG:
+            // 1. Nếu maCk = rỗng hoặc null → KHÔNG RESTORE (gift sẽ được giữ lại bởi logic validate)
+            // 2. Nếu maCk có, match được với listHH → RESTORE
+            if (needRestoreHH) {
+              for (var gift in DataLocal.listProductGift) {
+                if (gift.typeCK == 'HH') {
+                  String? giftMaCk = (gift.maCk ?? '').trim();
+                  String? giftCode = (gift.code ?? '').trim();
+                  
+                  // ✅ CHỈ restore nếu có maCk (gift từ chọn chiết khấu)
+                  if (giftMaCk.isEmpty) {
+                    print('💰 Debug HH: Gift ${gift.code} has empty maCk - skipping restore (will be kept by validation logic)');
+                    continue; // Không restore, nhưng gift sẽ được giữ lại bởi logic validate
+                  }
+                  
+                  // ✅ Restore nếu match được với listHH
+                  if (giftCode.isNotEmpty) {
+                    for (var hhItem in _bloc.listHH) {
+                      String hhSttRecCk = (hhItem.sttRecCk ?? '').trim();
+                      String hhId = '${hhSttRecCk}_${hhItem.tenVt?.trim() ?? ''}';
+                      String hhMaCk = (hhItem.maCk ?? '').trim();
+                      String hhMaVt = (hhItem.maVt ?? '').trim();
+                      
+                      // ✅ Match theo maCk VÀ maVt (giống CKG)
+                      if (hhMaCk.isNotEmpty && hhMaCk == giftMaCk &&
+                          hhMaVt.isNotEmpty && hhMaVt == giftCode) {
+                        restoredHHIds.add(hhId);
+                        print('💰 Found HH match: hhId=$hhId, gift=${gift.code}, tenVt=${hhItem.tenVt} (matched by maCk="$giftMaCk" and maVt="$giftCode")');
+                        break;
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        
+        // ✅ Check CKTDTT từ totalDiscountForOder hoặc codeDiscountTD
+        if (needRestoreCktdtt && _bloc.totalDiscountForOder != null && _bloc.totalDiscountForOder! > 0) {
+          for (var cktdttItem in _bloc.listCktdtt) {
+            String cktdttSttRecCk = (cktdttItem.sttRecCk ?? '').trim();
+            String cktdttMaCk = (cktdttItem.maCk ?? '').trim();
+            
+            // Match bằng sttRecCk hoặc maCk
+            if ((_bloc.sttRecCKOld?.trim() == cktdttSttRecCk) || 
+                (_bloc.codeDiscountTD?.trim() == cktdttMaCk)) {
+              restoredCktdttIds.add(cktdttSttRecCk);
+              print('💰 Found CKTDTT match: sttRecCk=$cktdttSttRecCk, maCk=$cktdttMaCk');
+              break;
+            }
+          }
+        }
+        
+        // ✅ Update selections nếu có restore được (merge với existing nếu có)
+        if (restoredCkgIds.isNotEmpty) {
+          _bloc.selectedCkgIds.addAll(restoredCkgIds);
+          print('💰 Restored selectedCkgIds: ${_bloc.selectedCkgIds}');
+        }
+        if (restoredHHIds.isNotEmpty) {
+          _bloc.selectedHHIds.addAll(restoredHHIds);
+          print('💰 Restored selectedHHIds: ${_bloc.selectedHHIds}');
+        }
+        if (restoredCktdttIds.isNotEmpty) {
+          _bloc.selectedCktdttIds.addAll(restoredCktdttIds);
+          print('💰 Restored selectedCktdttIds: ${_bloc.selectedCktdttIds}');
+        }
+        
+        if (restoredCkgIds.isEmpty && restoredHHIds.isEmpty && restoredCktdttIds.isEmpty) {
+          print('💰 No discounts found in listOrder to restore');
+        } else {
+          // ✅ Force rebuild sheet sau khi restore để checkbox được check
+          print('💰 Restore completed, will rebuild sheet with restored selections');
+        }
+      } else {
+        print('💰 Discount selections already exist, skipping restore');
+      }
+    }
+
+    _discountSheetKey = GlobalKey<DiscountVoucherSelectionSheetState>();
+    
+    // ✅ Debug: Log selectedCkgIds trước khi mở sheet
+    print('💰 Opening discount sheet with selectedCkgIds: ${_bloc.selectedCkgIds}');
+    print('💰 Opening discount sheet with selectedHHIds: ${_bloc.selectedHHIds}');
+    print('💰 Opening discount sheet with selectedCktdttIds: ${_bloc.selectedCktdttIds}');
+    
+    final result = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => BlocProvider.value(
+        value: _bloc,
+        child: BlocBuilder<CartBloc, CartState>(
+          buildWhen: (previous, current) {
+            // ✅ Rebuild khi có ApplyDiscountSuccess hoặc khi state thay đổi
+            return current is ApplyDiscountSuccess || previous != current;
+          },
+          builder: (context, state) {
+            // ✅ Rebuild sheet khi state thay đổi (khi có dữ liệu mới từ API)
+            print('💰 BlocBuilder rebuilding sheet - state: ${state.runtimeType}');
+            print('💰 Current discounts - CKG: ${_bloc.listCkg.length}, CKTDTT: ${_bloc.listCktdtt.length}, CKN: ${_bloc.listCkn.length}');
+            return DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (context, scrollController) => DiscountVoucherSelectionSheet(
+          key: _discountSheetKey,
+          listCkn: _bloc.listCkn,
+          listCkg: _bloc.listCkg,
+          listHH: _bloc.listHH,
+          listCktdtt: _bloc.listCktdtt,
+          listCktdth: _bloc.listCktdth,
+          selectedCknGroups: _bloc.selectedCknGroups,
+          selectedCkgIds: _bloc.selectedCkgIds,
+          selectedHHIds: _bloc.selectedHHIds,
+          selectedCktdttIds: _bloc.selectedCktdttIds,
+          selectedCktdthGroups: _bloc.selectedCktdthGroups,
+          currentCart: _bloc.listOrder,
+          onSelectCknGroup: (groupKey, items, totalQuantity) {
+            _handleCKNSelection({'action': 'select', 'groupKey': groupKey, 'items': items, 'totalQuantity': totalQuantity});
+          },
+          onRemoveCknGroup: (groupKey) {
+            _handleRemoveCKN({'groupKey': groupKey});
+          },
+          onSelectCktdthGroup: (groupKey, items, totalQuantity) {
+            _handleCKTDTHSelection({'action': 'select', 'groupKey': groupKey, 'items': items, 'totalQuantity': totalQuantity});
+          },
+          onRemoveCktdthGroup: (groupKey) {
+            _handleRemoveCKTDTH({'groupKey': groupKey});
+          },
+          onSelectCkg: (ckgId, ckgItem) {
+            // ✅ CKG: Áp dụng ngay khi chọn (giống cart_screen)
+            print('💰 🔔 CALLBACK: onSelectCkg called with ckgId=$ckgId');
+            _handleCKGSelection(ckgId, ckgItem);
+          },
+          onRemoveCkg: (ckgId, ckgItem) {
+            // ✅ CKG: Bỏ áp dụng ngay khi bỏ chọn (giống cart_screen)
+            _handleRemoveCKG(ckgId, ckgItem);
+          },
+          onSelectCktdtt: (cktdttId, cktdttItem) {
+            // ✅ CKTDTT: Áp dụng ngay khi chọn (giống cart_screen)
+            print('💰 🔔 CALLBACK: onSelectCktdtt called with cktdttId=$cktdttId');
+            _handleCKTDTTSSelection(cktdttId, cktdttItem);
+          },
+          onRemoveCktdtt: (cktdttId, cktdttItem) {
+            // ✅ CKTDTT: Bỏ áp dụng ngay khi bỏ chọn (giống cart_screen)
+            _handleRemoveCKTDTTS(cktdttId, cktdttItem);
+          },
+          onSelectHH: (hhId, hhItem) {
+            // ✅ HH: Áp dụng ngay khi chọn
+            print('💰 🔔 CALLBACK: onSelectHH called with hhId=$hhId');
+            _handleHHSelection(hhId, hhItem);
+          },
+          onRemoveHH: (hhId, hhItem) {
+            // ✅ HH: Bỏ áp dụng ngay khi bỏ chọn và gọi API reload
+            print('💰 🔔 CALLBACK: onRemoveHH called with hhId=$hhId');
+            _handleRemoveHH(hhId, hhItem);
+          },
+        ),
+            );
+          },
+        ),
+      ),
+    );
+
+    if (result != null) {
+      _handleDiscountResult(result);
+    }
+  }
+
+  // Handle discount result from bottom sheet
+  void _handleDiscountResult(Map<String, dynamic> result) {
+    final String action = result['action'];
+    print('💰 Discount action: $action');
+
+    switch (action) {
+      case 'apply':
+      case 'apply_all': // ✅ Fix: Handle 'apply_all' action from DiscountVoucherSelectionSheet
+        _applyDiscounts(result);
+        break;
+      case 'select_ckn':
+        _handleCKNSelection(result);
+        break;
+      case 'remove_ckn':
+        _handleRemoveCKN(result);
+        break;
+      case 'select_cktdth':
+        _handleCKTDTHSelection(result);
+        break;
+      case 'remove_cktdth':
+        _handleRemoveCKTDTH(result);
+        break;
+    }
+  }
+
+  // Handle remove CKN group gifts
+  void _handleRemoveCKN(Map<String, dynamic> result) {
+    final String groupKey = result['groupKey'];
+
+    print('💰 CKN: Removing gifts from group $groupKey');
+
+    // Remove all CKN gifts from this group
+    int removedCount = 0;
+    DataLocal.listProductGift.removeWhere((item) {
+      // Check by group_dk stored in gift (we need to track this)
+      // For now, remove by checking sttRecCK matching the group
+      var matchingCkn = _bloc.listCkn.where((ckn) =>
+        ckn.group_dk?.toString() == groupKey
+      ).toList();
+
+      if (matchingCkn.isNotEmpty) {
+        for (var ckn in matchingCkn) {
+          if (item.sttRec0 == ckn.sttRecCk?.trim()) {
+            _bloc.totalProductGift -= item.count ?? 0;
+            removedCount++;
+            return true;
+          }
+        }
+      }
+      return false;
+    });
+
+    // Note: CKN gifts don't affect totalPayment (they're free),
+    // but we update UI to show/hide them correctly
+
+    if (removedCount > 0) {
+      Utils.showCustomToast(
+        context,
+        Icons.info,
+        'Đã bỏ $removedCount quà tặng',
+      );
+      print('💰 CKN: Removed $removedCount gifts - totalProductGift=${_bloc.totalProductGift}');
+    }
+
+    setState(() {});
+  }
+
+  // Handle remove CKTDTH group gifts
+  void _handleRemoveCKTDTH(Map<String, dynamic> result) {
+    final String groupKey = result['groupKey'];
+
+    print('💰 CKTDTH: Removing gifts from group $groupKey');
+
+    int removedCount = 0;
+    DataLocal.listProductGift.removeWhere((item) {
+      var matchingCktdth = _bloc.listCktdth.where((cktdth) =>
+        cktdth.group_dk?.toString() == groupKey
+      ).toList();
+
+      if (matchingCktdth.isNotEmpty) {
+        for (var cktdth in matchingCktdth) {
+          if (item.sttRec0 == cktdth.sttRecCk?.trim()) {
+            _bloc.totalProductGift -= item.count ?? 0;
+            removedCount++;
+            return true;
+          }
+        }
+      }
+      return false;
+    });
+
+    if (removedCount > 0) {
+      Utils.showCustomToast(
+        context,
+        Icons.info,
+        'Đã bỏ $removedCount quà tặng CKTDTH',
+      );
+      print('💰 CKTDTH: Removed $removedCount gifts - totalProductGift=${_bloc.totalProductGift}');
+    }
+
+    setState(() {});
+  }
+
+  // Apply all selected discounts
+  void _applyDiscounts(Map<String, dynamic> result) {
+    final Set<String> selectedCknGroups = result['selectedCknGroups'] ?? <String>{};
+    final Set<String> selectedCkgIds = result['selectedCkgIds'] ?? <String>{};
+    final Set<String> selectedHHIds = result['selectedHHIds'] ?? <String>{};
+    final Set<String> selectedCktdttIds = result['selectedCktdttIds'] ?? <String>{};
+    final Set<String> selectedCktdthGroups = result['selectedCktdthGroups'] ?? <String>{};
+
+    print('💰 Applying discounts:');
+    print('   - CKN groups: ${selectedCknGroups.length}');
+    print('   - CKG: ${selectedCkgIds.length}');
+    print('   - HH: ${selectedHHIds.length}');
+    print('   - CKTDTT: ${selectedCktdttIds.length}');
+    print('   - CKTDTH groups: ${selectedCktdthGroups.length}');
+
+    // Save selections to bloc
+    _bloc.selectedCknGroups = selectedCknGroups;
+    _bloc.selectedCkgIds = selectedCkgIds;
+    _bloc.selectedHHIds = selectedHHIds;
+    _bloc.selectedCktdttIds = selectedCktdttIds;
+    _bloc.selectedCktdthGroups = selectedCktdthGroups;
+
+    // Apply CKG and CKTDTT (need to reload from backend)
+    bool needReload = false;
+    if (selectedCkgIds.isNotEmpty || selectedCktdttIds.isNotEmpty) {
+      needReload = true;
+      _applyAllCKG(selectedCkgIds);
+      _applyAllCKTDTT(selectedCktdttIds);
+    }
+
+    // ✅ Apply HH gifts TRƯỚC KHI reload (để có trong DataLocal.listProductGift)
+    // Sau đó sẽ re-apply sau API response nếu cần
+    if (selectedHHIds.isNotEmpty) {
+      print('💰 Applying HH gifts BEFORE reload');
+      _applyAllHH(selectedHHIds);
+      // ✅ Set flag để re-apply sau API reload
+      if (needReload) {
+        _needReapplyHHAfterReload = true;
+        print('💰 Set _needReapplyHHAfterReload = true (will re-apply HH after API reload)');
+      }
+    }
+
+    // Reload discounts from backend if needed
+    if (needReload) {
+      _reloadDiscountsFromBackend();
+    } else {
+      print('💰 No discount changes to sync');
+    }
+
+    // ✅ CKN và CKTDTH: Đảm bảo totalProductGift được cập nhật đúng
+    // (Gifts đã được thêm khi user click checkbox và chọn sản phẩm)
+    if (selectedCknGroups.isNotEmpty || selectedCktdthGroups.isNotEmpty) {
+      print('💰 Updating totalProductGift for CKN/CKTDTH gifts');
+      _bloc.totalProductGift = 0;
+      for (var gift in DataLocal.listProductGift) {
+        _bloc.totalProductGift += gift.count ?? 0;
+      }
+      print('💰 Updated totalProductGift: ${_bloc.totalProductGift} (from ${DataLocal.listProductGift.length} gifts)');
+    }
+
+    int totalApplied = selectedCknGroups.length + selectedCkgIds.length + selectedHHIds.length + selectedCktdttIds.length + selectedCktdthGroups.length;
+    Utils.showCustomToast(
+      context,
+      Icons.check_circle_outline,
+      'Đã áp dụng $totalApplied chương trình khuyến mại',
+    );
+
+    setState(() {});
+  }
+
+  // Apply all selected CKG discounts (add to listCKVT for backend)
+  void _applyAllCKG(Set<String> selectedIds) {
+    print('💰 Applying ${selectedIds.length} CKG discounts');
+    print('💰 Selected IDs: $selectedIds');
+    
+    bool hasAdditions = false;
+    bool hasRemovals = false;
+    
+    for (var ckgItem in _bloc.listCkg) {
+      String sttRecCk = ckgItem.sttRecCk?.trim() ?? '';
+      String productCode = ckgItem.maVt?.trim() ?? '';
+      
+      // ✅ Build ckgId với format giống DiscountVoucherSelectionSheet: "sttRecCk_productCode"
+      // Hoặc có thể là maCk (nếu DiscountVoucherSelectionSheet đã convert)
+      String ckgId = '${sttRecCk}_$productCode';
+      String maCk = (ckgItem.maCk ?? '').trim();
+      
+      // ✅ Check both formats: ckgId (sttRecCk_productCode) và maCk
+      bool shouldApply = selectedIds.contains(ckgId) || (maCk.isNotEmpty && selectedIds.contains(maCk));
+      
+      // ✅ discountKey dùng format "-" (vì DataLocal.listCKVT dùng format này)
+      String discountKey = '${sttRecCk}-${productCode}';
+      
+      print('💰 Processing CKG: ckgId=$ckgId, maCk=$maCk, sttRecCk=$sttRecCk, productCode=$productCode, shouldApply=$shouldApply');
+      
+      // ✅ Check if discountKey already exists (exact match in list)
+      List<String> ckvtList = DataLocal.listCKVT.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+      bool ckvtExists = ckvtList.contains(discountKey);
+      
+      // ✅ Check if sttRecCk already exists in listPromotion (exact match in list)
+      List<String> promoList = _bloc.listPromotion.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+      bool promoExists = promoList.contains(sttRecCk);
+      
+      // Find ALL products with this code (có thể có nhiều items cùng code)
+      for (int i = 0; i < _bloc.listOrder.length; i++) {
+        String cartProductCode = (_bloc.listOrder[i].code ?? '').trim();
+        String searchProductCode = productCode.trim();
+        
+        if (cartProductCode == searchProductCode && _bloc.listOrder[i].gifProduct != true) {
+          if (shouldApply) {
+            // ✅ ADD discount
+            if (!ckvtExists) {
+              // Add to List_ckvt
+              DataLocal.listCKVT = DataLocal.listCKVT.isEmpty 
+                ? discountKey 
+                : '${DataLocal.listCKVT},$discountKey';
+              ckvtExists = true; // Update flag
+              
+              // ✅ CRITICAL: Add to List_promo (backend needs this!)
+              if (!promoExists) {
+                _bloc.listPromotion = _bloc.listPromotion.isEmpty
+                  ? sttRecCk
+                  : '${_bloc.listPromotion},$sttRecCk';
+                promoExists = true; // Update flag
+              }
+            }
+            
+            // ✅ ALWAYS update product discount info (even if already in list)
+            // This ensures UI is updated immediately
+            final product = _bloc.listOrder[i];
+            
+            // ✅ Get original price (giá gốc) - ưu tiên giaSuaDoi, sau đó price, cuối cùng giaGoc từ CKG
+            double originalPrice = product.giaSuaDoi ?? 0;
+            if (originalPrice == 0) {
+              originalPrice = product.price ?? 0;
+            }
+            if (originalPrice == 0 && ckgItem.giaGoc != null && ckgItem.giaGoc! > 0) {
+              originalPrice = ckgItem.giaGoc!.toDouble();
+            }
+            
+            // ✅ Validate: Nếu originalPrice = 0, không thể apply discount
+            if (originalPrice == 0) {
+              print('💰 ⚠️ WARNING: originalPrice = 0 for product ${product.code}, cannot apply discount');
+              continue; // Skip this product
+            }
+            
+            // ✅ Calculate discount và priceAfter
+            final tlCk = (ckgItem.tlCk ?? 0).toDouble();
+            final ckValue = (ckgItem.ck ?? 0).toDouble();
+            final ckNtValue = (ckgItem.ckNt ?? 0).toDouble();
+            final giaSauCk = (ckgItem.giaSauCk ?? 0).toDouble();
+            final giaGoc = (ckgItem.giaGoc ?? originalPrice).toDouble();
+            double priceAfter = originalPrice;
+            double discountPercent = 0;
+
+            if (tlCk > 0) {
+              // Case 1: Trường hợp có tỉ lệ chiết khấu (%)
+              discountPercent = tlCk;
+              priceAfter = originalPrice - (originalPrice * discountPercent / 100);
+            } else if (giaSauCk > 0 && giaSauCk != giaGoc && giaGoc > 0) {
+              // Ưu tiên: Trường hợp có giá sau chiết khấu và khác giá gốc (có chiết khấu thực sự)
+              priceAfter = giaSauCk;
+              discountPercent = originalPrice > 0 ? ((originalPrice - priceAfter) / originalPrice) * 100 : 0;
+            } else if (ckValue > 0) {
+              // Case 2: Trường hợp có số tiền chiết khấu
+              double ckPerItem = ckValue;
+              
+              // Nếu ck > giaGoc, có thể là tổng chiết khấu cho nhiều sản phẩm
+              // Tìm số lượng sản phẩm trong giỏ hàng với cùng mã sản phẩm
+              if (ckValue > giaGoc && giaGoc > 0) {
+                double totalQuantity = 0;
+                for (var item in _bloc.listOrder) {
+                  if ((item.code ?? '').trim() == productCode.trim() && item.gifProduct != true) {
+                    totalQuantity += (item.count ?? 0);
+                  }
+                }
+                // Nếu tìm thấy số lượng, chia ck cho số lượng
+                if (totalQuantity > 0) {
+                  ckPerItem = ckValue / totalQuantity;
+                  print('💰 CKG: ck=$ckValue là tổng cho $totalQuantity sản phẩm, ckPerItem=$ckPerItem');
+                }
+              }
+              
+              // Áp dụng chiết khấu nếu hợp lý (ckPerItem <= originalPrice)
+              if (ckPerItem <= originalPrice && originalPrice > 0) {
+                priceAfter = originalPrice - ckPerItem;
+                discountPercent = (ckPerItem / originalPrice) * 100;
+              } else if (ckPerItem > originalPrice && originalPrice > 0) {
+                // Nếu ckPerItem vẫn > originalPrice, có thể là lỗi dữ liệu, nhưng vẫn tính để hiển thị
+                priceAfter = 0;
+                discountPercent = 100; // 100% discount
+                print('💰 ⚠️ WARNING: ckPerItem=$ckPerItem > originalPrice=$originalPrice, set priceAfter=0');
+              }
+            }
+            
+            if (priceAfter < 0) {
+              priceAfter = 0;
+            }
+
+            // ✅ Update product fields - ĐẢM BẢO UI HIỂN THỊ ĐÚNG
+            product.giaSuaDoi = originalPrice; // Giá gốc (để hiển thị với gạch ngang)
+            product.price = originalPrice; // Giá gốc
+            product.priceAfter = priceAfter; // Giá sau chiết khấu (hiển thị đậm)
+            product.priceAfter2 = priceAfter;
+            product.discountPercent = discountPercent; // Phần trăm chiết khấu (hiển thị -X%)
+            product.discountByHand = false;
+            product.discountPercentByHand = 0;
+            product.ckntByHand = 0;
+            product.ck = ckValue;
+            product.cknt = ckNtValue;
+            product.maCk = ckgItem.maCk;
+            product.maCkOld = ckgItem.maCk;
+            product.sttRecCK = ckgItem.sttRecCk;
+            product.typeCK = 'CKG';
+            product.maVtGoc = ckgItem.maVt;
+            product.sctGoc = ckgItem.sttRecCk;
+            
+            hasAdditions = true;
+            print('💰 ✅ Added CKG to product[$i]: code=${product.code}, originalPrice=$originalPrice, priceAfter=$priceAfter, discountPercent=$discountPercent%');
+          } else {
+            // ✅ UNCHECK: REMOVE discount
+            print('💰 UNCHECK: Removing discount for product ${productCode}');
+            
+            if (ckvtExists) {
+              // Remove from List_ckvt
+              ckvtList.removeWhere((item) => item.trim() == discountKey);
+              DataLocal.listCKVT = ckvtList.join(',');
+              ckvtExists = false; // Update flag
+              
+              // ✅ CRITICAL: Remove from List_promo (backend needs this!)
+              // Check if there are other CKG items with same sttRecCk before removing
+              bool hasOtherCkgWithSameStt = false;
+              for (var otherCkg in _bloc.listCkg) {
+                if (otherCkg.sttRecCk?.trim() == sttRecCk && otherCkg.maVt?.trim() != productCode) {
+                  String otherKey = '${sttRecCk}-${otherCkg.maVt?.trim()}';
+                  if (ckvtList.contains(otherKey)) {
+                    hasOtherCkgWithSameStt = true;
+                    break;
+                  }
+                }
+              }
+              
+              if (!hasOtherCkgWithSameStt && promoExists) {
+                promoList.removeWhere((item) => item.trim() == sttRecCk);
+                _bloc.listPromotion = promoList.join(',');
+              }
+              
+              hasRemovals = true;
+              print('💰 Removed CKG - listCKVT: $discountKey, listPromotion: ${_bloc.listPromotion}');
+            }
+            
+            // ✅ QUAN TRỌNG: LUÔN RESET discount cho product này khi UNCHECK (không cần check điều kiện thêm)
+            // Vì đã match productCode rồi, chỉ cần reset
+            print('💰 [${i}] Resetting ${productCode}: discountPercent=${_bloc.listOrder[i].discountPercent} → 0');
+            
+            // ✅ QUAN TRỌNG: Get original price (giá gốc) đúng cách
+            // Trong edit mode, element.price là giá gốc từ lineItem
+            // Trong add mode, element.giaSuaDoi là giá gốc (nếu chưa có chiết khấu)
+            double originalPrice = 0;
+            
+            // Check nếu đang ở edit mode (có maCk hoặc giaSuaDoi != price)
+            // ⚠️ CHÚ Ý: Phải check TRƯỚC KHI clear maCk, vì sau khi clear thì không còn maCk để check
+            bool isEditMode = (_bloc.listOrder[i].maCk != null && _bloc.listOrder[i].maCk.toString().trim().isNotEmpty) ||
+                             (_bloc.listOrder[i].giaSuaDoi != null && _bloc.listOrder[i].price != null && 
+                              _bloc.listOrder[i].giaSuaDoi! > 0 && _bloc.listOrder[i].price! > 0 && 
+                              _bloc.listOrder[i].giaSuaDoi != _bloc.listOrder[i].price);
+            
+            if (isEditMode) {
+              // EDIT MODE: Dùng price (giá gốc từ lineItem)
+              originalPrice = _bloc.listOrder[i].price ?? 0;
+              print('💰 [EDIT MODE] Using price as originalPrice: $originalPrice (giaSuaDoi=${_bloc.listOrder[i].giaSuaDoi} was priceAfter)');
+            } else {
+              // ADD MODE: Dùng giaSuaDoi (giá gốc)
+              originalPrice = _bloc.listOrder[i].giaSuaDoi ?? 0;
+              if (originalPrice == 0) {
+                originalPrice = _bloc.listOrder[i].price ?? 0;
+              }
+              print('💰 [ADD MODE] Using giaSuaDoi as originalPrice: $originalPrice');
+            }
+            
+            // Reset ALL discount fields
+            _bloc.listOrder[i].typeCK = '';
+            _bloc.listOrder[i].maCk = '';
+            _bloc.listOrder[i].sttRecCK = '';
+            _bloc.listOrder[i].maVtGoc = '';
+            _bloc.listOrder[i].sctGoc = '';
+            _bloc.listOrder[i].discountPercent = 0; // ✅ QUAN TRỌNG: Reset discountPercent về 0
+            _bloc.listOrder[i].discountPercentByHand = 0;
+            _bloc.listOrder[i].ckntByHand = 0;
+            _bloc.listOrder[i].ck = 0;
+            _bloc.listOrder[i].cknt = 0;
+            _bloc.listOrder[i].discountByHand = false;
+            
+            // ✅ Reset về giá gốc - ĐẢM BẢO UI HIỂN THỊ ĐÚNG
+            if (isEditMode) {
+              // EDIT MODE: Giữ nguyên price (giá gốc), set giaSuaDoi = price để đồng bộ
+              _bloc.listOrder[i].price = originalPrice; // Giá gốc từ lineItem
+              _bloc.listOrder[i].giaSuaDoi = originalPrice; // Set bằng price để đồng bộ
+              _bloc.listOrder[i].priceAfter = originalPrice; // Giá sau = giá gốc
+              _bloc.listOrder[i].priceAfter2 = originalPrice;
+              print('💰 [EDIT MODE] Reset: price=$originalPrice, giaSuaDoi=$originalPrice, priceAfter=$originalPrice');
+            } else {
+              // ADD MODE: Giữ nguyên logic cũ
+              _bloc.listOrder[i].giaSuaDoi = originalPrice; // Giá gốc
+              _bloc.listOrder[i].price = originalPrice; // Giá gốc
+              _bloc.listOrder[i].priceAfter = originalPrice; // Giá sau = giá gốc
+              _bloc.listOrder[i].priceAfter2 = originalPrice;
+            }
+            
+            DataLocal.listOrderCalculatorDiscount.removeWhere(
+              (element) => element.code.toString().trim() == productCode.toString().trim()
+            );
+            
+            hasRemovals = true; // Ensure hasRemovals is set
+            print('💰 [${i}] RESET DONE: originalPrice=$originalPrice, priceAfter=$originalPrice, discountPercent=0');
+          }
+        }
+      }
+    }
+    
+    // ✅ FORCE UI UPDATE NGAY
+    if (hasRemovals || hasAdditions) {
+      print('💰 Force UI rebuild - hasRemovals=$hasRemovals, hasAdditions=$hasAdditions');
+      
+      // ✅ CRITICAL: Sync listOrder → listProductOrderAndUpdate và database (đặc biệt quan trọng cho edit mode)
+      if (widget.viewUpdateOrder == true) {
+        print('💰 [EDIT MODE] Syncing discount changes to database...');
+        _syncListOrderToUI();
+      }
+      
+      // ✅ CRITICAL: Tính lại total LOCAL (không cần gọi backend vì backend không nhận discount info)
+      _recalculateTotalLocal();
+      
+      setState(() {});
+    }
+    
+    print('💰 Updated listCKVT: ${DataLocal.listCKVT}');
+    print('💰 Updated listPromotion: ${_bloc.listPromotion}');
+  }
+
+  // Apply all selected HH gifts
+  void _applyAllHH(Set<String> selectedIds) {
+    print('💰 Applying ${selectedIds.length} HH gifts - START totalProductGift=${_bloc.totalProductGift}');
+
+    int removedCount = 0;
+
+    // ✅ Remove all HH gifts first (prevent duplicate)
+    DataLocal.listProductGift.removeWhere((item) {
+      if (item.typeCK == 'HH') {
+        _bloc.totalProductGift -= item.count ?? 0;
+        removedCount++;
+        print('💰 Removed old HH gift: ${item.code} x${item.count}');
+        return true;
+      }
+      return false;
+    });
+
+    print('💰 Removed $removedCount old HH gifts');
+
+    // Rebuild listPromotion for HH
+    List<String> promoList = _bloc.listPromotion.split(',').where((s) => s.isNotEmpty).toList();
+
+    // Add selected HH gifts
+    int addedCount = 0;
+    for (var hhItem in _bloc.listHH) {
+      // ✅ FIX: Dùng unique ID (sttRecCk + tenVt) để match với selection
+      String hhId = '${hhItem.sttRecCk?.trim() ?? ''}_${hhItem.tenVt?.trim() ?? ''}';
+      String sttRecCk = hhItem.sttRecCk?.trim() ?? '';
+
+      if (selectedIds.contains(hhId)) {
+        // ✅ CRITICAL: Add to List_promo nếu chưa có
+        if (!promoList.contains(sttRecCk)) {
+          promoList.add(sttRecCk);
+        }
+        SearchItemResponseData gift = SearchItemResponseData(
+          code: hhItem.maVt?.trim() ?? '',
+          sttRec0: hhItem.sttRecCk?.trim() ?? '',
+          name: hhItem.tenVt ?? 'Quà tặng',
+          name2: hhItem.tenVt ?? 'Quà tặng',
+          dvt: hhItem.dvt ?? '',
+          count: hhItem.soLuong ?? 0,
+          priceAfter: 0,
+          price: 0,
+          giaSuaDoi: 0,
+          typeCK: 'HH',
+          discountPercent: 0,
+          gifProduct: true,
+          stockAmount: 0,
+          isMark: 1,
+        );
+
+        DataLocal.listProductGift.add(gift);
+        _bloc.totalProductGift += hhItem.soLuong ?? 0;
+        addedCount++;
+        print('💰 Added HH gift: ${hhItem.tenVt} x${hhItem.soLuong}');
+      } else {
+        // ✅ Remove from List_promo nếu không được chọn
+        promoList.removeWhere((item) => item.trim() == sttRecCk);
+      }
+    }
+
+    // ✅ Update listPromotion
+    _bloc.listPromotion = promoList.join(',');
+
+    print('💰 HH gifts complete - Added $addedCount items, END totalProductGift=${_bloc.totalProductGift}');
+    print('💰 Updated listPromotion: ${_bloc.listPromotion}');
+  }
+
+  // Apply all selected CKTDTT discounts (cộng dồn totalDiscountForOder)
+  void _applyAllCKTDTT(Set<String> selectedIds) {
+    // Reset totalDiscountForOder
+    _bloc.totalDiscountForOder = 0;
+
+    // Rebuild listPromotion for CKTDTT
+    List<String> promoList = _bloc.listPromotion.split(',').where((s) => s.isNotEmpty).toList();
+
+    for (var cktdttItem in _bloc.listCktdtt) {
+      String cktdttId = cktdttItem.sttRecCk?.trim() ?? '';
+      if (selectedIds.contains(cktdttId)) {
+        // ✅ Add to List_promo nếu chưa có
+        if (!promoList.contains(cktdttId)) {
+          promoList.add(cktdttId);
+        }
+        // ✅ Cộng dồn chiết khấu (tiền hoặc %)
+        // tlCkTt: tỷ lệ chiết khấu (%), tCkTt: tiền chiết khấu
+        if (cktdttItem.tlCkTt != null && cktdttItem.tlCkTt! > 0) {
+          // Tính % trên totalPayment
+          double discountAmount = (_bloc.totalPayment * (cktdttItem.tlCkTt ?? 0)) / 100;
+          _bloc.totalDiscountForOder += discountAmount;
+        } else if (cktdttItem.tCkTt != null && cktdttItem.tCkTt! > 0) {
+          // Tiền mặt
+          _bloc.totalDiscountForOder += cktdttItem.tCkTt ?? 0;
+        }
+      } else {
+        // ✅ Remove from List_promo nếu không được chọn
+        promoList.removeWhere((item) => item.trim() == cktdttId);
+      }
+    }
+
+    // ✅ Update listPromotion
+    _bloc.listPromotion = promoList.join(',');
+
+    print('💰 CKTDTT complete - totalDiscountForOder=${_bloc.totalDiscountForOder}');
+    print('💰 Updated listPromotion: ${_bloc.listPromotion}');
+
+    // Recalculate totals
+    _recalculateTotalLocal();
+  }
+
+  // Recalculate total payment locally (without API call)
+  void _recalculateTotalLocal() {
+    print('💰 === Recalculating Total Locally ===');
+    
+    double totalMoney = 0;
+    double totalDiscount = 0;
+    double totalTax = 0;
+    
+    // Loop through all products
+    for (var element in _bloc.listOrder) {
+      if (element.isMark == 1 && element.gifProduct != true) {
+        double originalPrice = element.giaSuaDoi ?? 0;
+        if (originalPrice == 0) {
+          originalPrice = element.price ?? 0;
+        }
+        double quantity = element.count ?? 0;
+        
+        // ✅ QUAN TRỌNG: Tính priceAfter - ưu tiên từ element.priceAfter, nếu không có thì tính từ discountPercent
+        // Điều này đảm bảo tính đúng cho mọi trường hợp và đồng bộ với UI
+        double priceAfter = element.priceAfter ?? 0;
+        double discountPercent = (element.discountPercentByHand ?? 0) > 0 
+          ? (element.discountPercentByHand ?? 0) 
+          : (element.discountPercent ?? 0);
+        
+        // Nếu priceAfter chưa được set hoặc bằng 0, tính từ discountPercent
+        if (priceAfter == 0 || priceAfter == originalPrice) {
+          if (discountPercent > 0 && originalPrice > 0) {
+            priceAfter = originalPrice - (originalPrice * discountPercent / 100);
+            if (priceAfter < 0) priceAfter = 0;
+          } else {
+            priceAfter = originalPrice;
+          }
+        }
+        
+        totalMoney += originalPrice * quantity;  // Original total
+        
+        // ✅ Calculate discount từ sự khác biệt giữa originalPrice và priceAfter
+        // Điều này đảm bảo tính đúng cho mọi trường hợp (tlCk, giaSauCk, ckValue)
+        if (priceAfter < originalPrice && originalPrice > 0) {
+          double lineDiscount = (originalPrice - priceAfter) * quantity;
+          totalDiscount += lineDiscount;
+        }
+        
+        // ✅ Calculate tax nếu có sử dụng thuế
+        if (Const.useTax == true && priceAfter > 0) {
+          double taxPercent = DataLocal.taxPercent;
+          double lineTax = ((priceAfter * quantity) * taxPercent) / 100;
+          totalTax += lineTax;
+          
+          // Update element.valuesTax để đảm bảo UI hiển thị đúng
+          element.valuesTax = lineTax / quantity; // Tax per unit
+        }
+
+         discountPercent = (element.discountPercentByHand ?? 0) > 0
+          ? (element.discountPercentByHand ?? 0)
+          : (element.discountPercent ?? 0);
+
+        print('💰 Product ${element.code}: qty=$quantity, originalPrice=$originalPrice, priceAfter=$priceAfter, discountPercent=$discountPercent%, lineDiscount=${priceAfter < originalPrice && originalPrice > 0 ? (originalPrice - priceAfter) * quantity : 0}, lineTax=${Const.useTax == true ? ((priceAfter * quantity) * DataLocal.taxPercent) / 100 : 0}');
+      }
+    }
+    
+    // ✅ Update BLoC state
+    _bloc.totalMoney = totalMoney;
+    _bloc.totalDiscount = totalDiscount;
+    
+    // ✅ Tính totalPayment = totalMoney - totalDiscount - totalDiscountForOder + totalTax
+    // totalMoney: Tổng tiền nguyên giá
+    // totalDiscount: Tổng chiết khấu sản phẩm (CKG, CKN, HH)
+    // totalDiscountForOder: Tổng chiết khấu tổng đơn (CKTDTT - Chiết khấu tổng đơn tặng tiền)
+    // totalTax: Tổng thuế (nếu có)
+    _bloc.totalPayment = totalMoney - totalDiscount - (_bloc.totalDiscountForOder ?? 0) + totalTax;
+    if (_bloc.totalPayment < 0) _bloc.totalPayment = 0;
+
+    print('💰 Recalculated totals:');
+    print('   - totalMoney: ${_bloc.totalMoney}');
+    print('   - totalDiscount: ${_bloc.totalDiscount}');
+    print('   - totalDiscountForOder: ${_bloc.totalDiscountForOder}');
+    print('   - totalTax: $totalTax');
+    print('   - totalPayment: ${_bloc.totalPayment}');
+
+    setState(() {});
+  }
+
+  // Handle CKN selection (when user clicks checkbox and needs to select gifts)
+  void _handleCKNSelection(Map<String, dynamic> result) async {
+    final String groupKey = result['groupKey'];
+    final List<ListCkMatHang> items = result['items'];
+    final double totalQuantity = result['totalQuantity'];
+
+    print('💰 CKN: User selected group $groupKey, need to select ${totalQuantity.toInt()} gifts from ${items.length} items');
+
+    // Store pending state
+    _pendingCknGroupKey = groupKey;
+    _pendingDiscountItems = items;
+    _pendingMaxQuantity = totalQuantity;
+    _pendingDiscountType = 'CKN';
+    _pendingDiscountName = items.isNotEmpty ? (items[0].tenVt ?? 'Chương trình CKN') : 'Chương trình CKN';
+
+    // Close bottom sheet first
+    Navigator.of(context).pop();
+
+    // Show gift product selection dialog
+    await _showGiftProductSelectionDialog();
+  }
+
+  // Handle CKTDTH selection
+  void _handleCKTDTHSelection(Map<String, dynamic> result) async {
+    final String groupKey = result['groupKey'];
+    final List<ListCkMatHang> items = result['items'];
+    final double totalQuantity = result['totalQuantity'];
+
+    print('💰 CKTDTH: User selected group $groupKey, need to select ${totalQuantity.toInt()} gifts from ${items.length} items');
+
+    _pendingCktdthGroupKey = groupKey;
+    _pendingDiscountItems = items;
+    _pendingMaxQuantity = totalQuantity;
+    _pendingDiscountType = 'CKTDTH';
+    _pendingDiscountName = items.isNotEmpty ? (items[0].tenVt ?? 'Chương trình CKTDTH') : 'Chương trình CKTDTH';
+
+    Navigator.of(context).pop();
+    await _showGiftProductSelectionDialog();
+  }
+
+  // Show gift product selection dialog
+  Future<void> _showGiftProductSelectionDialog() async {
+    if (_pendingDiscountItems == null || _pendingMaxQuantity == null) {
+      print('💰 ERROR: No pending discount items or quantity');
+      return;
+    }
+
+    // ✅ FIX: Use _bloc.listGiftProducts (already populated from API)
+    final result = await showDialog<Map<String, double>>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => CknGiftProductSelectionDialog(
+        giftProducts: _bloc.listGiftProducts,
+        discountName: _pendingDiscountName ?? 'Chương trình khuyến mại',
+        maxQuantity: _pendingMaxQuantity!,
+        initialSelections: {},
+      ),
+    );
+
+    if (result != null && result.isNotEmpty) {
+      print('💰 User selected ${result.length} gift products');
+
+      // Process selected products
+      _processSelectedGiftProducts(result);
+
+      // Add to selection set
+      if (_pendingDiscountType == 'CKN') {
+        _bloc.selectedCknGroups.add(_pendingCknGroupKey!);
+      } else if (_pendingDiscountType == 'CKTDTH') {
+        _bloc.selectedCktdthGroups.add(_pendingCktdthGroupKey!);
+      }
+
+      Utils.showCustomToast(
+        context,
+        Icons.check_circle_outline,
+        'Đã thêm ${result.length} quà tặng',
+      );
+
+      setState(() {});
+
+      // Clear pending state
+      _clearPendingDiscountState();
+    } else {
+      print('💰 User cancelled gift selection');
+      _clearPendingDiscountState();
+    }
+  }
+
+  // Process selected gift products (after user confirms selection)
+  void _processSelectedGiftProducts(Map<String, double> selectedQuantities) {
+    if (_pendingDiscountItems == null || _pendingDiscountItems!.isEmpty) {
+      print('💰 ERROR: No pending discount items');
+      return;
+    }
+
+    final discountItem = _pendingDiscountItems!.first;
+    
+    // Add all newly selected products
+    for (var entry in selectedQuantities.entries) {
+      final productCode = entry.key.trim();
+      final quantity = entry.value;
+
+      if (quantity <= 0) continue;
+
+      // Find product info from API result
+      final giftProduct = _bloc.listGiftProducts.firstWhere(
+        (item) => (item.maVt ?? '').trim() == productCode,
+        orElse: () => GiftProductItem(),
+      );
+
+      final productName = giftProduct.tenVt ?? 'Sản phẩm tặng';
+
+      print('💰 Adding gift: $productName x$quantity');
+
+      // Create gift product object
+      SearchItemResponseData gift = SearchItemResponseData(
+        code: productCode,
+        sttRec0: discountItem.sttRecCk?.trim() ?? '',
+        sttRecCK: discountItem.sttRecCk?.trim() ?? '',
+        maCk: discountItem.sttRecCk?.trim() ?? '',
+        name: productName,
+        name2: productName,
+        dvt: discountItem.dvt ?? '',
+        count: quantity,
+        priceAfter: 0,
+        price: 0,
+        giaSuaDoi: 0,
+        typeCK: _pendingDiscountType ?? 'CKN',
+        discountPercent: 0,
+        gifProduct: true,
+        stockAmount: 0,
+        isMark: 1,
+      );
+
+      DataLocal.listProductGift.add(gift);
+      _bloc.totalProductGift += quantity.toInt();
+    }
+
+    print('💰 Total gifts after adding: ${_bloc.totalProductGift}');
+  }
+
+  // Clear pending discount state
+  void _clearPendingDiscountState() {
+    _pendingDiscountName = null;
+    _pendingMaxQuantity = null;
+    _pendingDiscountItems = null;
+    _pendingDiscountType = null;
+    _pendingCknGroupKey = null;
+    _pendingCktdthGroupKey = null;
+  }
+
+  // Reload discounts from backend after applying CKG/CKTDTT
+  void _reloadDiscountsFromBackend() {
+    print('💰 Reloading discounts from backend...');
+    print('💰   - listCKVT: ${DataLocal.listCKVT}');
+    print('💰   - listPromotion: ${_bloc.listPromotion}');
+
+    // Call API to reload discounts
+    getDiscountProduct('Second');
+  }
+
+  // ========== DISCOUNT FLOW - END ==========
+
+  // ========== HANDLE IMMEDIATE SELECTION/REMOVAL (giống cart_screen) ==========
+
+  // Handle CKG selection (when user clicks checkbox - apply immediately)
+  void _handleCKGSelection(String ckgId, ListCk ckgItem) {
+    print('💰 ========== CKG SELECTION START ==========');
+    print('💰 CKG: User selecting discount for ckgId=$ckgId');
+    print('💰 CKG Item: sttRecCk=${ckgItem.sttRecCk}, maVt=${ckgItem.maVt}, maCk=${ckgItem.maCk}');
+    
+    // ✅ Parse ckgId: có thể là maCk hoặc format "sttRecCk_productCode"
+    String maCk = (ckgItem.maCk ?? '').trim();
+    String sttRecCk = ckgItem.sttRecCk?.trim() ?? '';
+    String productCode = ckgItem.maVt?.trim() ?? '';
+    
+    // Nếu ckgId là maCk, tìm tất cả CKG items cùng ma_ck
+    if (ckgId == maCk || (!ckgId.contains('_') && ckgId == sttRecCk)) {
+      // Apply cho tất cả items cùng ma_ck
+      _applyCKGByMaCk(maCk, shouldApply: true);
+    } else {
+      // Nếu ckgId là format "sttRecCk_productCode", apply cho item cụ thể
+      _applySingleCKG(ckgId, ckgItem, shouldApply: true);
+    }
+    
+    // Update BLoC state
+    _bloc.selectedCkgIds.add(ckgId);
+    print('💰 Updated selectedCkgIds: ${_bloc.selectedCkgIds}');
+    print('💰 ========== CKG SELECTION END ==========');
+  }
+
+  // Handle CKG removal (when user unchecks checkbox - remove immediately)
+  void _handleRemoveCKG(String ckgId, ListCk ckgItem) {
+    print('💰 CKG: User removing discount for ckgId=$ckgId');
+    
+    // ✅ Parse ckgId tương tự
+    String maCk = (ckgItem.maCk ?? '').trim();
+    String sttRecCk = ckgItem.sttRecCk?.trim() ?? '';
+    
+    // Nếu ckgId là maCk, remove cho tất cả items cùng ma_ck
+    if (ckgId == maCk || (!ckgId.contains('_') && ckgId == sttRecCk)) {
+      _applyCKGByMaCk(maCk, shouldApply: false);
+    } else {
+      _applySingleCKG(ckgId, ckgItem, shouldApply: false);
+    }
+    
+    // Update BLoC state
+    _bloc.selectedCkgIds.remove(ckgId);
+  }
+
+  // Handle CKTDTT selection (when user clicks checkbox - apply immediately)
+  void _handleCKTDTTSSelection(String cktdttId, ListCkTongDon cktdttItem) {
+    print('💰 ========== CKTDTT SELECTION START ==========');
+    print('💰 CKTDTT: User selecting discount for cktdttId=$cktdttId');
+    print('💰 CKTDTT Item: sttRecCk=${cktdttItem.sttRecCk}, maCk=${cktdttItem.maCk}');
+    
+    // Update BLoC state
+    _bloc.selectedCktdttIds.add(cktdttId);
+    print('💰 Updated selectedCktdttIds: ${_bloc.selectedCktdttIds}');
+    
+    // Apply CKTDTT discount immediately
+    _applySingleCKTDTT(cktdttId, cktdttItem, shouldApply: true);
+    
+    print('💰 ========== CKTDTT SELECTION END ==========');
+  }
+
+  // Handle CKTDTT removal (when user unchecks checkbox - remove immediately)
+  void _handleRemoveCKTDTTS(String cktdttId, ListCkTongDon cktdttItem) {
+    print('💰 CKTDTT: User removing discount for $cktdttId');
+    
+    // Update BLoC state
+    _bloc.selectedCktdttIds.remove(cktdttId);
+    
+    // Remove CKTDTT discount immediately
+    _applySingleCKTDTT(cktdttId, cktdttItem, shouldApply: false);
+  }
+
+  // Apply CKG discount cho tất cả items cùng ma_ck
+  void _applyCKGByMaCk(String maCk, {required bool shouldApply}) {
+    print('💰 ========== _applyCKGByMaCk START ==========');
+    print('💰 maCk=$maCk, shouldApply=$shouldApply');
+    
+    // Tìm tất cả CKG items có cùng ma_ck
+    List<ListCk> ckgItemsWithSameMaCk = _bloc.listCkg.where((ckg) => 
+      (ckg.maCk ?? '').trim() == maCk.trim()
+    ).toList();
+    
+    print('💰 Found ${ckgItemsWithSameMaCk.length} CKG items with maCk=$maCk');
+    
+    // Apply cho từng item
+    for (var ckgItem in ckgItemsWithSameMaCk) {
+      String sttRecCk = ckgItem.sttRecCk?.trim() ?? '';
+      String productCode = ckgItem.maVt?.trim() ?? '';
+      String ckgId = '${sttRecCk}_$productCode';
+      
+      print('💰 Applying CKG for product: $productCode (sttRecCk=$sttRecCk)');
+      _applySingleCKG(ckgId, ckgItem, shouldApply: shouldApply);
+    }
+    
+    print('💰 ========== _applyCKGByMaCk END ==========');
+  }
+
+  // Apply or remove a single CKG discount
+  void _applySingleCKG(String ckgId, ListCk ckgItem, {required bool shouldApply}) {
+    String sttRecCk = ckgItem.sttRecCk?.trim() ?? '';
+    String productCode = ckgItem.maVt?.trim() ?? '';
+    
+    // Parse ckgId nếu cần
+    if (ckgId.contains('_')) {
+      List<String> parts = ckgId.split('_');
+      if (parts.length >= 2) {
+        sttRecCk = parts[0].trim();
+        productCode = parts[1].trim();
+      }
+    }
+    
+    String discountKey = '${sttRecCk}-${productCode}';
+    
+    print('💰 _applySingleCKG: ckgId=$ckgId, sttRecCk=$sttRecCk, productCode=$productCode, shouldApply=$shouldApply');
+    
+    List<String> ckvtList = DataLocal.listCKVT.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+    bool ckvtExists = ckvtList.contains(discountKey);
+    
+    List<String> promoList = _bloc.listPromotion.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+    bool promoExists = promoList.contains(sttRecCk);
+    
+    bool hasChanges = false;
+    
+    for (int i = 0; i < _bloc.listOrder.length; i++) {
+      String cartProductCode = (_bloc.listOrder[i].code ?? '').trim();
+      
+      if (cartProductCode == productCode.trim() && _bloc.listOrder[i].gifProduct != true) {
+        if (shouldApply) {
+          // ADD discount
+          if (!ckvtExists) {
+            DataLocal.listCKVT = DataLocal.listCKVT.isEmpty ? discountKey : '${DataLocal.listCKVT},$discountKey';
+            ckvtExists = true;
+          }
+          if (!promoExists) {
+            _bloc.listPromotion = _bloc.listPromotion.isEmpty ? sttRecCk : '${_bloc.listPromotion},$sttRecCk';
+            promoExists = true;
+          }
+          
+          final product = _bloc.listOrder[i];
+          double originalPrice = product.giaSuaDoi ?? 0;
+          if (originalPrice == 0) originalPrice = product.price ?? 0;
+          if (originalPrice == 0 && ckgItem.giaGoc != null && ckgItem.giaGoc! > 0) {
+            originalPrice = ckgItem.giaGoc!.toDouble();
+          }
+          
+          if (originalPrice == 0) continue;
+          
+          // Calculate discount
+          final tlCk = (ckgItem.tlCk ?? 0).toDouble();
+          final ckValue = (ckgItem.ck ?? 0).toDouble();
+          final ckNtValue = (ckgItem.ckNt ?? 0).toDouble();
+          final giaSauCk = (ckgItem.giaSauCk ?? 0).toDouble();
+          final giaGoc = (ckgItem.giaGoc ?? originalPrice).toDouble();
+          double priceAfter = originalPrice;
+          double discountPercent = 0;
+
+          if (tlCk > 0) {
+            discountPercent = tlCk;
+            priceAfter = originalPrice - (originalPrice * discountPercent / 100);
+          } else if (giaSauCk > 0 && giaSauCk != giaGoc && giaGoc > 0) {
+            priceAfter = giaSauCk;
+            discountPercent = originalPrice > 0 ? ((originalPrice - priceAfter) / originalPrice) * 100 : 0;
+          } else if (ckValue > 0) {
+            double ckPerItem = ckValue;
+            if (ckValue > giaGoc && giaGoc > 0) {
+              double totalQuantity = 0;
+              for (var item in _bloc.listOrder) {
+                if ((item.code ?? '').trim() == productCode.trim() && item.gifProduct != true) {
+                  totalQuantity += (item.count ?? 0);
+                }
+              }
+              if (totalQuantity > 0) {
+                ckPerItem = ckValue / totalQuantity;
+              }
+            }
+            if (ckPerItem <= originalPrice && originalPrice > 0) {
+              priceAfter = originalPrice - ckPerItem;
+              discountPercent = (ckPerItem / originalPrice) * 100;
+            } else if (ckPerItem > originalPrice && originalPrice > 0) {
+              priceAfter = 0;
+              discountPercent = 100;
+            }
+          }
+          
+          if (priceAfter < 0) priceAfter = 0;
+
+          product.giaSuaDoi = originalPrice;
+          product.price = originalPrice;
+          product.priceAfter = priceAfter;
+          product.priceAfter2 = priceAfter;
+          product.discountPercent = discountPercent;
+          product.discountByHand = false;
+          product.discountPercentByHand = 0;
+          product.ckntByHand = 0;
+          product.ck = ckValue;
+          product.cknt = ckNtValue;
+          product.maCk = ckgItem.maCk;
+          product.maCkOld = ckgItem.maCk;
+          product.sttRecCK = ckgItem.sttRecCk;
+          product.typeCK = 'CKG';
+          product.maVtGoc = ckgItem.maVt;
+          product.sctGoc = ckgItem.sttRecCk;
+          
+          hasChanges = true;
+        } else {
+          // REMOVE discount
+          if (ckvtExists) {
+            ckvtList.removeWhere((item) => item.trim() == discountKey);
+            DataLocal.listCKVT = ckvtList.join(',');
+            ckvtExists = false;
+            
+            bool hasOtherCkgWithSameStt = false;
+            for (var otherCkg in _bloc.listCkg) {
+              if (otherCkg.sttRecCk?.trim() == sttRecCk && otherCkg.maVt?.trim() != productCode) {
+                String otherKey = '${sttRecCk}-${otherCkg.maVt?.trim()}';
+                if (ckvtList.contains(otherKey)) {
+                  hasOtherCkgWithSameStt = true;
+                  break;
+                }
+              }
+            }
+            if (!hasOtherCkgWithSameStt && promoExists) {
+              promoList.removeWhere((item) => item.trim() == sttRecCk);
+              _bloc.listPromotion = promoList.join(',');
+            }
+          }
+          
+          if ((_bloc.listOrder[i].sttRecCK == sttRecCk || 
+              (_bloc.listOrder[i].typeCK == 'CKG' && _bloc.listOrder[i].code == productCode))) {
+            double originalPrice = _bloc.listOrder[i].giaSuaDoi ?? 0;
+            if (originalPrice == 0) originalPrice = _bloc.listOrder[i].price ?? 0;
+            
+            _bloc.listOrder[i].typeCK = '';
+            _bloc.listOrder[i].maCk = '';
+            _bloc.listOrder[i].sttRecCK = '';
+            _bloc.listOrder[i].maVtGoc = '';
+            _bloc.listOrder[i].sctGoc = '';
+            _bloc.listOrder[i].discountPercent = 0;
+            _bloc.listOrder[i].discountPercentByHand = 0;
+            _bloc.listOrder[i].ckntByHand = 0;
+            _bloc.listOrder[i].ck = 0;
+            _bloc.listOrder[i].cknt = 0;
+            _bloc.listOrder[i].discountByHand = false;
+            _bloc.listOrder[i].giaSuaDoi = originalPrice;
+            _bloc.listOrder[i].price = originalPrice;
+            _bloc.listOrder[i].priceAfter = originalPrice;
+            _bloc.listOrder[i].priceAfter2 = originalPrice;
+            
+            hasChanges = true;
+          }
+        }
+      }
+    }
+    
+    if (hasChanges) {
+      _recalculateTotalLocal();
+      setState(() {});
+    }
+  }
+
+  // Apply or remove a single CKTDTT discount
+  void _applySingleCKTDTT(String cktdttId, ListCkTongDon cktdttItem, {required bool shouldApply}) {
+    String sttRecCk = (cktdttItem.sttRecCk ?? '').trim();
+    
+    List<String> promoList = _bloc.listPromotion.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+    bool promoExists = promoList.contains(sttRecCk);
+    
+    List<String> ckvtList = DataLocal.listCKVT.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+    bool ckvtExists = ckvtList.contains(sttRecCk);
+    
+    if (shouldApply) {
+      if (!promoExists) {
+        double currentDiscount = _bloc.totalDiscountForOder ?? 0;
+        double newDiscount = cktdttItem.tCkTtNt ?? 0;
+        _bloc.totalDiscountForOder = (currentDiscount + newDiscount);
+      }
+      
+      if (!promoExists) {
+        _bloc.listPromotion = _bloc.listPromotion.isEmpty ? sttRecCk : '${_bloc.listPromotion},$sttRecCk';
+      }
+      if (!ckvtExists) {
+        DataLocal.listCKVT = DataLocal.listCKVT.isEmpty ? sttRecCk : '${DataLocal.listCKVT},$sttRecCk';
+      }
+      
+      if (_bloc.codeDiscountTD.isEmpty) {
+        _bloc.codeDiscountTD = cktdttItem.maCk?.toString().trim() ?? '';
+      }
+      if (_bloc.sttRecCKOld.isEmpty) {
+        _bloc.sttRecCKOld = sttRecCk;
+      }
+    } else {
+      if (promoExists) {
+        promoList.removeWhere((item) => item.trim() == sttRecCk);
+        _bloc.listPromotion = promoList.join(',');
+      }
+      if (ckvtExists) {
+        ckvtList.removeWhere((item) => item.trim() == sttRecCk);
+        DataLocal.listCKVT = ckvtList.join(',');
+      }
+      
+      // Recalculate totalDiscountForOder
+      double totalDiscount = 0;
+      for (var item in _bloc.listCktdtt) {
+        String itemSttRecCk = (item.sttRecCk ?? '').trim();
+        if (itemSttRecCk.isNotEmpty && _bloc.selectedCktdttIds.contains(itemSttRecCk)) {
+          totalDiscount += (item.tCkTtNt ?? 0);
+        }
+      }
+      _bloc.totalDiscountForOder = totalDiscount;
+      
+      if (_bloc.selectedCktdttIds.isEmpty) {
+        _bloc.codeDiscountTD = '';
+        _bloc.sttRecCKOld = '';
+        _bloc.totalDiscountForOder = 0;
+      }
+    }
+    
+    _recalculateTotalLocal();
+    setState(() {});
+  }
+
+  // Handle HH selection (when user clicks checkbox - apply immediately)
+  void _handleHHSelection(String hhId, ListCk hhItem) {
+    print('💰 ========== HH SELECTION START ==========');
+    print('💰 HH: User selecting gift for hhId=$hhId');
+    print('💰 HH Item: sttRecCk=${hhItem.sttRecCk}, maVt=${hhItem.maVt}, tenVt=${hhItem.tenVt}');
+    
+    // Update BLoC state
+    _bloc.selectedHHIds.add(hhId);
+    print('💰 Updated selectedHHIds: ${_bloc.selectedHHIds}');
+    
+    // Apply HH gift immediately
+    Set<String> selectedIds = {hhId};
+    _applyAllHH(selectedIds);
+    
+    print('💰 ========== HH SELECTION END ==========');
+  }
+
+  // Handle HH removal (when user unchecks checkbox - remove immediately and reload API)
+  void _handleRemoveHH(String hhId, ListCk hhItem) {
+    print('💰 ========== HH REMOVAL START ==========');
+    print('💰 HH: User removing gift for hhId=$hhId');
+    
+    // Update BLoC state
+    _bloc.selectedHHIds.remove(hhId);
+    print('💰 Updated selectedHHIds: ${_bloc.selectedHHIds}');
+    
+    // Remove HH gift immediately
+    int removedCount = 0;
+    DataLocal.listProductGift.removeWhere((item) {
+      if (item.typeCK == 'HH') {
+        // ✅ Match bằng sttRec0 (sttRecCk) và code (maVt)
+        String itemSttRecCk = (item.sttRec0 ?? '').trim();
+        String itemCode = (item.code ?? '').trim();
+        String hhSttRecCk = (hhItem.sttRecCk ?? '').trim();
+        String hhMaVt = (hhItem.maVt ?? '').trim();
+        
+        if (itemSttRecCk == hhSttRecCk && itemCode == hhMaVt) {
+          _bloc.totalProductGift -= item.count ?? 0;
+          removedCount++;
+          print('💰 Removed HH gift: ${item.code} x${item.count}');
+          return true;
+        }
+      }
+      return false;
+    });
+    
+    // ✅ Remove from listPromotion
+    String sttRecCk = (hhItem.sttRecCk ?? '').trim();
+    if (sttRecCk.isNotEmpty) {
+      List<String> promoList = _bloc.listPromotion.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+      promoList.removeWhere((item) => item.trim() == sttRecCk);
+      _bloc.listPromotion = promoList.join(',');
+    }
+    
+    print('💰 Removed $removedCount HH gifts');
+    print('💰 Updated listPromotion: ${_bloc.listPromotion}');
+    
+    // ✅ CRITICAL: Gọi API reload để sync với backend khi bỏ chọn HH
+    // Vì HH có thể ảnh hưởng đến chiết khấu khác
+    if (removedCount > 0) {
+      print('💰 Calling API reload after removing HH gifts');
+      _reloadDiscountsFromBackend();
+    }
+    
+    setState(() {});
+    print('💰 ========== HH REMOVAL END ==========');
   }
 }

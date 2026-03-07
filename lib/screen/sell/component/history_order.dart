@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:persistent_bottom_nav_bar/persistent_bottom_nav_bar.dart';
@@ -36,6 +37,17 @@ class _HistoryOrderScreenState extends State<HistoryOrderScreen>  with TickerPro
   late TabController tabController;
   bool show = false;
   int _previousTabIndex = -1;
+  
+  // Search functionality
+  bool _isSearchMode = false;
+  final TextEditingController _searchController = TextEditingController();
+  Timer? _debounceTimer;
+  final FocusNode _searchFocusNode = FocusNode();
+  
+  // Animation controllers for search
+  late AnimationController _searchAnimationController;
+  late Animation<double> _searchAnimation;
+  late Animation<double> _bounceAnimation;
 
   @override
   void initState() {
@@ -49,6 +61,35 @@ class _HistoryOrderScreenState extends State<HistoryOrderScreen>  with TickerPro
     show = true;
     _scrollController = ScrollController();
     _pageController = PageController();
+    
+    // Initialize search animation controllers
+    _searchAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    
+    _searchAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _searchAnimationController,
+      curve: Curves.easeInOut,
+    ));
+    
+    _bounceAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _searchAnimationController,
+      curve: Curves.elasticOut,
+    ));
+    
+    // Add listener to search controller for suffix icon
+    _searchController.addListener(() {
+      if (mounted) {
+        setState(() {});
+      }
+    });
 
     // Listener để gọi API khi chuyển tab
     tabController.addListener(_onTabChanged);
@@ -79,7 +120,11 @@ class _HistoryOrderScreenState extends State<HistoryOrderScreen>  with TickerPro
             dateFrom: Const.dateFrom,
             dateTo: Const.dateTo,
             isLoadMore: true,
-            userId:  widget.userId, typeLetterId: 'ORDERLIST'
+            userId:  widget.userId, 
+            typeLetterId: 'ORDERLIST',
+            firstElement: _isSearchMode && _searchController.text.trim().isNotEmpty 
+                ? _searchController.text.trim() 
+                : null,
         ));
       }
     });
@@ -100,6 +145,9 @@ class _HistoryOrderScreenState extends State<HistoryOrderScreen>  with TickerPro
           dateTo: Const.dateTo,
           userId: widget.userId,
           typeLetterId: 'ORDERLIST',
+          firstElement: _isSearchMode && _searchController.text.trim().isNotEmpty 
+              ? _searchController.text.trim() 
+              : null,
         ));
       }
     }
@@ -111,7 +159,58 @@ class _HistoryOrderScreenState extends State<HistoryOrderScreen>  with TickerPro
     tabController.dispose();
     _scrollController.dispose();
     _pageController.dispose();
+    _searchController.dispose();
+    _searchFocusNode.dispose();
+    _debounceTimer?.cancel();
+    _searchAnimationController.dispose();
     super.dispose();
+  }
+  
+  void _onSearchChanged(String value) {
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(seconds: 1), () {
+      _performSearch(value);
+    });
+  }
+  
+  void _performSearch(String searchText) {
+    if (mounted) {
+      _bloc.list.clear();
+      _bloc.add(GetListHistoryOrder(
+        status: _bloc.statusOrderList,
+        dateFrom: Const.dateFrom,
+        dateTo: Const.dateTo,
+        userId: widget.userId,
+        typeLetterId: 'ORDERLIST',
+        firstElement: searchText.trim().isEmpty ? null : searchText.trim(),
+      ));
+    }
+  }
+  
+  void _toggleSearchMode() {
+    setState(() {
+      _isSearchMode = !_isSearchMode;
+      if (_isSearchMode) {
+        _searchAnimationController.forward();
+        // Focus vào search field khi mở
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _searchFocusNode.requestFocus();
+        });
+      } else {
+        _searchAnimationController.reverse();
+        // Clear search và reset khi đóng
+        _searchController.clear();
+        _debounceTimer?.cancel();
+        _bloc.list.clear();
+        _bloc.add(GetListHistoryOrder(
+          status: _bloc.statusOrderList,
+          dateFrom: Const.dateFrom,
+          dateTo: Const.dateTo,
+          userId: widget.userId,
+          typeLetterId: 'ORDERLIST',
+        ));
+      }
+    });
   }
 
   @override
@@ -135,12 +234,30 @@ class _HistoryOrderScreenState extends State<HistoryOrderScreen>  with TickerPro
           else if(state is ChangePageViewSuccess) {
             if (state.valueChange == 0) {
               _bloc.list.clear();
-              _bloc.add(GetListHistoryOrder(status: 0,dateFrom: Const.dateFrom, dateTo: Const.dateTo,userId:  widget.userId, typeLetterId: 'ORDERLIST'));
+              _bloc.add(GetListHistoryOrder(
+                status: 0,
+                dateFrom: Const.dateFrom, 
+                dateTo: Const.dateTo,
+                userId: widget.userId, 
+                typeLetterId: 'ORDERLIST',
+                firstElement: _isSearchMode && _searchController.text.trim().isNotEmpty 
+                    ? _searchController.text.trim() 
+                    : null,
+              ));
               _pageController.animateToPage(
                   0, duration: const Duration(milliseconds: 500), curve: Curves.ease);
             } else {
               _bloc.list.clear();
-              _bloc.add(GetListHistoryOrder(status: 2,dateFrom: Const.dateFrom, dateTo: Const.dateTo,userId:  widget.userId, typeLetterId: 'ORDERLIST'));
+              _bloc.add(GetListHistoryOrder(
+                status: 2,
+                dateFrom: Const.dateFrom, 
+                dateTo: Const.dateTo,
+                userId: widget.userId, 
+                typeLetterId: 'ORDERLIST',
+                firstElement: _isSearchMode && _searchController.text.trim().isNotEmpty 
+                    ? _searchController.text.trim() 
+                    : null,
+              ));
               _pageController.animateToPage(
                   1, duration: const Duration(milliseconds: 500), curve: Curves.ease);
             }
@@ -232,7 +349,16 @@ class _HistoryOrderScreenState extends State<HistoryOrderScreen>  with TickerPro
                 dateEstDelivery: listOrder[index].dateEstDelivery.toString(),
               ),withNavBar: false).then((value){
                 if(value == Const.REFRESH){
-                  _bloc.add(GetListHistoryOrder(status: i,dateFrom: Const.dateFrom, dateTo: Const.dateTo,userId:  widget.userId, typeLetterId: 'ORDERLIST'));
+                  _bloc.add(GetListHistoryOrder(
+                    status: i,
+                    dateFrom: Const.dateFrom, 
+                    dateTo: Const.dateTo,
+                    userId: widget.userId, 
+                    typeLetterId: 'ORDERLIST',
+                    firstElement: _isSearchMode && _searchController.text.trim().isNotEmpty 
+                        ? _searchController.text.trim() 
+                        : null,
+                  ));
                 }
               }),
               child: Card(
@@ -372,104 +498,244 @@ class _HistoryOrderScreenState extends State<HistoryOrderScreen>  with TickerPro
                   ),
                 ),
                 Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: const Align(
-                      alignment: Alignment.center,
-                      child: Text(
-                        "Lịch sử đơn hàng",
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 17,
-                          color: Colors.white,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
+                  child: AnimatedBuilder(
+                    animation: _searchAnimation,
+                    builder: (context, child) {
+                      return _isSearchMode
+                          ? Transform.scale(
+                              scale: _bounceAnimation.value,
+                              child: Opacity(
+                                opacity: _searchAnimation.value,
+                                child: Container(
+                                  height: 40,
+                                  margin: const EdgeInsets.symmetric(horizontal: 8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                      color: Colors.white.withOpacity(0.5),
+                                      width: 1.5,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.1),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: TextField(
+                                    controller: _searchController,
+                                    focusNode: _searchFocusNode,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                    ),
+                                    decoration: InputDecoration(
+                                      hintText: 'Tìm kiếm đơn hàng...',
+                                      hintStyle: TextStyle(
+                                        color: Colors.white.withOpacity(0.7),
+                                        fontSize: 16,
+                                      ),
+                                      prefixIcon: const Icon(
+                                        Icons.search,
+                                        color: Colors.white,
+                                        size: 20,
+                                      ),
+                                      suffixIcon: _searchController.text.isNotEmpty
+                                          ? IconButton(
+                                              icon: const Icon(
+                                                Icons.close,
+                                                color: Colors.white,
+                                                size: 18,
+                                              ),
+                                              onPressed: () {
+                                                _searchController.clear();
+                                                _onSearchChanged('');
+                                              },
+                                            )
+                                          : null,
+                                      border: InputBorder.none,
+                                      enabledBorder: InputBorder.none,
+                                      focusedBorder: InputBorder.none,
+                                      contentPadding: const EdgeInsets.only(top: 5.5),
+                                    ),
+                                    onChanged: _onSearchChanged,
+                                  ),
+                                ),
+                              ),
+                            )
+                          : Opacity(
+                              opacity: 1 - _searchAnimation.value,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                child: const Align(
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    "Lịch sử đơn hàng",
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 17,
+                                      color: Colors.white,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ),
+                            );
+                    },
                   ),
                 ),
-                InkWell(
-                  onTap: () => showDialog(
-                    context: context,
-                    builder: (context) => OptionsFilterDate(
-                      dateFrom: Const.dateFrom.toString(),
-                      dateTo: Const.dateTo.toString(),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    InkWell(
+                      onTap: _toggleSearchMode,
+                      child: SizedBox(
+                        width: 40,
+                        height: 40,
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 300),
+                          transitionBuilder: (Widget child, Animation<double> animation) {
+                            return ScaleTransition(
+                              scale: animation,
+                              child: FadeTransition(
+                                opacity: animation,
+                                child: child,
+                              ),
+                            );
+                          },
+                          child: Icon(
+                            _isSearchMode ? Icons.close_rounded : Icons.search_rounded,
+                            key: ValueKey(_isSearchMode ? 'close' : 'search'),
+                            size: 24,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
                     ),
-                  ).then((value) {
-                    if (value != 'CANCEL' && value != null) {
-                      Const.dateFrom = Utils.parseStringToDate(value[3], Const.DATE_SV_FORMAT);
-                      Const.dateTo = Utils.parseStringToDate(value[4], Const.DATE_SV_FORMAT);
-                      _bloc.add(GetListHistoryOrder(
-                        status: _bloc.statusOrderList,
-                        dateFrom: Const.dateFrom,
-                        dateTo: Const.dateTo,
-                        userId: widget.userId,
-                        typeLetterId: 'ORDERLIST',
-                      ));
-                    }
-                  }),
-                  child: const SizedBox(
-                    width: 40,
-                    height: 40,
-                    child: Icon(
-                      Icons.filter_list_rounded,
-                      size: 24,
-                      color: Colors.white,
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 300),
+                      switchInCurve: Curves.easeInOutCubic,
+                      switchOutCurve: Curves.easeInOutCubic,
+                      transitionBuilder: (Widget child, Animation<double> animation) {
+                        return ScaleTransition(
+                          scale: animation,
+                          child: FadeTransition(
+                            opacity: animation,
+                            child: child,
+                          ),
+                        );
+                      },
+                      child: !_isSearchMode
+                          ? InkWell(
+                              key: const ValueKey('filter'),
+                              onTap: () => showDialog(
+                                context: context,
+                                builder: (context) => OptionsFilterDate(
+                                  dateFrom: Const.dateFrom.toString(),
+                                  dateTo: Const.dateTo.toString(),
+                                ),
+                              ).then((value) {
+                                if (value != 'CANCEL' && value != null) {
+                                  Const.dateFrom = Utils.parseStringToDate(value[3], Const.DATE_SV_FORMAT);
+                                  Const.dateTo = Utils.parseStringToDate(value[4], Const.DATE_SV_FORMAT);
+                                  _bloc.add(GetListHistoryOrder(
+                                    status: _bloc.statusOrderList,
+                                    dateFrom: Const.dateFrom,
+                                    dateTo: Const.dateTo,
+                                    userId: widget.userId,
+                                    typeLetterId: 'ORDERLIST',
+                                    firstElement: _searchController.text.trim().isEmpty ? null : _searchController.text.trim(),
+                                  ));
+                                }
+                              }),
+                              child: const SizedBox(
+                                width: 40,
+                                height: 40,
+                                child: Icon(
+                                  Icons.filter_list_rounded,
+                                  size: 24,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            )
+                          : const SizedBox.shrink(key: ValueKey('empty')),
                     ),
-                  ),
+                  ],
                 ),
               ],
             ),
           ),
-          Visibility(
-            visible: show == true,
-            child: Container(
-              width: double.infinity,
-              margin: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: Colors.white.withOpacity(0.3),
-                  width: 1,
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 400),
+            switchInCurve: Curves.easeInOutCubic,
+            switchOutCurve: Curves.easeInOutCubic,
+            transitionBuilder: (Widget child, Animation<double> animation) {
+              return SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0, -0.3),
+                  end: Offset.zero,
+                ).animate(CurvedAnimation(
+                  parent: animation,
+                  curve: Curves.easeInOutCubic,
+                )),
+                child: FadeTransition(
+                  opacity: animation,
+                  child: child,
                 ),
-              ),
-              padding: const EdgeInsets.all(4),
-              child: TabBar(
-                controller: tabController,
-                indicator: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.08),
-                      offset: const Offset(0, 2),
-                      blurRadius: 4,
+              );
+            },
+            child: show == true && !_isSearchMode
+                ? Container(
+                    key: const ValueKey('tabbar'),
+                    width: double.infinity,
+                    margin: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.3),
+                        width: 1,
+                      ),
                     ),
-                  ],
-                ),
-                indicatorSize: TabBarIndicatorSize.tab,
-                indicatorPadding: const EdgeInsets.all(2),
-                dividerColor: Colors.transparent,
-                labelColor: subColor,
-                unselectedLabelColor: Colors.white,
-                labelPadding: EdgeInsets.zero,
-                isScrollable: DataLocal.listStatusToOrder.length > 6,
-                tabAlignment: DataLocal.listStatusToOrder.length <= 6
-                    ? TabAlignment.fill 
-                    : TabAlignment.start,
-                tabs: List<Widget>.generate(
-                  DataLocal.listStatusToOrder.length,
-                  (int index) {
-                    return _buildVerticalTab(
-                      DataLocal.listStatusToOrder[index],
-                      index,
-                    );
-                  },
-                ),
-              ),
-            ),
+                    padding: const EdgeInsets.all(4),
+                    child: TabBar(
+                      controller: tabController,
+                      indicator: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.08),
+                            offset: const Offset(0, 2),
+                            blurRadius: 4,
+                          ),
+                        ],
+                      ),
+                      indicatorSize: TabBarIndicatorSize.tab,
+                      indicatorPadding: const EdgeInsets.all(2),
+                      dividerColor: Colors.transparent,
+                      labelColor: subColor,
+                      unselectedLabelColor: Colors.white,
+                      labelPadding: EdgeInsets.zero,
+                      isScrollable: DataLocal.listStatusToOrder.length > 6,
+                      tabAlignment: DataLocal.listStatusToOrder.length <= 6
+                          ? TabAlignment.fill 
+                          : TabAlignment.start,
+                      tabs: List<Widget>.generate(
+                        DataLocal.listStatusToOrder.length,
+                        (int index) {
+                          return _buildVerticalTab(
+                            DataLocal.listStatusToOrder[index],
+                            index,
+                          );
+                        },
+                      ),
+                    ),
+                  )
+                : const SizedBox.shrink(key: ValueKey('tabbar_empty')),
           ),
         ],
       ),

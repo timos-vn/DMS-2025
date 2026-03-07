@@ -128,9 +128,10 @@ class GetListHistoryOrder extends SellEvent {
   final DateTime dateTo;
   final String userId;
   final String typeLetterId;
+  final String? firstElement;
 
   GetListHistoryOrder({this.isRefresh = false, this.isLoadMore = false,required this.status,
-    required this.dateFrom,required this.dateTo, required this.userId, required this.typeLetterId});
+    required this.dateFrom,required this.dateTo, required this.userId, required this.typeLetterId, this.firstElement});
 
   @override
   String toString() => 'GetListHistoryOrder {}';
