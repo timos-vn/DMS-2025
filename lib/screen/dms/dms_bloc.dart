@@ -462,7 +462,8 @@ class DMSBloc extends Bloc<DMSEvent,DMSState>{
           "MST": event.mst.toString(),
           "Desc": event.desc.toString(),
           "IdCommune": event.idCommune.toString(),
-          "IdState":event.idState
+          "IdState":event.idState,
+          "nhom_gia": event.nhomGia
         }
     );
     if(listFileInvoice.isNotEmpty){
@@ -501,7 +502,8 @@ class DMSBloc extends Bloc<DMSEvent,DMSState>{
           "MST": event.mst,
           "Desc": event.desc,
           "IdCommune": event.idCommune,
-          "IdState":event.idState
+          "IdState":event.idState,
+          "nhom_gia": event.nhomGia
         }
     );
     if(listFileInvoice.isNotEmpty){

@@ -160,13 +160,15 @@ class UpdateRequestOpenStoreEvent extends DMSEvent {
   final String idTypeStore;
   final String idStoreForm;
   final String idState;
+  final String? nhomGia;
 
   UpdateRequestOpenStoreEvent({ required this.idRequestOpenStore,
     required this.nameCustomer,required  this.phoneCustomer,required  this.nameStore,required  this.address,
     required  this.idTour,required  this.email, required this.birthDay,
     required  this.note, this.mst,this.desc,this.phoneStore,
     required this.idCommune,required this.idProvince,required this.idDistrict,this.gps,required this.idArea,
-    required this.idTypeStore,required this.idStoreForm,required this.idState
+    required this.idTypeStore,required this.idStoreForm,required this.idState,
+    this.nhomGia
 });
 
   @override
@@ -196,13 +198,15 @@ class AddNewRequestOpenStoreEvent extends DMSEvent {
   final String idTypeStore;
   final String idStoreForm;
   final String idState;
+  final String? nhomGia;
 
   AddNewRequestOpenStoreEvent({
     required this.nameCustomer,required  this.phoneCustomer,required  this.nameStore,required  this.address,
     required  this.idTour,required  this.email, required this.birthDay,
     required  this.note, this.mst,this.desc,this.phoneStore,
     required this.idCommune,required this.idProvince,required this.idDistrict,this.gps,required this.idArea,
-    required this.idTypeStore,required this.idStoreForm,required this.idState
+    required this.idTypeStore,required this.idStoreForm,required this.idState,
+    this.nhomGia
   });
 
   @override

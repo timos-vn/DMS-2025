@@ -76,6 +76,8 @@ class DetailRequestOpenStore {
   String? ngaySinh;
   String? idState;
   String? nameState;
+  String? nhomGia;
+  String? nhomGiaTen;
 
   DetailRequestOpenStore(
       {this.maNvbh,
@@ -118,7 +120,7 @@ class DetailRequestOpenStore {
         this.tenHinhThuc,
         this.hinhThucYn,
         this.latlong,
-        this.fax,this.ngaySinh, this.idState, this.nameState});
+        this.fax,this.ngaySinh, this.idState, this.nameState, this.nhomGia, this.nhomGiaTen});
 
   DetailRequestOpenStore.fromJson(Map<String, dynamic> json) {
     maNvbh = json['ma_nvbh'];
@@ -163,6 +165,7 @@ class DetailRequestOpenStore {
     latlong = json['latlong'];
     fax = json['fax']; ngaySinh = json['ngay_sinh'];
     nameState = json['ten_tinh_trang']; idState = json['ma_tinh_trang'];
+    nhomGia = json['nhom_gia']; nhomGiaTen = json['nhom_gia_ten'];
   }
 
   Map<String, dynamic> toJson() {
@@ -209,6 +212,7 @@ class DetailRequestOpenStore {
     data['latlong'] = latlong;
     data['fax'] = fax; data['ngay_sinh'] = ngaySinh;
     data['ten_tinh_trang'] = nameState; data['ma_tinh_trang'] = idState;
+    data['nhom_gia'] = nhomGia; data['nhom_gia_ten'] = nhomGiaTen;
     return data;
   }
 }

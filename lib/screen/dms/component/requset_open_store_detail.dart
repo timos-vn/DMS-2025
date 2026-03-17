@@ -5,6 +5,8 @@ import 'dart:io';
 
 import 'package:dms/utils/const.dart';
 import 'package:dms/widget/custom_camera.dart';
+import 'package:dms/model/database/data_local.dart';
+import 'package:dms/screen/menu/component/option_report_filter.dart';
 import 'package:dms/widget/custom_question.dart';
 import 'package:dms/widget/pending_action.dart';
 import 'package:dms/widget/text_field_widget2.dart';
@@ -60,6 +62,9 @@ class _RequestOpenStoreDetailScreenState extends State<RequestOpenStoreDetailScr
 
   final _nameTourController = TextEditingController();
   final FocusNode _nameTourFocus = FocusNode();
+
+  final _priceGroupController = TextEditingController();
+  String _priceGroupCode = '';
 
   final _emailController = TextEditingController();
   final FocusNode _emailFocus = FocusNode();
@@ -179,7 +184,8 @@ class _RequestOpenStoreDetailScreenState extends State<RequestOpenStoreDetailScr
               idTypeStore:idTypeStore,
               idStoreForm:idStoreForm,
               birthDay: _birthDayController.text,
-              idState: idState
+              idState: idState,
+              nhomGia: _priceGroupCode
             ));
           }else{
             Utils.showCustomToast(context, Icons.warning_amber_outlined, 'Úi, Vui lòng nhập đầy đủ nội dung');
@@ -226,6 +232,8 @@ class _RequestOpenStoreDetailScreenState extends State<RequestOpenStoreDetailScr
           idTypeStore = _bloc.detailRequestOpenStore.phanLoai.toString();
           _storeFormController.text  = _bloc.detailRequestOpenStore.tenHinhThuc.toString();
           idStoreForm = _bloc.detailRequestOpenStore.hinhThuc.toString();
+          _priceGroupController.text = _bloc.detailRequestOpenStore.nhomGiaTen?.toString() ?? '';
+          _priceGroupCode = _bloc.detailRequestOpenStore.nhomGia?.toString() ?? '';
            _birthDayController.text = _bloc.detailRequestOpenStore.ngaySinh.toString().isNotEmpty ? Utils.parseDateTToString(_bloc.detailRequestOpenStore.ngaySinh.toString(), Const.DATE_TIME_FORMAT) : '' ;
            idState = _bloc.detailRequestOpenStore.idState.toString();
           _nameStateController.text = _bloc.detailRequestOpenStore.nameState.toString();
@@ -521,6 +529,31 @@ class _RequestOpenStoreDetailScreenState extends State<RequestOpenStoreDetailScr
                     child: inputWidget(title: "Chọn Tour/Tuyến",hideText: 'Vui lòng chọn Tour',controller: _nameTourController,focusNode: _nameTourFocus,
                       textInputAction: TextInputAction.done, onTapSuffix: (){},note: true,isEnable: false,iconPrefix: Icons.search_outlined,isNull: true,colors:  Colors.grey,
                       onSubmitted: ()=>null,)
+                ),
+                Visibility(
+                  visible: DataLocal.hotIdName.toLowerCase() == 'namdung',
+                  child: InkWell(
+                    onTap: (){
+                      FocusScope.of(context).unfocus();
+                      showDialog(
+                        context: context,
+                        builder: (context) => const OptionReportFilter(
+                          controller: 'dmnhkh2_lookup',
+                          listItem: '',
+                          show: false,
+                        ),
+                      ).then((value){
+                        if (value is List && value.length >= 2) {
+                          _priceGroupCode = value[0].toString().trim();
+                          _priceGroupController.text = value[1].toString().trim();
+                        }
+                        setState(() {});
+                      });
+                    },
+                    child: inputWidget(title: "Nhóm giá",hideText: 'Chọn nhóm giá',controller: _priceGroupController,focusNode: _nameTourFocus,
+                      textInputAction: TextInputAction.done, onTapSuffix: (){},note: false,isEnable: false,iconPrefix: Icons.search_outlined,isNull: true,colors:  Colors.grey,
+                      onSubmitted: ()=>null,)
+                  ),
                 ),
                 Visibility(
                   visible: Const.chooseStateWhenCreateNewOpenStore == true,

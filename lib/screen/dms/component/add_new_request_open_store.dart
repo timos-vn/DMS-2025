@@ -7,6 +7,8 @@ import 'package:dms/widget/custom_camera.dart';
 import 'package:dms/widget/pending_action.dart';
 
 import 'package:flutter/material.dart';
+import 'package:dms/screen/menu/component/option_report_filter.dart';
+import 'package:dms/model/database/data_local.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
@@ -55,6 +57,9 @@ class _AddNewRequestOpenStoreScreenState extends State<AddNewRequestOpenStoreScr
   final _nameTourController = TextEditingController();
   final _nameStateController = TextEditingController();
   final _emailController = TextEditingController();
+  final _priceGroupController = TextEditingController();
+  String _priceGroupCode = '';
+
   final FocusNode _emailFocus = FocusNode();
   final _mstController = TextEditingController();
   final FocusNode _mstFocus = FocusNode();
@@ -122,6 +127,7 @@ class _AddNewRequestOpenStoreScreenState extends State<AddNewRequestOpenStoreScr
     _nameTourController.dispose();
     _nameStateController.dispose();
     _emailController.dispose();
+    _priceGroupController.dispose();
     _emailFocus.dispose();
     _mstController.dispose();
     _mstFocus.dispose();
@@ -375,7 +381,8 @@ class _AddNewRequestOpenStoreScreenState extends State<AddNewRequestOpenStoreScr
             idTypeStore: idTypeStore,
             idStoreForm: idStoreForm,
             birthDay: _birthDayController.text,
-            idState: idState));
+            idState: idState,
+            nhomGia: _priceGroupCode));
       } else {
         _bloc.add(AddNewRequestOpenStoreEvent(
           nameCustomer: _nameCustomerController.text,
@@ -397,6 +404,7 @@ class _AddNewRequestOpenStoreScreenState extends State<AddNewRequestOpenStoreScr
           idStoreForm: idStoreForm,
           birthDay: _birthDayController.text,
           idState: idState,
+          nhomGia: _priceGroupCode,
         ));
       }
     } else {
@@ -453,6 +461,8 @@ class _AddNewRequestOpenStoreScreenState extends State<AddNewRequestOpenStoreScr
               idTypeStore = _bloc.detailRequestOpenStore.phanLoai.toString();
               _storeFormController.text = _bloc.detailRequestOpenStore.tenHinhThuc.toString();
               idStoreForm = _bloc.detailRequestOpenStore.hinhThuc.toString();
+              _priceGroupController.text = _bloc.detailRequestOpenStore.nhomGiaTen?.toString() ?? '';
+              _priceGroupCode = _bloc.detailRequestOpenStore.nhomGia?.toString() ?? '';
               _birthDayController.text = _bloc.detailRequestOpenStore.ngaySinh.toString().isNotEmpty
                   ? Utils.parseDateTToString(_bloc.detailRequestOpenStore.ngaySinh.toString(), Const.DATE_TIME_FORMAT)
                   : '';
@@ -990,6 +1000,13 @@ class _AddNewRequestOpenStoreScreenState extends State<AddNewRequestOpenStoreScr
           onTap: () => _selectTour(),
           isRequired: true,
         ),
+        if (DataLocal.hotIdName.toString().contains('namdung'))
+          _buildSelectionField(
+            title: "Nhóm giá",
+            hint: 'Chọn nhóm giá',
+            controller: _priceGroupController,
+            onTap: () => _selectPriceGroup(),
+          ),
         if (Const.chooseStateWhenCreateNewOpenStore == true)
           _buildSelectionField(
             title: "Trạng thái",
@@ -1832,6 +1849,26 @@ class _AddNewRequestOpenStoreScreenState extends State<AddNewRequestOpenStoreScr
           idTour = value[1].toString().trim();
           _nameTourController.text = value[2].toString().trim();
           // Clear cache để update progress indicator
+          _clearStepCompletionCache();
+        });
+      }
+    });
+  }
+
+  void _selectPriceGroup() {
+    FocusScope.of(context).unfocus();
+    showDialog(
+      context: context,
+      builder: (context) => const OptionReportFilter(
+        controller: 'dmnhkh2_lookup',
+        listItem: '',
+        show: false,
+      ),
+    ).then((value) {
+      if (value is List && value.length >= 2) {
+        setState(() {
+          _priceGroupCode = value[0].toString().trim();
+          _priceGroupController.text = value[1].toString().trim();
           _clearStepCompletionCache();
         });
       }
